@@ -56,13 +56,28 @@ def min_jerk(start, goal, dur, freq=100):
         # ------------------------------------------------------
         # Place your code here
         # ------------------------------------------------------
-        #t = 
+        t = i / float(freq)
+        s = t / dur
+        
+        dist = goal - start
+        
+        # x(t) = x0 + dist * (10s^3 - 15s^4 + 6s^5)
+        pos = start + dist * (10*s**3 - 15*s**4 + 6*s**5)
+        X.append(pos)
+        
+        # dx/dt = (dist/dur) * (30s^2 - 60s^3 + 30s^4)
+        vel = (dist / dur) * (30*s**2 - 60*s**3 + 30*s**4)
+        Xd.append(vel)
+        
+        # d2x/dt2 = (dist/dur^2) * (60s - 180s^2 + 120s^3)
+        acc = (dist / (dur**2)) * (60*s - 180*s**2 + 120*s**3)
+        Xdd.append(acc)
+        
+        # d3x/dt3 = (dist/dur^3) * (60 - 360s + 360s^2)
+        jerk = (dist / (dur**3)) * (60 - 360*s + 360*s**2)
+        Xddd.append(jerk)
 
         time.append(t)
-        #X.append( )
-        #Xd.append( )
-        #Xdd.append( )
-        #Xddd.append( )
         # ------------------------------------------------------
 
     return time, np.array(X), np.array(Xd), np.array(Xdd), np.array(Xddd)

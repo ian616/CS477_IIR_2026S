@@ -197,15 +197,18 @@ def astar_planning(start, goal, actions, resolution, grid_limits,
         # ADD YOUR CODE
         #------------------------------------------------------------
         # Select the minimum value node as the current node (index)
-        #cur_idx  = min(openset, key=lambda o: ....) 
-        #cur_node = ...
-
+        cur_idx  = min(openset, key=lambda o: openset[o].cost + openset[o].h)
+        cur_node = openset[cur_idx]
         
         #------------------------------------------------------------
 
         # When found the goal index
         if cur_idx == goal_node.idx :
             print("goal found! {}, {}".format(cur_idx, cur_node.prev_idx))
+
+            explored_coords = [node.pos.tolist() for node in closedset.values()]
+            print(f"Explored nodes: {explored_coords}")
+            print(f"Size of the list: {len(closedset)}")
             goal_node.prev_idx = cur_node.prev_idx
             goal_node.cost = cur_node.cost
             goal_node.h    = cur_node.h
@@ -222,17 +225,26 @@ def astar_planning(start, goal, actions, resolution, grid_limits,
 
         # expand nodes based on available actions
         for i, action in enumerate(actions): 
-            next_pos = cur_node.pos+action
+            next_pos = cur_node.pos + np.array(action)
+            next_idx = get_grid_index(next_pos, resolution, grid_limits, grid_dim)
 
-            # ...
+            if next_idx in closedset:
+                continue
 
+            if not is_valid(next_pos, grid_limits, obstacle_tree, robot_size):
+                continue
 
-
-
-
-
-
+            step_cost = np.linalg.norm(action)
+            next_cost = cur_node.cost + step_cost
+            next_h = np.linalg.norm(next_pos - np.array(goal))
             
+            next_node = Node(next_pos, next_idx, next_cost, next_h, cur_idx)
+
+            if next_idx in openset:
+                if openset[next_idx].cost > next_cost:
+                    openset[next_idx] = next_node
+            else:
+                openset[next_idx] = next_node
             
         #------------------------------------------------------------
 
@@ -242,14 +254,14 @@ def astar_planning(start, goal, actions, resolution, grid_limits,
     # ADD YOUR CODE
     #------------------------------------------------------------
     # From the goal node, iterative find the previous node 
-    # ...
+    prev_idx = goal_node.prev_idx
     
-    #while prev_idx != start_node.idx:
-    #   ...    
-
+    while prev_idx != start_node.idx:
+        prev_node = closedset[prev_idx]
+        path.append(prev_node.pos)
+        prev_idx = prev_node.prev_idx
+        
+    path.append(start_node.pos)
     
     #------------------------------------------------------------
     return path[::-1]
-
-                
-

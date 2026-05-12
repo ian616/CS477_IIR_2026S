@@ -34,7 +34,7 @@ def package_files(data_files, directory_list):
 setup(
     name=package_name,
     version='0.0.1',
-    packages=[package_name],
+    packages=[package_name, package_name + '.custom'],
     data_files=package_files(data_files, ['data/models/', 'launch/', 'data/worlds/', 'config']),
     install_requires=[
         'setuptools',
@@ -62,7 +62,9 @@ setup(
             'get_joint    = manip_challenge.get_joint:main',            
             'get_pose     = manip_challenge.get_pose:main',            
             'move_gripper = manip_challenge.move_gripper:main',
-            'move_joint   = manip_challenge.move_joint:main',            
+            'move_joint   = manip_challenge.move_joint:main',
+            'perception   = manip_challenge.custom.perception:main',
+            'main         = manip_challenge.custom.main:main',
             ],
     },
 )

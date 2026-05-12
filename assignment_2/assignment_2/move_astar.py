@@ -117,13 +117,22 @@ def test(arm):
         # Place your code here
         # ------------------------------------------------------
         # position
-        #p.position.x = ...
-        #p.position.y = ...
-        #p.position.z = ...
+        p.position.x = float(pos[0])
+        p.position.y = float(pos[1])
+        p.position.z = float(pos[2])
         
         # orientation (You can use the SLERP function in quaternion.py)
-        #p.orientation = ...
+        progress = i / (len(pos_traj) - 1) if len(pos_traj) > 1 else 0.0
         
+        q_start = [start_pose.orientation.x, start_pose.orientation.y, start_pose.orientation.z, start_pose.orientation.w]
+        q_goal = [goal_pose.orientation.x, goal_pose.orientation.y, goal_pose.orientation.z, goal_pose.orientation.w]
+        
+        q_interp = quaternion.slerp(q_start, q_goal, progress)
+        
+        p.orientation.x = q_interp[0]
+        p.orientation.y = q_interp[1]
+        p.orientation.z = q_interp[2]
+        p.orientation.w = q_interp[3]
         # ------------------------------------------------------
         pose_traj.append(p)
     
