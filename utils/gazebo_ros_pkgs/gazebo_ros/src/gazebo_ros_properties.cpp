@@ -32,6 +32,7 @@
 #include <gazebo_msgs/srv/set_physics_properties.hpp>
 #include <gazebo_ros/conversions/geometry_msgs.hpp>
 #include <gazebo_ros/node.hpp>
+#include <gazebo_msgs/srv/set_model_configuration.hpp>
 
 #include <memory>
 
@@ -92,6 +93,10 @@ public:
     gazebo_msgs::srv::SetLightProperties::Request::SharedPtr _req,
     gazebo_msgs::srv::SetLightProperties::Response::SharedPtr _res);
 
+  void SetModelConfiguration(
+    gazebo_msgs::srv::SetModelConfiguration::Request::SharedPtr _req,
+    gazebo_msgs::srv::SetModelConfiguration::Response::SharedPtr _res);
+  
   /// \brief World pointer from Gazebo.
   gazebo::physics::WorldPtr world_;
 
@@ -119,6 +124,10 @@ public:
   /// \brief ROS service to handle requests to set light properties.
   rclcpp::Service<gazebo_msgs::srv::SetLightProperties>::SharedPtr set_light_properties_service_;
 
+  /// \brief ROS service to handle requests for set model configuration.
+  rclcpp::Service<gazebo_msgs::srv::SetModelConfiguration>::SharedPtr set_model_configuration_service_;
+
+  
   /// Gazebo node for communication.
   gazebo::transport::NodePtr gz_node_;
 
@@ -188,6 +197,12 @@ void GazeboRosProperties::Load(gazebo::physics::WorldPtr _world, sdf::ElementPtr
   impl_->gz_node_->Init(_world->Name());
   impl_->gz_properties_light_pub_ =
     impl_->gz_node_->Advertise<gazebo::msgs::Light>("~/light/modify");
+
+  impl_->set_model_configuration_service_ = 
+    impl_->ros_node_->create_service<gazebo_msgs::srv::SetModelConfiguration>(
+    "set_model_configuration", std::bind(
+    &GazeboRosPropertiesPrivate::SetModelConfiguration, impl_.get(),
+    std::placeholders::_1, std::placeholders::_2));
 }
 
 void GazeboRosPropertiesPrivate::GetModelProperties(
@@ -464,6 +479,52 @@ void GazeboRosPropertiesPrivate::SetLightProperties(
   }
 }
 
+void GazeboRosPropertiesPrivate::SetModelConfiguration(
+    gazebo_msgs::srv::SetModelConfiguration::Request::SharedPtr _req,
+    gazebo_msgs::srv::SetModelConfiguration::Response::SharedPtr _res) 
+{
+  gazebo::physics::ModelPtr gazebo_model = world_->ModelByName(_req->model_name);
+
+  if(!gazebo_model)
+  {
+    RCLCPP_ERROR(
+      ros_node_->get_logger(), "SetModelConfiguration: model [%s] does not exist",
+      _req->model_name.c_str());
+    _res->success = false;
+    _res->status_message = "SetModelConfiguration: model does not exist";
+    return;
+  }    
+  if (_req->joint_names.size() == _req->joint_positions.size())
+  {
+    std::map<std::string, double> joint_position_map;
+
+    for (unsigned int i = 0; i < _req->joint_names.size(); i++)
+    {
+      joint_position_map[_req->joint_names[i]] = _req->joint_positions[i];
+    }
+
+    // make the service call to pause gazebo
+    bool is_paused = world_->IsPaused();
+    if (!is_paused) world_->SetPaused(true);
+
+    gazebo_model->SetJointPositions(joint_position_map);
+
+    // resume paused state before this call
+    world_->SetPaused(is_paused);
+
+    _res->success = true;
+    _res->status_message = "SetModelConfiguration: success";
+    return;
+  }
+  else
+  {
+    _res->success = false;
+    _res->status_message = "SetModelConfiguration: joint name and position list have different lengths";
+    return;
+  }
+}
+
+  
 GZ_REGISTER_WORLD_PLUGIN(GazeboRosProperties)
 
 }  // namespace gazebo_ros
