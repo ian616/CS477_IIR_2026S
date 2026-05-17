@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 import time
+import copy
 
 import rclpy
-import tf2_geometry_msgs  # noqa: F401 — registers PoseStamped with tf2
+import tf2_geometry_msgs
 from geometry_msgs.msg import PoseStamped
 from tf2_ros import Buffer, ConnectivityException, ExtrapolationException, LookupException
 
+from manip_challenge import move_gripper
 
 def transform_pose(node, tf_buffer, pose, source_frame, target_frame):
     """Transform a Pose from source_frame to target_frame. Returns None on failure."""
@@ -31,3 +33,19 @@ def wait_for_tf(node, tf_buffer, source_frame, target_frame):
                 timeout=rclpy.duration.Duration(seconds=1.0)):
             break
         time.sleep(0.1)
+
+def execute_pick_sequence(node, arm, grasp_pose):
+    move_gripper.gripper_open(node)
+
+    approach_pose = copy.copy(grasp_pose)
+    approach_pose.position.z += 0.1
+    arm.move_pose(approach_pose)
+
+    grasp_pose.position.z -= 0.01
+    arm.move_pose(grasp_pose)
+
+    move_gripper.gripper_close(node, force=0.5, gripper_close_pos=0.5)
+
+    lift_pose = copy.copy(grasp_pose)
+    lift_pose.position.z += 0.2
+    arm.move_pose(lift_pose)
