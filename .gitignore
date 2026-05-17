@@ -26,3 +26,4 @@ __pycache__
 
 # specific repo
 ###############
+manip_challenge/manip_challenge/custom/perception/rgbd_crops/
