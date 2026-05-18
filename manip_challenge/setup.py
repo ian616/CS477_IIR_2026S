@@ -65,6 +65,12 @@ setup(
             'move_joint   = manip_challenge.move_joint:main',
             'perception   = manip_challenge.custom.perception:main',
             'main         = manip_challenge.custom.main:main',
+            'pose_detection = manip_challenge.alvan.pose_detection:main',
+            'path_planner = manip_challenge.alvan.path_planner:main',
+            'home_robot = manip_challenge.alvan.home_robot:main',
+            'rviz_visualizer = manip_challenge.alvan.rviz_visualizer:main',
+            'gripper_control = manip_challenge.alvan.gripper_control:main',
+
             ],
     },
 )
