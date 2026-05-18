@@ -1,0 +1,142 @@
+{
+  "all_detections": [
+    {
+      "bbox_xyxy": [
+        202,
+        199,
+        259,
+        248
+      ],
+      "center_xy": [
+        230,
+        223
+      ],
+      "confidence": 0.960681676864624,
+      "label": "coke_can"
+    },
+    {
+      "bbox_xyxy": [
+        251,
+        102,
+        340,
+        327
+      ],
+      "center_xy": [
+        295,
+        214
+      ],
+      "confidence": 0.9600806832313538,
+      "label": "hammer"
+    },
+    {
+      "bbox_xyxy": [
+        385,
+        127,
+        522,
+        258
+      ],
+      "center_xy": [
+        453,
+        192
+      ],
+      "confidence": 0.9318422675132751,
+      "label": "banana"
+    },
+    {
+      "bbox_xyxy": [
+        496,
+        246,
+        527,
+        276
+      ],
+      "center_xy": [
+        511,
+        261
+      ],
+      "confidence": 0.931219756603241,
+      "label": "strawberry"
+    },
+    {
+      "bbox_xyxy": [
+        386,
+        224,
+        436,
+        300
+      ],
+      "center_xy": [
+        411,
+        262
+      ],
+      "confidence": 0.9291440844535828,
+      "label": "meat_can"
+    }
+  ],
+  "detection": {
+    "bbox_xyxy": [
+      202,
+      199,
+      259,
+      248
+    ],
+    "center_xy": [
+      230,
+      223
+    ],
+    "confidence": 0.960681676864624,
+    "label": "coke_can"
+  },
+  "frame_id": "wrist_camera_color_optical_frame",
+  "label": "coke_can",
+  "location_xyz_m": [
+    -0.11481565237045288,
+    -0.018405720591545105,
+    0.586668074131012
+  ],
+  "padded_detection": {
+    "bbox_xyxy": [
+      193,
+      192,
+      268,
+      255
+    ],
+    "center_xy": [
+      230,
+      223
+    ],
+    "confidence": 0.960681676864624,
+    "label": "coke_can"
+  },
+  "request": "coke_can",
+  "roi": {
+    "bbox_xyxy": [
+      193,
+      192,
+      268,
+      255
+    ],
+    "centroid_xyz": [
+      -0.11481565237045288,
+      -0.018405720591545105,
+      0.586668074131012
+    ],
+    "cloud_bbox_xyxy": [
+      193,
+      192,
+      268,
+      255
+    ],
+    "crop_shape_hw": [
+      63,
+      75
+    ],
+    "mask_nonzero": 2239,
+    "num_foreground_points": 2239,
+    "stats": {
+      "foreground_points": 2239,
+      "foreground_z_limit": 0.6656230854988098,
+      "valid_points": 4725,
+      "z_min": 0.5856230854988098,
+      "z_percentile_95": 0.7112960577011108
+    }
+  }
+}
