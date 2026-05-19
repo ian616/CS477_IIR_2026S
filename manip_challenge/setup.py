@@ -34,7 +34,7 @@ def package_files(data_files, directory_list):
 setup(
     name=package_name,
     version='0.0.1',
-    packages=[package_name, package_name + '.custom'],
+    packages=[package_name, package_name + '.custom', package_name + '.alvan'],
     data_files=package_files(data_files, ['data/models/', 'launch/', 'data/worlds/', 'config']),
     install_requires=[
         'setuptools',
@@ -69,9 +69,9 @@ setup(
             'path_planner = manip_challenge.alvan.path_planner:main',
             'home_robot = manip_challenge.alvan.home_robot:main',
             'rviz_visualizer = manip_challenge.alvan.rviz_visualizer:main',
+            'rviz_visualizer_collider = manip_challenge.alvan.rviz_visualizer_collider:main',
             'gripper_control = manip_challenge.alvan.gripper_control:main',
 
             ],
     },
 )
-
