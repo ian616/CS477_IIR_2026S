@@ -46,11 +46,11 @@ class ObjectModel:
 
 
 OBJECT_MODELS = {
-    "coke_can": ObjectModel("coke_can", ("coke can", "coke", "can"), (0.0670, 0.0670, 0.1239), 0.08, "Cylinder-like object."),
-    "strawberry": ObjectModel("strawberry", ("strawberry",), (0.0452, 0.0453, 0.0457), 0.045, "Nearly spherical object."),
-    "meat_can": ObjectModel("meat_can", ("meat can", "meat", "spam"), (0.1021, 0.0601, 0.0835), 0.085, "Box/can-like object."),
-    "hammer": ObjectModel("hammer", ("hammer",), (0.1335, 0.3348, 0.0336), 0.12, "Elongated object."),
-    "banana": ObjectModel("banana", ("banana",), (0.0819, 0.1432, 0.0685), 0.08, "Curved elongated object."),
+    "coke_can": ObjectModel("coke_can", ("coke can", "coke", "can"), (0.0670, 0.0670, 0.1239), 0.05, "Cylinder-like object."),
+    "strawberry": ObjectModel("strawberry", ("strawberry",), (0.0452, 0.0453, 0.0457), 0.035, "Nearly spherical object."),
+    "meat_can": ObjectModel("meat_can", ("meat can", "meat", "spam"), (0.1021, 0.0601, 0.0835), 0.055, "Box/can-like object."),
+    "hammer": ObjectModel("hammer", ("hammer",), (0.1335, 0.3348, 0.0336), 0.08, "Elongated object."),
+    "banana": ObjectModel("banana", ("banana",), (0.0819, 0.1432, 0.0685), 0.05, "Curved elongated object."),
 }
 
 
@@ -237,7 +237,109 @@ def largest_component(mask):
     return (labels == largest_label).astype(np.uint8)
 
 
-def extract_rgbd_roi(rgb_image, depth_image, cloud, bbox_xyxy, image_shape, depth_margin_m, min_points=30):
+def center_component(mask):
+    if mask.dtype != np.uint8:
+        mask = mask.astype(np.uint8)
+    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(mask, connectivity=8)
+    if num_labels <= 1:
+        return mask
+
+    h, w = mask.shape[:2]
+    center = np.asarray([(w - 1) * 0.5, (h - 1) * 0.5], dtype=np.float64)
+    labels_at_center = labels[max(0, h // 2 - 2):min(h, h // 2 + 3), max(0, w // 2 - 2):min(w, w // 2 + 3)]
+    center_labels = labels_at_center[labels_at_center > 0]
+    if center_labels.size:
+        values, counts = np.unique(center_labels, return_counts=True)
+        selected_label = int(values[np.argmax(counts)])
+    else:
+        component_centers = centroids[1:]
+        distances = np.linalg.norm(component_centers - center, axis=1)
+        areas = stats[1:, cv2.CC_STAT_AREA].astype(np.float64)
+        # Prefer components near the target bbox center, with a small area bonus
+        # so tiny speckles do not beat the actual object component.
+        score = distances / np.sqrt(np.maximum(areas, 1.0))
+        selected_label = int(np.argmin(score) + 1)
+    return (labels == selected_label).astype(np.uint8)
+
+
+def select_component(mask, mode):
+    if mode == "largest":
+        return largest_component(mask)
+    if mode == "center":
+        return center_component(mask)
+    raise ValueError(f"Unknown component selection mode: {mode}")
+
+
+def estimate_center_depth(cloud_crop, valid_mask, window_ratio=0.25):
+    h, w = valid_mask.shape[:2]
+    half_h = max(2, int(round(h * window_ratio * 0.5)))
+    half_w = max(2, int(round(w * window_ratio * 0.5)))
+    cy = h // 2
+    cx = w // 2
+    y1 = max(0, cy - half_h)
+    y2 = min(h, cy + half_h + 1)
+    x1 = max(0, cx - half_w)
+    x2 = min(w, cx + half_w + 1)
+    center_valid = valid_mask[y1:y2, x1:x2]
+    center_z = cloud_crop[y1:y2, x1:x2, 2][center_valid]
+    if center_z.size >= 10:
+        return float(np.median(center_z)), int(center_z.size)
+
+    all_z = cloud_crop[:, :, 2][valid_mask]
+    return float(np.median(all_z)), int(all_z.size)
+
+
+def point_bounds(points):
+    if points is None or len(points) == 0:
+        return {}
+    points = np.asarray(points, dtype=np.float64)[:, :3]
+    min_xyz = np.min(points, axis=0)
+    max_xyz = np.max(points, axis=0)
+    extent_xyz = max_xyz - min_xyz
+    return {
+        "min_xyz": min_xyz.tolist(),
+        "max_xyz": max_xyz.tolist(),
+        "extent_xyz": extent_xyz.tolist(),
+    }
+
+
+def banana_color_mask(rgb_crop, min_pixels=30):
+    hsv = cv2.cvtColor(rgb_crop, cv2.COLOR_BGR2HSV)
+    # Gazebo banana is strongly yellow. Keep this deliberately conservative:
+    # color is used only as an extra filter, never as the sole foreground source.
+    mask = cv2.inRange(hsv, np.array([18, 45, 45], dtype=np.uint8), np.array([42, 255, 255], dtype=np.uint8))
+    kernel = np.ones((3, 3), dtype=np.uint8)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+    if int(np.count_nonzero(mask)) < min_pixels:
+        return None
+    return mask.astype(bool)
+
+
+def object_color_mask(label, rgb_crop, mode):
+    if mode == "none":
+        return None, "none", 0
+    if mode == "banana" or (mode == "auto" and label == "banana"):
+        mask = banana_color_mask(rgb_crop)
+        if mask is None:
+            return None, "banana_failed", 0
+        return mask, "banana", int(np.count_nonzero(mask))
+    return None, "none", 0
+
+
+def extract_rgbd_roi(
+    rgb_image,
+    depth_image,
+    cloud,
+    bbox_xyxy,
+    image_shape,
+    depth_margin_m,
+    min_points=30,
+    component_mode="center",
+    depth_mode="center",
+    label="",
+    color_mask_mode="auto",
+):
     if cloud is None or cloud.ndim != 3:
         raise ValueError("An organized point cloud with shape (H, W, 3) is required.")
 
@@ -265,22 +367,46 @@ def extract_rgbd_roi(rgb_image, depth_image, cloud, bbox_xyxy, image_shape, dept
     cloud_crop = cloud[cy1:cy2, cx1:cx2].copy()
 
     valid_mask = np.isfinite(cloud_crop).all(axis=2) & (cloud_crop[:, :, 2] > 0.0)
+    color_mask, color_mask_used, color_mask_nonzero = object_color_mask(label, rgb_crop, color_mask_mode)
+    if color_mask is not None and color_mask.shape[:2] != valid_mask.shape[:2]:
+        color_mask = cv2.resize(color_mask.astype(np.uint8), (valid_mask.shape[1], valid_mask.shape[0]), interpolation=cv2.INTER_NEAREST).astype(bool)
+    if color_mask is not None:
+        valid_mask = valid_mask & color_mask
     if not np.any(valid_mask):
         raise ValueError("No valid depth points inside ROI.")
 
     valid_z = cloud_crop[:, :, 2][valid_mask]
     z_min = float(np.min(valid_z))
     z_far = float(np.percentile(valid_z, 95.0))
-    foreground_limit = min(z_min + float(depth_margin_m), z_far)
-    foreground_mask = valid_mask & (cloud_crop[:, :, 2] <= foreground_limit)
-    foreground_mask = largest_component(foreground_mask.astype(np.uint8)).astype(bool)
+    z_center, center_depth_points = estimate_center_depth(cloud_crop, valid_mask)
+
+    if depth_mode == "nearest":
+        foreground_min = z_min
+        foreground_max = min(z_min + float(depth_margin_m), z_far)
+    elif depth_mode == "center":
+        half_band = float(depth_margin_m) * 0.5
+        foreground_min = max(z_min, z_center - half_band)
+        foreground_max = min(z_far, z_center + half_band)
+    else:
+        raise ValueError(f"Unknown depth mode: {depth_mode}")
+
+    foreground_mask = valid_mask & (cloud_crop[:, :, 2] >= foreground_min) & (cloud_crop[:, :, 2] <= foreground_max)
+    foreground_mask = select_component(foreground_mask.astype(np.uint8), component_mode).astype(bool)
     foreground_points = cloud_crop[foreground_mask]
 
     if len(foreground_points) < min_points:
-        relaxed_limit = min(z_min + float(depth_margin_m) * 1.5, z_far)
-        foreground_mask = valid_mask & (cloud_crop[:, :, 2] <= relaxed_limit)
-        foreground_mask = largest_component(foreground_mask.astype(np.uint8)).astype(bool)
+        if depth_mode == "nearest":
+            relaxed_min = z_min
+            relaxed_max = min(z_min + float(depth_margin_m) * 1.5, z_far)
+        else:
+            relaxed_half_band = float(depth_margin_m) * 0.75
+            relaxed_min = max(z_min, z_center - relaxed_half_band)
+            relaxed_max = min(z_far, z_center + relaxed_half_band)
+        foreground_mask = valid_mask & (cloud_crop[:, :, 2] >= relaxed_min) & (cloud_crop[:, :, 2] <= relaxed_max)
+        foreground_mask = select_component(foreground_mask.astype(np.uint8), component_mode).astype(bool)
         foreground_points = cloud_crop[foreground_mask]
+        foreground_min = relaxed_min
+        foreground_max = relaxed_max
 
     if len(foreground_points) < min_points:
         raise ValueError(f"Only {len(foreground_points)} foreground points found; need at least {min_points}.")
@@ -297,9 +423,18 @@ def extract_rgbd_roi(rgb_image, depth_image, cloud, bbox_xyxy, image_shape, dept
         stats={
             "z_min": z_min,
             "z_percentile_95": z_far,
-            "foreground_z_limit": foreground_limit,
+            "z_center_median": z_center,
+            "center_depth_points": center_depth_points,
+            "foreground_z_min": foreground_min,
+            "foreground_z_max": foreground_max,
+            "depth_mode": depth_mode,
+            "component_mode": component_mode,
+            "color_mask_mode": color_mask_mode,
+            "color_mask_used": color_mask_used,
+            "color_mask_nonzero": color_mask_nonzero,
             "valid_points": int(np.count_nonzero(valid_mask)),
             "foreground_points": int(len(foreground_points)),
+            "foreground_bounds": point_bounds(foreground_points[:, :3]),
         },
     )
 
@@ -341,8 +476,11 @@ class RgbdCropServiceNode(Node):
         self.declare_parameter("depth_topic", "/wrist_camera/wrist_camera/depth/color/image_raw")
         self.declare_parameter("points_topic", "/wrist_camera/wrist_camera/depth/color/points")
         self.declare_parameter("camera_frame", "wrist_camera_color_optical_frame")
-        self.declare_parameter("bbox_padding_ratio", 0.15)
+        self.declare_parameter("bbox_padding_ratio", 0.0)
         self.declare_parameter("min_roi_points", 30)
+        self.declare_parameter("component_mode", "center")
+        self.declare_parameter("depth_mode", "center")
+        self.declare_parameter("color_mask_mode", "auto")
         self.declare_parameter("save_dir", str(DEFAULT_SAVE_DIR))
         self.declare_parameter("annotated_image_topic", "/yolov11/rgbd_crop_detection_image")
         self.declare_parameter("roi_mask_topic", "/yolov11/rgbd_crop_mask")
@@ -354,6 +492,9 @@ class RgbdCropServiceNode(Node):
         self.camera_frame = self.get_parameter("camera_frame").value
         self.bbox_padding_ratio = float(self.get_parameter("bbox_padding_ratio").value)
         self.min_roi_points = int(self.get_parameter("min_roi_points").value)
+        self.component_mode = str(self.get_parameter("component_mode").value)
+        self.depth_mode = str(self.get_parameter("depth_mode").value)
+        self.color_mask_mode = str(self.get_parameter("color_mask_mode").value)
         self.save_dir = Path(self.get_parameter("save_dir").value).expanduser()
         self.save_dir.mkdir(parents=True, exist_ok=True)
 
@@ -451,6 +592,10 @@ class RgbdCropServiceNode(Node):
             image_shape=self.latest_cv_img.shape,
             depth_margin_m=model.depth_margin_m,
             min_points=self.min_roi_points,
+            component_mode=self.component_mode,
+            depth_mode=self.depth_mode,
+            label=model.name,
+            color_mask_mode=self.color_mask_mode,
         )
 
         request_dir = self.make_request_dir(model.name)

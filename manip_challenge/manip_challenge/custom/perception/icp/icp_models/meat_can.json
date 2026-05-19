@@ -1,0 +1,61 @@
+{
+  "cloud_bounds": {
+    "center_xyz": [
+      0.00010792329175019627,
+      -0.00011813095422397342,
+      -0.0001313678272237863
+    ],
+    "extent_xyz": [
+      0.10123485061405939,
+      0.05872549642301236,
+      0.08288820653151752
+    ],
+    "max_xyz": [
+      0.05072534859877989,
+      0.029244617257282206,
+      0.04131273543853497
+    ],
+    "min_xyz": [
+      -0.0505095020152795,
+      -0.029480879165730153,
+      -0.04157547109298254
+    ]
+  },
+  "created_at": "2026-05-19T11:25:19",
+  "mesh_bounds": {
+    "center_xyz": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "extent_xyz": [
+      0.10208500176668167,
+      0.060102999210357666,
+      0.08354300260543823
+    ],
+    "max_xyz": [
+      0.051042500883340836,
+      0.030051499605178833,
+      0.041771501302719116
+    ],
+    "min_xyz": [
+      -0.051042500883340836,
+      -0.030051499605178833,
+      -0.041771501302719116
+    ]
+  },
+  "mesh_loader": "trimesh",
+  "mesh_path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/gazebo_object/meat_can/textured.dae",
+  "mesh_unit_scale": 1.0,
+  "model_scale": 1.0,
+  "normal_max_nn": 30,
+  "normal_orientation": "outward",
+  "normal_outward_ratio": 1.0,
+  "normal_radius_m": 0.01,
+  "num_points": 1000,
+  "object": "meat_can",
+  "point_cloud_path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/icp_models/meat_can.ply",
+  "sample_points_requested": 5000,
+  "target_points": 1000,
+  "voxel_size_m": 0.0025
+}

@@ -3,6 +3,11 @@ pyassimp
 empy==3.3.4
 lark
 numpy~=1.24.4
+opencv-python
+open3d
+pycollada
+trimesh
+ultralytics
 billiard
 FuzzyTM
 catkin_pkg
