@@ -64,22 +64,17 @@ def pick_place_storage(node, arm, grasp_pose, destination, obj_name):
     move_gripper.gripper_open(node)
 
     pick_pan_angle = math.atan2(grasp_pose.position.y, grasp_pose.position.x)
-    # Rotate joint 1
-    arm.move_joint([pick_pan_angle, -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., 0.], duration=1)
+    pick_joint = [pick_pan_angle, -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., 0.]
 
     approach_pose = copy.deepcopy(grasp_pose)
     approach_pose.position.z += 0.15
-    # Approach pose
-    arm.move_pose(approach_pose, duration=1.5)
 
-    # Grasp pose
-    arm.move_pose(grasp_pose, duration=1.5)
+    # Rotate → approach → grasp in one smooth trajectory
+    arm.execute_trajectory(
+        [pick_joint, approach_pose, grasp_pose],
+        durations=[1.0, 1.5, 1.5],
+    )
     move_gripper.gripper_close(node, force=0.5, gripper_close_pos=0.5)
-
-    lift_pose = copy.deepcopy(grasp_pose)
-    lift_pose.position.z += 0.20
-    # Ready to place pose
-    arm.move_pose(lift_pose, duration=1.0)
 
     # 2. [Place Phase]
     node.get_logger().info(f"Starting PLACE phase. Destination: {destination}")
@@ -97,6 +92,9 @@ def pick_place_storage(node, arm, grasp_pose, destination, obj_name):
     y_start, y_end = config["range_y"][0], config["range_y"][1]
     y_slots = [y_start + (y_end - y_start) * (0.125 + 0.25 * i) for i in range(4)]
 
+    lift_pose = copy.deepcopy(grasp_pose)
+    lift_pose.position.z += 0.20
+
     place_pose = Pose()
     place_pose.position.x = x_slots[(count // 4) % 2]
     place_pose.position.y = y_slots[count % 4]
@@ -104,28 +102,28 @@ def pick_place_storage(node, arm, grasp_pose, destination, obj_name):
     place_pose.orientation = lift_pose.orientation
 
     place_pan_angle = math.atan2(place_pose.position.y, place_pose.position.x)
-    # Rotate joint 1
-    arm.move_joint([place_pan_angle, -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., 0.], duration=2.0)
+    place_joint = [place_pan_angle, -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., 0.]
 
     place_approach = copy.deepcopy(place_pose)
     place_approach.position.z += 0.15
 
-    # Approach pose
-    arm.move_pose(place_approach, duration=2.0)
-
-    # Place pose
-    arm.move_pose(place_pose, duration=1.0)
+    # Lift → rotate → approach → place in one smooth trajectory
+    arm.execute_trajectory(
+        [lift_pose, place_joint, place_approach, place_pose],
+        durations=[1.0, 2.0, 2.0, 1.0],
+    )
     move_gripper.gripper_open(node)
 
     retreat_pose = copy.deepcopy(place_pose)
     retreat_pose.position.z += 0.20
-    arm.move_pose(retreat_pose, duration=2.0)
+    idle_joint = [0., -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., 0.]
 
+    # Retreat → idle in one smooth trajectory
+    arm.execute_trajectory(
+        [retreat_pose, idle_joint],
+        durations=[2.0, 2.0],
+    )
     setattr(node, count_attr, count + 1)
-
-    # 3. [Idle Phase]
-    node.get_logger().info("Returning to IDLE position...")
-    arm.move_joint([0., -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., 0.], duration=2.0)
 
     node.get_logger().info("PICK-and-PLACE sequence completed successfully!")
 
@@ -136,22 +134,17 @@ def pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name):
     move_gripper.gripper_open(node)
 
     pick_pan_angle = math.atan2(grasp_pose.position.y, grasp_pose.position.x)
-    # Rotate joint 1
-    arm.move_joint([pick_pan_angle, -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., 0.], duration=1)
+    pick_joint = [pick_pan_angle, -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., 0.]
 
     approach_pose = copy.deepcopy(grasp_pose)
     approach_pose.position.z += 0.15
-    # Approach pose
-    arm.move_pose(approach_pose, duration=1.5)
 
-    # Grasp pose
-    arm.move_pose(grasp_pose, duration=1.5)
+    # Rotate → approach → grasp in one smooth trajectory
+    arm.execute_trajectory(
+        [pick_joint, approach_pose, grasp_pose],
+        durations=[1.0, 1.5, 1.5],
+    )
     move_gripper.gripper_close(node, force=0.5, gripper_close_pos=0.5)
-
-    lift_pose = copy.deepcopy(grasp_pose)
-    lift_pose.position.z += 0.20
-    # Ready to place pose
-    arm.move_pose(lift_pose, duration=1.0)
 
     # 2. [Place Phase]
     node.get_logger().info(f"Starting PLACE phase. Destination: {destination}")
@@ -160,10 +153,13 @@ def pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name):
     if not hasattr(node, 'bookshelf_count'):
         node.bookshelf_count = 0
 
+    lift_pose = copy.deepcopy(grasp_pose)
+    lift_pose.position.z += 0.20
+
     # Generate pose
     place_pose = Pose()
     place_pose.position.x = 0.925
-    
+
     y_slots = [-0.215, -0.30, -0.385]
     place_pose.position.y = y_slots[node.bookshelf_count % len(y_slots)]
 
@@ -175,28 +171,28 @@ def pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name):
     place_pose.orientation.w = 0.5
 
     place_pan_angle = math.atan2(place_pose.position.y, place_pose.position.x)
-    # Rotate joint 1
-    arm.move_joint([place_pan_angle, -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., 0.], duration=2.0)
+    place_joint = [place_pan_angle, -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., 0.]
 
     place_approach = copy.deepcopy(place_pose)
     place_approach.position.x -= 0.15
 
-    # Approach pose
-    arm.move_pose(place_approach, duration=2.0)
-
-    # Place pose
-    arm.move_pose(place_pose, duration=1.0)
+    # Lift → rotate → approach → place in one smooth trajectory
+    arm.execute_trajectory(
+        [lift_pose, place_joint, place_approach, place_pose],
+        durations=[1.0, 2.0, 2.0, 1.0],
+    )
     move_gripper.gripper_open(node)
 
     retreat_pose = copy.deepcopy(place_pose)
     retreat_pose.position.x -= 0.3
-    arm.move_pose(retreat_pose, duration=2.0)
+    idle_joint = [0., -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., 0.]
 
+    # Retreat → idle in one smooth trajectory
+    arm.execute_trajectory(
+        [retreat_pose, idle_joint],
+        durations=[2.0, 2.0],
+    )
     node.bookshelf_count += 1
-
-    # 3. [Idle Phase]
-    node.get_logger().info("Returning to IDLE position...")
-    arm.move_joint([0., -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., 0.], duration=2.0)
 
     node.get_logger().info("PICK-and-PLACE sequence completed successfully!")
 

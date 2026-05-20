@@ -538,7 +538,108 @@ class ArmClient(Node):
         self.send_goal(g)
         return time, np.array(joint_position_traj), np.array(joint_velocity_traj), None, None
 
-        
+
+    def _ik_pose(self, q_init, target_pose, max_iter=200, tol=1e-4):
+        """Iterative Jacobian IK: returns joint angles that reach target_pose."""
+        q = np.asarray(q_init, dtype=float).flatten()
+        target_frame = misc.pose2KDLframe(self.detachTool(target_pose))
+
+        for _ in range(max_iter):
+            curr_homo = self.arm_kdl.forward(q.tolist())
+            curr_pos, curr_quat = PoseConv.to_pos_quat(curr_homo)
+            curr_frame = misc.pose2KDLframe(misc.list2Pose(list(curr_pos) + list(curr_quat)))
+
+            pos_err = target_frame.p - curr_frame.p
+            R_err = target_frame.M * curr_frame.M.Inverse()
+            w_err = 0.5 * np.array([
+                R_err[2, 1] - R_err[1, 2],
+                R_err[0, 2] - R_err[2, 0],
+                R_err[1, 0] - R_err[0, 1],
+            ])
+            V = np.array([pos_err.x(), pos_err.y(), pos_err.z(),
+                          w_err[0], w_err[1], w_err[2]]).reshape(6, 1)
+
+            if np.linalg.norm(V) < tol:
+                break
+
+            J = self.arm_kdl.jacobian(q.tolist())
+            
+            dq = np.asarray(np.dot(np.linalg.pinv(J), V)).flatten()
+            q = np.asarray(q + dq).flatten()
+
+        return q.tolist()
+
+
+    def execute_trajectory(self, waypoints, total_duration=5.0, durations=None):
+        """
+        Execute a smooth trajectory through a list of waypoints without stopping
+        at intermediate points.
+
+        Parameters
+        ----------
+        waypoints : list
+            Each element is either a Pose (converted via IK) or a list of 6 joint angles.
+        total_duration : float
+            Total time for the trajectory (split evenly across segments when durations=None).
+        durations : list of float, optional
+            Per-segment durations. Length must equal len(waypoints).
+        """
+        # Build joint-angle sequence starting from current state
+        q = np.array(self.js_joint_position, dtype=float).flatten().tolist()
+        q_list = [q]
+
+        for wp in waypoints:
+            # wp가 리스트나 넘파이 배열 형태(관절 각도)일 때
+            if isinstance(wp, (list, np.ndarray, tuple)):
+                # 리스트 내부의 요소가 또 리스트인지 확인하는 방어 코드 추가
+                wp_np = np.array(wp, dtype=float).flatten()
+                if len(wp_np) == 6:
+                    q = wp_np.tolist()
+                else:
+                    raise ValueError(f"Joint waypoint must have exactly 6 elements, got {len(wp_np)}")
+            else:  
+                # Pose 객체일 때: 현재까지 정제된 1차원 리스트 q를 들고 IK 연산 진입
+                q_raw = self._ik_pose(q, wp)
+                q = np.array(q_raw, dtype=float).flatten().tolist()
+                
+            q_list.append(q)
+
+        n_segs = len(q_list) - 1
+        if durations is not None:
+            seg_durs = list(durations)
+        else:
+            seg_durs = [total_duration / n_segs] * n_segs
+
+        # Cumulative timestamps
+        times = [0.0]
+        for d in seg_durs:
+            times.append(times[-1] + d)
+
+        # Velocity at each knot: 0 at endpoints, finite-difference at intermediates
+        n = len(q_list)
+        vels = [[0.0] * 6]
+        for k in range(1, n - 1):
+            v = 0.5 * (
+                (np.array(q_list[k]) - np.array(q_list[k - 1])) / seg_durs[k - 1] +
+                (np.array(q_list[k + 1]) - np.array(q_list[k])) / seg_durs[k]
+            )
+            vels.append(v.tolist())
+        vels.append([0.0] * 6)
+
+        # Build and send a single trajectory goal
+        g = FollowJointTrajectory.Goal()
+        g.trajectory = JointTrajectory()
+        g.trajectory.joint_names = JOINT_NAMES
+        g.trajectory.points = []
+        for q, v, t in zip(q_list, vels, times):
+            pt = JointTrajectoryPoint()
+            pt.positions = list(q)
+            pt.velocities = v
+            pt.time_from_start = Duration(sec=int(t), nanosec=int((t - int(t)) * 1e9))
+            g.trajectory.points.append(pt)
+
+        self.send_goal(g)
+
 
 def problem_1b(arm):
     """Problem 1. B: joint trajectory """
