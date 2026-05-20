@@ -145,8 +145,7 @@ def pick_place_storage(node, arm, grasp_pose, destination, obj_name, on_before_i
 
     rot_time_idle = _calc_rot_time(place_pan_angle, 0.0)
 
-    arm.execute_trajectory([retreat_pose], durations=[1.0])
-    arm.execute_trajectory([idle_joint], durations=[rot_time_idle])
+    arm.execute_trajectory([retreat_pose, idle_joint], durations=[1.5, rot_time_idle])
     setattr(node, count_attr, count + 1)
 
     node.get_logger().info("PICK-and-PLACE sequence completed successfully!")
@@ -202,7 +201,7 @@ def pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name, on_before
     place_joint = [place_pan_angle, -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., 0.]
 
     place_approach = copy.deepcopy(place_pose)
-    place_approach.position.x -= 0.15
+    place_approach.position.x -= 0.2
 
     rot_time_place = _calc_rot_time(pick_pan_angle, place_pan_angle)
 
@@ -220,10 +219,7 @@ def pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name, on_before
     retreat_pose.position.x -= 0.3
     idle_joint = [0., -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., 0.]
 
-    rot_time_idle = _calc_rot_time(place_pan_angle, 0.0)
-
-    arm.execute_trajectory([retreat_pose], durations=[1.0])
-    arm.execute_trajectory([idle_joint], durations=[rot_time_idle])
+    arm.execute_trajectory([retreat_pose, idle_joint], durations=[1.3, 1.5])
     node.bookshelf_count += 1
 
     node.get_logger().info("PICK-and-PLACE sequence completed successfully!")

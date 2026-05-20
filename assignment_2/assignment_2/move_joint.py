@@ -539,6 +539,26 @@ class ArmClient(Node):
         return time, np.array(joint_position_traj), np.array(joint_velocity_traj), None, None
 
 
+    def _ik_pose_subdivided(self, q_init, target_pose, n_steps=5):
+        """IK with linear subdivision to avoid branch jumps on large motions."""
+        start_pose = self.fk_request(q_init, attach_tool=True)
+        q = list(q_init)
+        for i in range(1, n_steps + 1):
+            alpha = i / n_steps
+            interp = Pose()
+            interp.position.x = start_pose.position.x + alpha * (target_pose.position.x - start_pose.position.x)
+            interp.position.y = start_pose.position.y + alpha * (target_pose.position.y - start_pose.position.y)
+            interp.position.z = start_pose.position.z + alpha * (target_pose.position.z - start_pose.position.z)
+            q0 = [start_pose.orientation.x, start_pose.orientation.y,
+                  start_pose.orientation.z, start_pose.orientation.w]
+            q1 = [target_pose.orientation.x, target_pose.orientation.y,
+                  target_pose.orientation.z, target_pose.orientation.w]
+            qi = quaternion.slerp(q0, q1, alpha)
+            interp.orientation.x, interp.orientation.y = qi[0], qi[1]
+            interp.orientation.z, interp.orientation.w = qi[2], qi[3]
+            q = np.array(self._ik_pose(q, interp), dtype=float).flatten().tolist()
+        return q
+
     def _ik_pose(self, q_init, target_pose, max_iter=200, tol=1e-4):
         """Iterative Jacobian IK: returns joint angles that reach target_pose."""
         q = np.asarray(q_init, dtype=float).flatten()
@@ -597,9 +617,9 @@ class ArmClient(Node):
                     q = wp_np.tolist()
                 else:
                     raise ValueError(f"Joint waypoint must have exactly 6 elements, got {len(wp_np)}")
-            else:  
-                # Pose 객체일 때: 현재까지 정제된 1차원 리스트 q를 들고 IK 연산 진입
-                q_raw = self._ik_pose(q, wp)
+            else:
+                # Pose 객체일 때: subdivided IK로 branch jump 방지
+                q_raw = self._ik_pose_subdivided(q, wp)
                 q = np.array(q_raw, dtype=float).flatten().tolist()
                 
             q_list.append(q)
