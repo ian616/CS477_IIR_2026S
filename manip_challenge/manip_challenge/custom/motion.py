@@ -72,28 +72,31 @@ def wait_for_tf(node, tf_buffer, source_frame, target_frame):
         time.sleep(0.1)
 
 
-def pick_place_storage(node, arm, grasp_pose, destination, obj_name, on_before_idle=None):
-    # 1. [Pick Phase]
-    node.get_logger().info(f"Starting PICK phase for {obj_name}...")
-    move_gripper.gripper_open(node)
-
-    # Get the current Pan joint angle (used when rotating from the initial position to the object)
-    current_pan = arm.js_joint_position[0]
+def pick_place_storage(node, arm, grasp_pose, destination, obj_name,
+                       on_before_idle=None, get_next_pick_data=None,
+                       pick_already_done=False):
     pick_pan_angle = math.atan2(grasp_pose.position.y, grasp_pose.position.x)
-    pick_joint = [pick_pan_angle, -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., 0.]
 
-    approach_pose = copy.deepcopy(grasp_pose)
-    approach_pose.position.z += 0.15
+    if not pick_already_done:
+        # 1. [Pick Phase]
+        node.get_logger().info(f"Starting PICK phase for {obj_name}...")
+        move_gripper.gripper_open(node)
 
-    # 💡 Apply dynamic rotation time (Current angle -> Pick angle)
-    rot_time_pick = _calc_rot_time(current_pan, pick_pan_angle)
+        current_pan = arm.js_joint_position[0]
 
-    # Rotate → approach → grasp in one smooth trajectory
-    arm.execute_trajectory(
-        [pick_joint, approach_pose, grasp_pose],
-        durations=[rot_time_pick, 1.5, 1.0],
-    )
-    move_gripper.gripper_close(node, force=0.5, gripper_close_pos=0.5)
+        approach_pose = copy.deepcopy(grasp_pose)
+        approach_pose.position.z += 0.15
+
+        if abs(pick_pan_angle - current_pan) < 0.05:
+            arm.execute_trajectory([approach_pose, grasp_pose], durations=[1.5, 1.0])
+        else:
+            pick_joint = [pick_pan_angle, -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., 0.]
+            rot_time_pick = _calc_rot_time(current_pan, pick_pan_angle)
+            arm.execute_trajectory(
+                [pick_joint, approach_pose, grasp_pose],
+                durations=[rot_time_pick, 1.5, 1.0],
+            )
+        move_gripper.gripper_close(node, force=0.5, gripper_close_pos=0.5)
 
     # 2. [Place Phase]
     node.get_logger().info(f"Starting PLACE phase. Destination: {destination}")
@@ -141,37 +144,52 @@ def pick_place_storage(node, arm, grasp_pose, destination, obj_name, on_before_i
 
     retreat_pose = copy.deepcopy(place_pose)
     retreat_pose.position.z += 0.20
-    idle_joint = [0., -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., 0.]
 
-    rot_time_idle = _calc_rot_time(place_pan_angle, 0.0)
+    next_data = get_next_pick_data() if get_next_pick_data is not None else None
+    if next_data is not None:
+        next_pick_joint = next_data['pick_joint']
+        next_approach = next_data['approach_pose']
+        next_grasp = next_data['grasp_pose']
+        rot_time_next = _calc_rot_time(place_pan_angle, next_pick_joint[0])
+        arm.execute_trajectory(
+            [retreat_pose, next_pick_joint, next_approach, next_grasp],
+            durations=[1.0, rot_time_next, 1.5, 1.0],
+        )
+        move_gripper.gripper_close(node, force=0.5, gripper_close_pos=0.5)
+    else:
+        idle_joint = [0., -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., 0.]
+        rot_time_idle = _calc_rot_time(place_pan_angle, 0.0)
+        arm.execute_trajectory([retreat_pose, idle_joint], durations=[1.0, rot_time_idle])
 
-    arm.execute_trajectory([retreat_pose, idle_joint], durations=[1.5, rot_time_idle])
     setattr(node, count_attr, count + 1)
-
     node.get_logger().info("PICK-and-PLACE sequence completed successfully!")
 
 
-def pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name, on_before_idle=None):
-    # 1. [Pick Phase]
-    node.get_logger().info(f"Starting PICK phase for {obj_name}...")
-    move_gripper.gripper_open(node)
-
-    # Get the current Pan joint angle
-    current_pan = arm.js_joint_position[0]
+def pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name,
+                         on_before_idle=None, get_next_pick_data=None,
+                         pick_already_done=False):
     pick_pan_angle = math.atan2(grasp_pose.position.y, grasp_pose.position.x)
-    pick_joint = [pick_pan_angle, -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., 0.]
 
-    approach_pose = copy.deepcopy(grasp_pose)
-    approach_pose.position.z += 0.15
+    if not pick_already_done:
+        # 1. [Pick Phase]
+        node.get_logger().info(f"Starting PICK phase for {obj_name}...")
+        move_gripper.gripper_open(node)
 
-    rot_time_pick = _calc_rot_time(current_pan, pick_pan_angle)
+        current_pan = arm.js_joint_position[0]
 
-    # Rotate → approach → grasp in one smooth trajectory
-    arm.execute_trajectory(
-        [pick_joint, approach_pose, grasp_pose],
-        durations=[rot_time_pick, 1.5, 1.0],
-    )
-    move_gripper.gripper_close(node, force=0.5, gripper_close_pos=0.5)
+        approach_pose = copy.deepcopy(grasp_pose)
+        approach_pose.position.z += 0.15
+
+        if abs(pick_pan_angle - current_pan) < 0.05:
+            arm.execute_trajectory([approach_pose, grasp_pose], durations=[1.5, 1.0])
+        else:
+            pick_joint = [pick_pan_angle, -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., 0.]
+            rot_time_pick = _calc_rot_time(current_pan, pick_pan_angle)
+            arm.execute_trajectory(
+                [pick_joint, approach_pose, grasp_pose],
+                durations=[rot_time_pick, 1.5, 1.0],
+            )
+        move_gripper.gripper_close(node, force=0.5, gripper_close_pos=0.5)
 
     # 2. [Place Phase]
     node.get_logger().info(f"Starting PLACE phase. Destination: {destination}")
@@ -181,7 +199,7 @@ def pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name, on_before
         node.bookshelf_count = 0
 
     lift_pose = copy.deepcopy(grasp_pose)
-    lift_pose.position.z += 0.20
+    lift_pose.position.z += 0.1
 
     # Generate target pose
     place_pose = Pose()
@@ -217,16 +235,32 @@ def pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name, on_before
 
     retreat_pose = copy.deepcopy(place_pose)
     retreat_pose.position.x -= 0.3
-    idle_joint = [0., -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., 0.]
 
-    arm.execute_trajectory([retreat_pose, idle_joint], durations=[1.3, 1.5])
+    next_data = get_next_pick_data() if get_next_pick_data is not None else None
+    if next_data is not None:
+        next_pick_joint = next_data['pick_joint']
+        next_approach = next_data['approach_pose']
+        next_grasp = next_data['grasp_pose']
+        rot_time_next = _calc_rot_time(place_pan_angle, next_pick_joint[0])
+        arm.execute_trajectory(
+            [retreat_pose, next_pick_joint, next_approach, next_grasp],
+            durations=[1.3, rot_time_next, 1.5, 1.0],
+        )
+        move_gripper.gripper_close(node, force=0.5, gripper_close_pos=0.5)
+    else:
+        idle_joint = [0., -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., 0.]
+        arm.execute_trajectory([retreat_pose, idle_joint], durations=[1.3, 1.5])
+
     node.bookshelf_count += 1
-
     node.get_logger().info("PICK-and-PLACE sequence completed successfully!")
 
 
-def execute_pick_place_sequence(node, arm, grasp_pose, destination, obj_name, on_before_idle=None):
+def execute_pick_place_sequence(node, arm, grasp_pose, destination, obj_name,
+                                on_before_idle=None, get_next_pick_data=None,
+                                pick_already_done=False):
     if destination == "bookshelf":
-        pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name, on_before_idle)
+        pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name,
+                             on_before_idle, get_next_pick_data, pick_already_done)
     else:
-        pick_place_storage(node, arm, grasp_pose, destination, obj_name, on_before_idle)
+        pick_place_storage(node, arm, grasp_pose, destination, obj_name,
+                           on_before_idle, get_next_pick_data, pick_already_done)
