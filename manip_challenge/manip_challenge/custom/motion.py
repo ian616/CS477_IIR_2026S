@@ -33,6 +33,18 @@ PLACE_CONFIGS = {
     },
 }
 
+
+# Helper function to dynamically calculate rotation time based on the angle difference
+def _calc_rot_time(start_angle, target_angle, sec_per_rad=1.2, min_time=0.8):
+    """
+    Calculates the required rotation time based on the difference between start_angle and target_angle.
+    - sec_per_rad: Time allocated per radian (approx. 57 degrees). Lower = faster rotation.
+    - min_time: Minimum guaranteed time to prevent sudden jerks or motor overloads.
+    """
+    delta = abs(target_angle - start_angle)
+    return max(min_time, delta * sec_per_rad)
+
+
 def transform_pose(node, tf_buffer, pose, source_frame, target_frame):
     """Transform a Pose from source_frame to target_frame. Returns None on failure."""
     try:
@@ -58,21 +70,27 @@ def wait_for_tf(node, tf_buffer, source_frame, target_frame):
             break
         time.sleep(0.1)
 
+
 def pick_place_storage(node, arm, grasp_pose, destination, obj_name):
     # 1. [Pick Phase]
     node.get_logger().info(f"Starting PICK phase for {obj_name}...")
     move_gripper.gripper_open(node)
 
+    # Get the current Pan joint angle (used when rotating from the initial position to the object)
+    current_pan = arm.js_joint_position[0]
     pick_pan_angle = math.atan2(grasp_pose.position.y, grasp_pose.position.x)
     pick_joint = [pick_pan_angle, -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., 0.]
 
     approach_pose = copy.deepcopy(grasp_pose)
     approach_pose.position.z += 0.15
 
+    # 💡 Apply dynamic rotation time (Current angle -> Pick angle)
+    rot_time_pick = _calc_rot_time(current_pan, pick_pan_angle)
+
     # Rotate → approach → grasp in one smooth trajectory
     arm.execute_trajectory(
         [pick_joint, approach_pose, grasp_pose],
-        durations=[1.0, 1.5, 1.5],
+        durations=[rot_time_pick, 1.5, 1.0],
     )
     move_gripper.gripper_close(node, force=0.5, gripper_close_pos=0.5)
 
@@ -85,7 +103,7 @@ def pick_place_storage(node, arm, grasp_pose, destination, obj_name):
         setattr(node, count_attr, 0)
     count = getattr(node, count_attr)
 
-    # Devide storage into 8 slots
+    # Divide storage into 8 slots
     x_start, x_end = config["range_x"][0], config["range_x"][1]
     x_slots = [x_start + (x_end - x_start) * 0.25, x_start + (x_end - x_start) * 0.75]
 
@@ -107,10 +125,13 @@ def pick_place_storage(node, arm, grasp_pose, destination, obj_name):
     place_approach = copy.deepcopy(place_pose)
     place_approach.position.z += 0.15
 
+    # 💡 Apply dynamic rotation time (Pick angle -> Place angle)
+    rot_time_place = _calc_rot_time(pick_pan_angle, place_pan_angle)
+
     # Lift → rotate → approach → place in one smooth trajectory
     arm.execute_trajectory(
         [lift_pose, place_joint, place_approach, place_pose],
-        durations=[1.0, 2.0, 2.0, 1.0],
+        durations=[1.0, rot_time_place, 1.5, 1.0],
     )
     move_gripper.gripper_open(node)
 
@@ -118,10 +139,13 @@ def pick_place_storage(node, arm, grasp_pose, destination, obj_name):
     retreat_pose.position.z += 0.20
     idle_joint = [0., -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., 0.]
 
+    # 💡 Apply dynamic rotation time (Place angle -> IDLE front 0 degrees)
+    rot_time_idle = _calc_rot_time(place_pan_angle, 0.0)
+
     # Retreat → idle in one smooth trajectory
     arm.execute_trajectory(
         [retreat_pose, idle_joint],
-        durations=[2.0, 2.0],
+        durations=[1.0, rot_time_idle],
     )
     setattr(node, count_attr, count + 1)
 
@@ -133,16 +157,20 @@ def pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name):
     node.get_logger().info(f"Starting PICK phase for {obj_name}...")
     move_gripper.gripper_open(node)
 
+    # Get the current Pan joint angle
+    current_pan = arm.js_joint_position[0]
     pick_pan_angle = math.atan2(grasp_pose.position.y, grasp_pose.position.x)
     pick_joint = [pick_pan_angle, -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., 0.]
 
     approach_pose = copy.deepcopy(grasp_pose)
     approach_pose.position.z += 0.15
 
+    rot_time_pick = _calc_rot_time(current_pan, pick_pan_angle)
+
     # Rotate → approach → grasp in one smooth trajectory
     arm.execute_trajectory(
         [pick_joint, approach_pose, grasp_pose],
-        durations=[1.0, 1.5, 1.5],
+        durations=[rot_time_pick, 1.5, 1.0],
     )
     move_gripper.gripper_close(node, force=0.5, gripper_close_pos=0.5)
 
@@ -156,14 +184,14 @@ def pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name):
     lift_pose = copy.deepcopy(grasp_pose)
     lift_pose.position.z += 0.20
 
-    # Generate pose
+    # Generate target pose
     place_pose = Pose()
     place_pose.position.x = 0.925
 
     y_slots = [-0.215, -0.30, -0.385]
     place_pose.position.y = y_slots[node.bookshelf_count % len(y_slots)]
 
-    # Force all objects to the 2nd floor
+    # Force all objects to the 2nd floor of the bookshelf
     place_pose.position.z = config["base_z"] + 0.15
     place_pose.orientation.x = 0.5
     place_pose.orientation.y = 0.5
@@ -176,10 +204,12 @@ def pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name):
     place_approach = copy.deepcopy(place_pose)
     place_approach.position.x -= 0.15
 
+    rot_time_place = _calc_rot_time(pick_pan_angle, place_pan_angle)
+
     # Lift → rotate → approach → place in one smooth trajectory
     arm.execute_trajectory(
         [lift_pose, place_joint, place_approach, place_pose],
-        durations=[1.0, 2.0, 2.0, 1.0],
+        durations=[1.0, rot_time_place, 1.5, 1.0],
     )
     move_gripper.gripper_open(node)
 
@@ -187,10 +217,12 @@ def pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name):
     retreat_pose.position.x -= 0.3
     idle_joint = [0., -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., 0.]
 
+    rot_time_idle = _calc_rot_time(place_pan_angle, 0.0)
+
     # Retreat → idle in one smooth trajectory
     arm.execute_trajectory(
         [retreat_pose, idle_joint],
-        durations=[2.0, 2.0],
+        durations=[1.0, rot_time_idle],
     )
     node.bookshelf_count += 1
 
@@ -202,5 +234,3 @@ def execute_pick_place_sequence(node, arm, grasp_pose, destination, obj_name):
         pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name)
     else:
         pick_place_storage(node, arm, grasp_pose, destination, obj_name)
-
-
