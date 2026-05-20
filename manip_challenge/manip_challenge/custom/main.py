@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import json
+import time
 import threading
 import numpy as np
 
@@ -25,13 +26,46 @@ class _TFNode(Node):
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
 
-class TaskManagerNode(Node):
+class PerceptionNode(Node):
+    """Dedicated node for perception — runs in background executor so
+    detection service calls are processed while the arm is moving."""
     def __init__(self):
-        super().__init__('task_manager_node')
-
+        super().__init__('perception_node')
         self.cli = self.create_client(StringString, 'detect_object_rgbd_crop')
         while not self.cli.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('Waiting for perception service...')
+        self.get_logger().info('Perception node ready')
+
+    def detect_async(self, obj_name):
+        """Send detection request and return a Future immediately."""
+        req = StringString.Request()
+        req.data = obj_name
+        return self.cli.call_async(req)
+
+    def collect(self, future, obj_name):
+        """Block until future is resolved (executor handles it in background).
+        Returns Pose or None."""
+        while not future.done():
+            time.sleep(0.01)
+        result = future.result()
+        if result is None:
+            self.get_logger().error(f"No response for '{obj_name}'")
+            return None
+        info = json.loads(result.data)
+        if not info.get('ok'):
+            self.get_logger().error(f"Detection failed for '{obj_name}': {info.get('error')}")
+            return None
+        xyz = info['location_xyz_m']
+        pose = Pose()
+        pose.position.x = xyz[0]
+        pose.position.y = xyz[1]
+        pose.position.z = xyz[2]
+        return pose
+
+
+class TaskManagerNode(Node):
+    def __init__(self):
+        super().__init__('task_manager_node')
 
         self.task_queue = []
         self.create_subscription(String, '/task_commands', self._command_callback, 10)
@@ -44,38 +78,19 @@ class TaskManagerNode(Node):
         self.get_logger().info(f'Parsed {len(tasks)} tasks: {tasks}')
         self.task_queue.extend(tasks)
 
-    def _detect_object(self, obj_name):
-        req = StringString.Request()
-        req.data = obj_name
-        future = self.cli.call_async(req)
-        rclpy.spin_until_future_complete(self, future)
-        result = future.result()
-        if result is None:
-            return None
-        info = json.loads(result.data)
-        if not info.get('ok'):
-            self.get_logger().error(f"Detection failed: {info.get('error')}")
-            return None
-        xyz = info['location_xyz_m']
-        pose = Pose()
-        pose.position.x = xyz[0]
-        pose.position.y = xyz[1]
-        pose.position.z = xyz[2]
-        return pose
-
 
 def main():
     rclpy.init()
 
     tf_node = _TFNode()
+    perception_node = PerceptionNode()
     node = TaskManagerNode()
 
-    # Only tf_node goes in the executor so TF stays fresh during blocking calls.
-    # node and arm stay outside — library functions (move_gripper, ArmClient.send_goal)
-    # call spin_until_future_complete on them directly, which requires they are not
-    # already owned by an executor.
+    # tf_node and perception_node share the executor so both stay responsive
+    # while the arm is blocking in the main thread.
     executor = MultiThreadedExecutor()
     executor.add_node(tf_node)
+    executor.add_node(perception_node)
     spin_thread = threading.Thread(target=executor.spin, daemon=True)
     spin_thread.start()
 
@@ -83,25 +98,52 @@ def main():
     try:
         arm.move_joint([0., -np.pi / 2.0, 1., -np.pi / 3., -np.pi / 2., 0.])
 
-        while rclpy.ok():
-            rclpy.spin_once(node, timeout_sec=0.1)
+        # Holds a pre-fetched detection future for the current task.
+        pending_future = None
+        pending_obj = None
 
+        while rclpy.ok():
             if not node.task_queue:
+                rclpy.spin_once(node, timeout_sec=0.1)
                 continue
 
             obj_name, destination = node.task_queue.pop(0)
-            node.get_logger().info(f"Picking: '{obj_name}'")
+            node.get_logger().info(f"Processing '{obj_name}' → '{destination}'")
 
-            pose = node._detect_object(obj_name)
+            # Collect detection: either pre-fetched (ran during last idle return)
+            # or start a fresh blocking detection now.
+            if pending_future is not None and pending_obj == obj_name:
+                pose = perception_node.collect(pending_future, obj_name)
+                pending_future = None
+                pending_obj = None
+            else:
+                pose = perception_node.collect(perception_node.detect_async(obj_name), obj_name)
 
-            if pose is not None and not (
+            if pose is None or (
                     pose.position.x == 0.0 and
                     pose.position.y == 0.0 and
                     pose.position.z == 0.0):
-                node.get_logger().info(f"Detected '{obj_name}'! Executing pick...")
-                pick(node, tf_node.tf_buffer, arm, pose, destination, obj_name)
-            else:
                 node.get_logger().error(f"Failed to detect '{obj_name}', skipping.")
+                continue
+
+            node.get_logger().info(f"Detected '{obj_name}'! Executing pick...")
+
+            # Build the on_before_idle callback: fires after retreat, before idle
+            # return — starts detecting the next object while the arm is moving home.
+            def make_callback(task_queue, perc_node):
+                def on_before_idle():
+                    nonlocal pending_future, pending_obj
+                    if task_queue:
+                        next_obj, _ = task_queue[0]
+                        node.get_logger().info(
+                            f"[on_before_idle] Starting detection for next: '{next_obj}'")
+                        pending_future = perc_node.detect_async(next_obj)
+                        pending_obj = next_obj
+                return on_before_idle
+
+            callback = make_callback(node.task_queue, perception_node)
+            pick(node, tf_node.tf_buffer, arm, pose, destination, obj_name,
+                 on_before_idle=callback)
 
     except KeyboardInterrupt:
         pass
@@ -109,6 +151,7 @@ def main():
     executor.shutdown()
     node.destroy_node()
     tf_node.destroy_node()
+    perception_node.destroy_node()
     rclpy.shutdown()
 
 

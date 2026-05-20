@@ -4,7 +4,7 @@ import numpy as np
 from .motion import transform_pose, wait_for_tf, execute_pick_place_sequence
 
 
-def pick(node, tf_buffer, arm, pose, destination, obj_name):
+def pick(node, tf_buffer, arm, pose, destination, obj_name, on_before_idle=None):
     joint_angles = [0., -np.pi / 2.0, 1., -np.pi / 3., -np.pi / 2., 0.]
     home_pose = arm.fk_request(joint_angles)
 
@@ -18,4 +18,4 @@ def pick(node, tf_buffer, arm, pose, destination, obj_name):
     goal_pose.orientation = home_pose.orientation
     goal_pose.position.y -= 0.01
 
-    execute_pick_place_sequence(node, arm, goal_pose, destination, obj_name)
+    execute_pick_place_sequence(node, arm, goal_pose, destination, obj_name, on_before_idle)

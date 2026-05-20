@@ -3,6 +3,7 @@ import time
 import copy
 import math
 import random
+import threading
 
 import rclpy
 import tf2_geometry_msgs
@@ -71,7 +72,7 @@ def wait_for_tf(node, tf_buffer, source_frame, target_frame):
         time.sleep(0.1)
 
 
-def pick_place_storage(node, arm, grasp_pose, destination, obj_name):
+def pick_place_storage(node, arm, grasp_pose, destination, obj_name, on_before_idle=None):
     # 1. [Pick Phase]
     node.get_logger().info(f"Starting PICK phase for {obj_name}...")
     move_gripper.gripper_open(node)
@@ -129,6 +130,9 @@ def pick_place_storage(node, arm, grasp_pose, destination, obj_name):
     rot_time_place = _calc_rot_time(pick_pan_angle, place_pan_angle)
 
     # Lift → rotate → approach → place in one smooth trajectory
+    # Fire on_before_idle after place rotation ends (lift + rotate = 1.0 + rot_time_place)
+    if on_before_idle is not None:
+        threading.Timer(1.0 + rot_time_place, on_before_idle).start()
     arm.execute_trajectory(
         [lift_pose, place_joint, place_approach, place_pose],
         durations=[1.0, rot_time_place, 1.5, 1.0],
@@ -139,20 +143,16 @@ def pick_place_storage(node, arm, grasp_pose, destination, obj_name):
     retreat_pose.position.z += 0.20
     idle_joint = [0., -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., 0.]
 
-    # 💡 Apply dynamic rotation time (Place angle -> IDLE front 0 degrees)
     rot_time_idle = _calc_rot_time(place_pan_angle, 0.0)
 
-    # Retreat → idle in one smooth trajectory
-    arm.execute_trajectory(
-        [retreat_pose, idle_joint],
-        durations=[1.0, rot_time_idle],
-    )
+    arm.execute_trajectory([retreat_pose], durations=[1.0])
+    arm.execute_trajectory([idle_joint], durations=[rot_time_idle])
     setattr(node, count_attr, count + 1)
 
     node.get_logger().info("PICK-and-PLACE sequence completed successfully!")
 
 
-def pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name):
+def pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name, on_before_idle=None):
     # 1. [Pick Phase]
     node.get_logger().info(f"Starting PICK phase for {obj_name}...")
     move_gripper.gripper_open(node)
@@ -207,6 +207,9 @@ def pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name):
     rot_time_place = _calc_rot_time(pick_pan_angle, place_pan_angle)
 
     # Lift → rotate → approach → place in one smooth trajectory
+    # Fire on_before_idle after place rotation ends (lift + rotate = 1.0 + rot_time_place)
+    if on_before_idle is not None:
+        threading.Timer(1.0 + rot_time_place, on_before_idle).start()
     arm.execute_trajectory(
         [lift_pose, place_joint, place_approach, place_pose],
         durations=[1.0, rot_time_place, 1.5, 1.0],
@@ -219,18 +222,15 @@ def pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name):
 
     rot_time_idle = _calc_rot_time(place_pan_angle, 0.0)
 
-    # Retreat → idle in one smooth trajectory
-    arm.execute_trajectory(
-        [retreat_pose, idle_joint],
-        durations=[1.0, rot_time_idle],
-    )
+    arm.execute_trajectory([retreat_pose], durations=[1.0])
+    arm.execute_trajectory([idle_joint], durations=[rot_time_idle])
     node.bookshelf_count += 1
 
     node.get_logger().info("PICK-and-PLACE sequence completed successfully!")
 
 
-def execute_pick_place_sequence(node, arm, grasp_pose, destination, obj_name):
+def execute_pick_place_sequence(node, arm, grasp_pose, destination, obj_name, on_before_idle=None):
     if destination == "bookshelf":
-        pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name)
+        pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name, on_before_idle)
     else:
-        pick_place_storage(node, arm, grasp_pose, destination, obj_name)
+        pick_place_storage(node, arm, grasp_pose, destination, obj_name, on_before_idle)
