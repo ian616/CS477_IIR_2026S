@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import os
 from glob import glob
-from setuptools import setup
+from setuptools import find_packages, setup
 from pathlib import Path
     
 package_name = 'manip_challenge'
@@ -34,7 +34,10 @@ def package_files(data_files, directory_list):
 setup(
     name=package_name,
     version='0.0.1',
-    packages=[package_name, package_name + '.custom', package_name + '.alvan'],
+    packages=find_packages(include=[package_name, package_name + '.*']),
+    package_data={
+        'manip_challenge.custom.perception': ['model/best.pt'],
+    },
     data_files=package_files(data_files, ['data/models/', 'launch/', 'data/worlds/', 'config']),
     install_requires=[
         'setuptools',
@@ -63,7 +66,8 @@ setup(
             'get_pose     = manip_challenge.get_pose:main',            
             'move_gripper = manip_challenge.move_gripper:main',
             'move_joint   = manip_challenge.move_joint:main',
-            'perception   = manip_challenge.custom.perception:main',
+            'custom_rgbd_crop_server = manip_challenge.custom.perception.rgbd_crop_server:main',
+            'custom_rgbd_crop_client = manip_challenge.custom.perception.rgbd_crop_client:main',
             'main         = manip_challenge.custom.main:main',
             'pose_detection = manip_challenge.alvan.pose_detection:main',
             'path_planner = manip_challenge.alvan.path_planner:main',

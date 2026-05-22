@@ -155,8 +155,8 @@ class RandomBinSpawner(Node):
             return False
     
     def run(self):
-        random.seed(3)
-        
+        # random.seed(3)
+
         spawn_list = []
         for i in range(self.num_spawns):
             # Select a random object 

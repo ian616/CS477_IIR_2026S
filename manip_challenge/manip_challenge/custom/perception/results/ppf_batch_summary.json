@@ -1,0 +1,57 @@
+[
+  {
+    "crop_dir": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/rgbd_crops/20260517_181919_128658_strawberry",
+    "object": "strawberry",
+    "result_yml": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/rgbd_crops/20260517_181919_128658_strawberry/ppf_pose_result.yml",
+    "single_overlay": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/results/20260517_181919_128658_strawberry_full_rgb_pose_axes.png",
+    "translation_xyz_m": [
+      0.2883985832989242,
+      0.033371613541608385,
+      0.6999711262380286
+    ]
+  },
+  {
+    "crop_dir": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/rgbd_crops/20260517_110353_242819_coke_can",
+    "object": "coke_can",
+    "result_yml": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/rgbd_crops/20260517_110353_242819_coke_can/ppf_pose_result.yml",
+    "single_overlay": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/results/20260517_110353_242819_coke_can_full_rgb_pose_axes.png",
+    "translation_xyz_m": [
+      -0.12285672717020875,
+      -0.01783907321083325,
+      0.6470180174744967
+    ]
+  },
+  {
+    "crop_dir": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/rgbd_crops/20260517_181900_385839_meat_can",
+    "object": "meat_can",
+    "result_yml": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/rgbd_crops/20260517_181900_385839_meat_can/ppf_pose_result.yml",
+    "single_overlay": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/results/20260517_181900_385839_meat_can_full_rgb_pose_axes.png",
+    "translation_xyz_m": [
+      0.12976179714617733,
+      0.03800871248116999,
+      0.6776674370766856
+    ]
+  },
+  {
+    "crop_dir": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/rgbd_crops/20260517_181843_874077_hammer",
+    "object": "hammer",
+    "result_yml": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/rgbd_crops/20260517_181843_874077_hammer/ppf_pose_result.yml",
+    "single_overlay": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/results/20260517_181843_874077_hammer_full_rgb_pose_axes.png",
+    "translation_xyz_m": [
+      -0.024181797963412546,
+      0.036583822426385755,
+      0.7022969620697915
+    ]
+  },
+  {
+    "crop_dir": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/rgbd_crops/20260517_181833_308538_banana",
+    "object": "banana",
+    "result_yml": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/rgbd_crops/20260517_181833_308538_banana/ppf_pose_result.yml",
+    "single_overlay": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/results/20260517_181833_308538_banana_full_rgb_pose_axes.png",
+    "translation_xyz_m": [
+      0.23609358509324355,
+      -0.05962812118953722,
+      0.6943383030948505
+    ]
+  }
+]
