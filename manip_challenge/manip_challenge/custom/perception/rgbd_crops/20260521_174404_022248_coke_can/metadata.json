@@ -1,0 +1,142 @@
+{
+  "all_detections": [
+    {
+      "bbox_xyxy": [
+        238,
+        219,
+        353,
+        320
+      ],
+      "center_xy": [
+        295,
+        269
+      ],
+      "confidence": 0.9462800621986389,
+      "label": "hammer"
+    },
+    {
+      "bbox_xyxy": [
+        199,
+        299,
+        227,
+        324
+      ],
+      "center_xy": [
+        213,
+        311
+      ],
+      "confidence": 0.8991856575012207,
+      "label": "coke_can"
+    },
+    {
+      "bbox_xyxy": [
+        222,
+        351,
+        305,
+        450
+      ],
+      "center_xy": [
+        263,
+        400
+      ],
+      "confidence": 0.8452274799346924,
+      "label": "hammer"
+    },
+    {
+      "bbox_xyxy": [
+        221,
+        439,
+        361,
+        479
+      ],
+      "center_xy": [
+        291,
+        459
+      ],
+      "confidence": 0.5589560866355896,
+      "label": "hammer"
+    },
+    {
+      "bbox_xyxy": [
+        347,
+        248,
+        380,
+        282
+      ],
+      "center_xy": [
+        363,
+        265
+      ],
+      "confidence": 0.5227394104003906,
+      "label": "meat_can"
+    }
+  ],
+  "detection": {
+    "bbox_xyxy": [
+      199,
+      299,
+      227,
+      324
+    ],
+    "center_xy": [
+      213,
+      311
+    ],
+    "confidence": 0.8991856575012207,
+    "label": "coke_can"
+  },
+  "frame_id": "camera_color_optical_frame",
+  "label": "coke_can",
+  "location_xyz_m": [
+    -0.3187216520309448,
+    0.2166820913553238,
+    1.3581823110580444
+  ],
+  "padded_detection": {
+    "bbox_xyxy": [
+      195,
+      295,
+      231,
+      328
+    ],
+    "center_xy": [
+      213,
+      311
+    ],
+    "confidence": 0.8991856575012207,
+    "label": "coke_can"
+  },
+  "request": "coke can",
+  "roi": {
+    "bbox_xyxy": [
+      195,
+      295,
+      231,
+      328
+    ],
+    "centroid_xyz": [
+      -0.3187216520309448,
+      0.2166820913553238,
+      1.3581823110580444
+    ],
+    "cloud_bbox_xyxy": [
+      195,
+      295,
+      231,
+      328
+    ],
+    "crop_shape_hw": [
+      33,
+      36
+    ],
+    "mask_nonzero": 503,
+    "num_foreground_points": 503,
+    "stats": {
+      "foreground_points": 503,
+      "foreground_z_limit": 1.4373163747787476,
+      "valid_points": 1188,
+      "z_min": 1.3573163747787476,
+      "z_percentile_95": 1.4807361364364624
+    }
+  }
+}

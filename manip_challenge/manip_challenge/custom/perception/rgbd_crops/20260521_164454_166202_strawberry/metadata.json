@@ -1,0 +1,184 @@
+{
+  "all_detections": [
+    {
+      "bbox_xyxy": [
+        306,
+        301,
+        343,
+        341
+      ],
+      "center_xy": [
+        324,
+        321
+      ],
+      "confidence": 0.9100385308265686,
+      "label": "meat_can"
+    },
+    {
+      "bbox_xyxy": [
+        235,
+        243,
+        248,
+        257
+      ],
+      "center_xy": [
+        241,
+        250
+      ],
+      "confidence": 0.8915098309516907,
+      "label": "strawberry"
+    },
+    {
+      "bbox_xyxy": [
+        256,
+        284,
+        269,
+        298
+      ],
+      "center_xy": [
+        262,
+        291
+      ],
+      "confidence": 0.8744937181472778,
+      "label": "strawberry"
+    },
+    {
+      "bbox_xyxy": [
+        355,
+        217,
+        417,
+        344
+      ],
+      "center_xy": [
+        386,
+        280
+      ],
+      "confidence": 0.8509156107902527,
+      "label": "hammer"
+    },
+    {
+      "bbox_xyxy": [
+        203,
+        287,
+        225,
+        328
+      ],
+      "center_xy": [
+        214,
+        307
+      ],
+      "confidence": 0.7323773503303528,
+      "label": "coke_can"
+    },
+    {
+      "bbox_xyxy": [
+        222,
+        355,
+        346,
+        461
+      ],
+      "center_xy": [
+        284,
+        408
+      ],
+      "confidence": 0.5908032655715942,
+      "label": "hammer"
+    },
+    {
+      "bbox_xyxy": [
+        285,
+        439,
+        361,
+        479
+      ],
+      "center_xy": [
+        323,
+        459
+      ],
+      "confidence": 0.5132278800010681,
+      "label": "hammer"
+    },
+    {
+      "bbox_xyxy": [
+        378,
+        216,
+        421,
+        260
+      ],
+      "center_xy": [
+        399,
+        238
+      ],
+      "confidence": 0.4190331697463989,
+      "label": "meat_can"
+    }
+  ],
+  "detection": {
+    "bbox_xyxy": [
+      235,
+      243,
+      248,
+      257
+    ],
+    "center_xy": [
+      241,
+      250
+    ],
+    "confidence": 0.8915098309516907,
+    "label": "strawberry"
+  },
+  "frame_id": "camera_color_optical_frame",
+  "label": "strawberry",
+  "location_xyz_m": [
+    -0.24688416719436646,
+    0.029640348628163338,
+    1.4498209953308105
+  ],
+  "padded_detection": {
+    "bbox_xyxy": [
+      233,
+      241,
+      250,
+      259
+    ],
+    "center_xy": [
+      241,
+      250
+    ],
+    "confidence": 0.8915098309516907,
+    "label": "strawberry"
+  },
+  "request": "pick up the strawberry",
+  "roi": {
+    "bbox_xyxy": [
+      233,
+      241,
+      250,
+      259
+    ],
+    "centroid_xyz": [
+      -0.24688416719436646,
+      0.029640348628163338,
+      1.4498209953308105
+    ],
+    "cloud_bbox_xyxy": [
+      233,
+      241,
+      250,
+      259
+    ],
+    "crop_shape_hw": [
+      18,
+      17
+    ],
+    "mask_nonzero": 291,
+    "num_foreground_points": 291,
+    "stats": {
+      "foreground_points": 291,
+      "foreground_z_limit": 1.479635238647461,
+      "valid_points": 306,
+      "z_min": 1.4349013566970825,
+      "z_percentile_95": 1.479635238647461
+    }
+  }
+}

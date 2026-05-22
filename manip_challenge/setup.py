@@ -71,7 +71,7 @@ setup(
             'rviz_visualizer = manip_challenge.alvan.rviz_visualizer:main',
             'rviz_visualizer_collider = manip_challenge.alvan.rviz_visualizer_collider:main',
             'gripper_control = manip_challenge.alvan.gripper_control:main',
-
+            'record_grasp_pose = manip_challenge.alvan.record_grasp_pose:main',
             ],
     },
 )

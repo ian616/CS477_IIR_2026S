@@ -1,0 +1,128 @@
+{
+  "all_detections": [
+    {
+      "bbox_xyxy": [
+        242,
+        212,
+        354,
+        313
+      ],
+      "center_xy": [
+        298,
+        262
+      ],
+      "confidence": 0.9510059952735901,
+      "label": "hammer"
+    },
+    {
+      "bbox_xyxy": [
+        172,
+        240,
+        214,
+        278
+      ],
+      "center_xy": [
+        193,
+        259
+      ],
+      "confidence": 0.9214978814125061,
+      "label": "meat_can"
+    },
+    {
+      "bbox_xyxy": [
+        222,
+        352,
+        304,
+        450
+      ],
+      "center_xy": [
+        263,
+        401
+      ],
+      "confidence": 0.8573400974273682,
+      "label": "hammer"
+    },
+    {
+      "bbox_xyxy": [
+        220,
+        438,
+        361,
+        479
+      ],
+      "center_xy": [
+        290,
+        458
+      ],
+      "confidence": 0.5113276243209839,
+      "label": "hammer"
+    }
+  ],
+  "detection": {
+    "bbox_xyxy": [
+      242,
+      212,
+      354,
+      313
+    ],
+    "center_xy": [
+      298,
+      262
+    ],
+    "confidence": 0.9510059952735901,
+    "label": "hammer"
+  },
+  "frame_id": "camera_color_optical_frame",
+  "label": "hammer",
+  "location_xyz_m": [
+    -0.08313634991645813,
+    0.14551503956317902,
+    0.768548846244812
+  ],
+  "padded_detection": {
+    "bbox_xyxy": [
+      225,
+      197,
+      371,
+      328
+    ],
+    "center_xy": [
+      298,
+      262
+    ],
+    "confidence": 0.9510059952735901,
+    "label": "hammer"
+  },
+  "request": "hammer",
+  "roi": {
+    "bbox_xyxy": [
+      225,
+      197,
+      371,
+      328
+    ],
+    "centroid_xyz": [
+      -0.08313634991645813,
+      0.14551503956317902,
+      0.768548846244812
+    ],
+    "cloud_bbox_xyxy": [
+      225,
+      197,
+      371,
+      328
+    ],
+    "crop_shape_hw": [
+      131,
+      146
+    ],
+    "mask_nonzero": 32,
+    "num_foreground_points": 32,
+    "stats": {
+      "foreground_points": 32,
+      "foreground_z_limit": 0.8868443918228149,
+      "valid_points": 19126,
+      "z_min": 0.7668443918228149,
+      "z_percentile_95": 1.4806404113769531
+    }
+  }
+}
