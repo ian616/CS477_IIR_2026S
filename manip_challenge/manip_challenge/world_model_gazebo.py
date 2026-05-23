@@ -150,9 +150,11 @@ class WorldModelPublisher(WorldModel):
     # -----------------------------------------------------------------------------------------
     def _object_pose_srv(self, request, response):
         p = self.get_pose_from_world(request.data)
-        assert p is not False, "{} pose is not available".format(request.data)
-        response.pose = misc.list2Pose(p)        
-        return response  
+        if p is False:
+            self.get_logger().error("{} pose is not available".format(request.data))
+            return response
+        response.pose = misc.list2Pose(p)
+        return response
 
     ## def _object_grasp_pose_srv(self, request, response):
     ##     p = self.get_pose_from_world(request.data, return_grip=True)
