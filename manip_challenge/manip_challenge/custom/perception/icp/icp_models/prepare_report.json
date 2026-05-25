@@ -1,0 +1,124 @@
+{
+  "created_at": "2026-05-19T11:25:21",
+  "max_points": 1000,
+  "min_points": 500,
+  "objects": [
+    {
+      "errors": [],
+      "extent_xyz_m": [
+        0.10609955706905305,
+        0.03549634723612972,
+        0.19681322231825027
+      ],
+      "finite_normal_ratio": 1.0,
+      "finite_point_ratio": 1.0,
+      "has_normals": true,
+      "metadata_normal_orientation": "outward",
+      "metadata_num_points": 1000,
+      "metadata_path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/icp_models/banana.json",
+      "normal_norm_max": 1.0000000000000002,
+      "normal_norm_mean": 1.0,
+      "normal_norm_min": 0.9999999999999998,
+      "normal_outward_ratio": 1.0,
+      "num_points": 1000,
+      "object": "banana",
+      "point_cloud_path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/icp_models/banana.ply",
+      "status": "ok",
+      "warnings": []
+    },
+    {
+      "errors": [],
+      "extent_xyz_m": [
+        0.06693835282470657,
+        0.06694281440964193,
+        0.12383238759595433
+      ],
+      "finite_normal_ratio": 1.0,
+      "finite_point_ratio": 1.0,
+      "has_normals": true,
+      "metadata_normal_orientation": "outward",
+      "metadata_num_points": 1000,
+      "metadata_path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/icp_models/coke_can.json",
+      "normal_norm_max": 1.0000000000000002,
+      "normal_norm_mean": 1.0,
+      "normal_norm_min": 0.9999999999999998,
+      "normal_outward_ratio": 1.0,
+      "num_points": 1000,
+      "object": "coke_can",
+      "point_cloud_path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/icp_models/coke_can.ply",
+      "status": "ok",
+      "warnings": []
+    },
+    {
+      "errors": [],
+      "extent_xyz_m": [
+        0.1331173694941148,
+        0.3346246592563077,
+        0.03276474688370726
+      ],
+      "finite_normal_ratio": 1.0,
+      "finite_point_ratio": 1.0,
+      "has_normals": true,
+      "metadata_normal_orientation": "outward",
+      "metadata_num_points": 1000,
+      "metadata_path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/icp_models/hammer.json",
+      "normal_norm_max": 1.0000000000000002,
+      "normal_norm_mean": 1.0,
+      "normal_norm_min": 0.9999999999999999,
+      "normal_outward_ratio": 1.0,
+      "num_points": 1000,
+      "object": "hammer",
+      "point_cloud_path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/icp_models/hammer.ply",
+      "status": "ok",
+      "warnings": []
+    },
+    {
+      "errors": [],
+      "extent_xyz_m": [
+        0.10123485061405939,
+        0.05872549642301236,
+        0.08288820653151752
+      ],
+      "finite_normal_ratio": 1.0,
+      "finite_point_ratio": 1.0,
+      "has_normals": true,
+      "metadata_normal_orientation": "outward",
+      "metadata_num_points": 1000,
+      "metadata_path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/icp_models/meat_can.json",
+      "normal_norm_max": 1.0000000000000002,
+      "normal_norm_mean": 1.0,
+      "normal_norm_min": 0.9999999999999999,
+      "normal_outward_ratio": 1.0,
+      "num_points": 1000,
+      "object": "meat_can",
+      "point_cloud_path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/icp_models/meat_can.ply",
+      "status": "ok",
+      "warnings": []
+    },
+    {
+      "errors": [],
+      "extent_xyz_m": [
+        0.044897338706605866,
+        0.0449725485056742,
+        0.045207461559252864
+      ],
+      "finite_normal_ratio": 1.0,
+      "finite_point_ratio": 1.0,
+      "has_normals": true,
+      "metadata_normal_orientation": "outward",
+      "metadata_num_points": 1000,
+      "metadata_path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/icp_models/strawberry.json",
+      "normal_norm_max": 1.0000000000000002,
+      "normal_norm_mean": 1.0,
+      "normal_norm_min": 0.9999999999999999,
+      "normal_outward_ratio": 1.0,
+      "num_points": 1000,
+      "object": "strawberry",
+      "point_cloud_path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/icp_models/strawberry.ply",
+      "status": "ok",
+      "warnings": []
+    }
+  ],
+  "output_dir": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/icp_models",
+  "status": "ok"
+}

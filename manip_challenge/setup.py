@@ -36,7 +36,7 @@ setup(
     version='0.0.1',
     packages=find_packages(include=[package_name, package_name + '.*']),
     package_data={
-        'manip_challenge.custom.perception': ['model/best.pt'],
+        'manip_challenge.custom.perception': ['model/best.pt', 'model/yolov11_seg.pt'],
     },
     data_files=package_files(data_files, ['data/models/', 'launch/', 'data/worlds/', 'config']),
     install_requires=[
@@ -76,6 +76,18 @@ setup(
             'rviz_visualizer_collider = manip_challenge.grasping.rviz_visualizer_collider:main',
             'gripper_control = manip_challenge.custom.grasping.gripper_control:main',
             'record_grasp_pose = manip_challenge.custom.grasping.record_grasp_pose:main',
+            'move_joint   = manip_challenge.move_joint:main',            
+            'prepare_icp_models = manip_challenge.custom.perception.icp.prepare_icp_models:main',
+            'test_icp_on_saved_crop = manip_challenge.custom.perception.test_icp_on_saved_crop:main',
+            'custom_rgbd_crop_server = manip_challenge.custom.perception.rgbd_crop_server:main',
+            'custom_rgbd_crop_client = manip_challenge.custom.perception.rgbd_crop_client:main',
+            'custom_rgbd_seg_crop_server = manip_challenge.custom.perception.icp.rgbd_seg_crop_server:main',
+            'custom_rgbd_seg_crop_client = manip_challenge.custom.perception.icp.rgbd_seg_crop_client:main',
+            'custom_rgbd_seg_icp_pose_server = manip_challenge.custom.perception.icp.rgbd_seg_icp_pose_server:main',
+            'custom_rgbd_seg_icp_pose_client = manip_challenge.custom.perception.icp.rgbd_seg_icp_pose_client:main',
+            'run_icp_pose_on_crop = manip_challenge.custom.perception.icp.run_icp_pose_on_crop:main',
+            'custom_rgbd_icp_pose_server = manip_challenge.custom.perception.rgbd_icp_pose_server:main',
+            'custom_rgbd_icp_pose_client = manip_challenge.custom.perception.rgbd_icp_pose_client:main',
             ],
     },
 )

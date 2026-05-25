@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>ICP Model Visualization</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 24px; color: #222; }
+    table { border-collapse: collapse; min-width: 760px; }
+    th, td { border-bottom: 1px solid #ddd; padding: 8px 10px; text-align: left; }
+    th { background: #f5f5f5; }
+    code { background: #f5f5f5; padding: 2px 4px; }
+  </style>
+</head>
+<body>
+  <h1>ICP Model Visualization</h1>
+  <p>Check that each cloud has an object-like shape, a tight bounding box, and mostly outward normals.</p>
+  <table>
+    <thead><tr><th>object</th><th>points</th><th>outward</th><th>extent xyz (m)</th><th>static</th><th>interactive</th></tr></thead>
+    <tbody>
+      <tr><td>banana</td><td>1000</td><td>1.000</td><td>0.1061, 0.0355, 0.1968</td><td><a href='banana_model_normals.png'>PNG</a></td><td><a href='banana_model_normals.html'>HTML</a></td></tr>
+      <tr><td>coke_can</td><td>1000</td><td>1.000</td><td>0.0669, 0.0669, 0.1238</td><td><a href='coke_can_model_normals.png'>PNG</a></td><td><a href='coke_can_model_normals.html'>HTML</a></td></tr>
+      <tr><td>hammer</td><td>1000</td><td>1.000</td><td>0.1331, 0.3346, 0.0328</td><td><a href='hammer_model_normals.png'>PNG</a></td><td><a href='hammer_model_normals.html'>HTML</a></td></tr>
+      <tr><td>meat_can</td><td>1000</td><td>1.000</td><td>0.1012, 0.0587, 0.0829</td><td><a href='meat_can_model_normals.png'>PNG</a></td><td><a href='meat_can_model_normals.html'>HTML</a></td></tr>
+      <tr><td>strawberry</td><td>1000</td><td>1.000</td><td>0.0449, 0.0450, 0.0452</td><td><a href='strawberry_model_normals.png'>PNG</a></td><td><a href='strawberry_model_normals.html'>HTML</a></td></tr>
+    </tbody>
+  </table>
+</body>
+</html>

@@ -1,0 +1,61 @@
+{
+  "cloud_bounds": {
+    "center_xyz": [
+      -2.1971776814677657e-05,
+      -3.536603256168447e-05,
+      9.270555498722133e-06
+    ],
+    "extent_xyz": [
+      0.06693835282470657,
+      0.06694281440964193,
+      0.12383238759595433
+    ],
+    "max_xyz": [
+      0.03344720463553861,
+      0.03343604117225928,
+      0.06192546435347589
+    ],
+    "min_xyz": [
+      -0.033491148189167964,
+      -0.03350677323738265,
+      -0.06190692324247844
+    ]
+  },
+  "created_at": "2026-05-19T11:25:13",
+  "mesh_bounds": {
+    "center_xyz": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "extent_xyz": [
+      0.06701000034809113,
+      0.0670199990272522,
+      0.12389999628067017
+    ],
+    "max_xyz": [
+      0.03350500017404556,
+      0.0335099995136261,
+      0.06194999814033508
+    ],
+    "min_xyz": [
+      -0.03350500017404556,
+      -0.0335099995136261,
+      -0.06194999814033508
+    ]
+  },
+  "mesh_loader": "trimesh",
+  "mesh_path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/gazebo_object/coke_can/meshes/coke_can.dae",
+  "mesh_unit_scale": 1.0,
+  "model_scale": 1.0,
+  "normal_max_nn": 30,
+  "normal_orientation": "outward",
+  "normal_outward_ratio": 1.0,
+  "normal_radius_m": 0.01,
+  "num_points": 1000,
+  "object": "coke_can",
+  "point_cloud_path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/icp_models/coke_can.ply",
+  "sample_points_requested": 5000,
+  "target_points": 1000,
+  "voxel_size_m": 0.0025
+}

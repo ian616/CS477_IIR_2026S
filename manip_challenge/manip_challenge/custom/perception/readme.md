@@ -128,6 +128,89 @@ The client prints JSON with:
 - saved directory
 - saved file paths
 
+## Run YOLO Segmentation RGB-D Crop Server
+
+Use this version when overlapping objects make bbox-only crops unreliable. It
+uses `model/yolov11_seg.pt`, converts the selected YOLO polygon into a mask, and
+keeps only masked RGB-D/point-cloud pixels.
+
+Start the server:
+
+```bash
+ros2 run manip_challenge custom_rgbd_seg_crop_server
+```
+
+Request an object:
+
+```bash
+ros2 run manip_challenge custom_rgbd_seg_crop_client banana
+ros2 run manip_challenge custom_rgbd_seg_crop_client coke_can
+```
+
+Default service and topics:
+
+```text
+Service:         /detect_object_rgbd_seg_crop
+Annotated image: /yolov11_seg/rgbd_crop_detection_image
+Mask image:      /yolov11_seg/rgbd_crop_mask
+ROI points:      /yolov11_seg/rgbd_crop_points
+Info JSON:       /yolov11_seg/rgbd_crop_info
+Save dir:        perception/icp/results/
+```
+
+Each successful request saves:
+
+```text
+rgb.png
+rgb_masked.png
+depth.npy
+depth.png
+depth_vis.png
+mask.png
+mask_full.png
+mask_depth_size.png
+mask_cloud_size.png
+cloud.npy
+foreground_points.npy
+annotated.png
+polygon.json
+metadata.json
+```
+
+## Run YOLO Segmentation + ICP 6D Pose Server
+
+This server runs the segmentation crop first, then aligns the prepared ICP model
+cloud with `foreground_points.npy`, and writes projected 6D pose axes on the
+saved images.
+
+Start the server:
+
+```bash
+ros2 run manip_challenge custom_rgbd_seg_icp_pose_server
+```
+
+Request an object:
+
+```bash
+ros2 run manip_challenge custom_rgbd_seg_icp_pose_client banana
+```
+
+Additional files saved in the same result folder:
+
+```text
+icp_pose_result.json
+pose_axes_full.png
+pose_axes_crop.png
+icp_aligned_model.ply
+icp_scene.ply
+```
+
+To run only the ICP/overlay stage on an existing crop folder:
+
+```bash
+ros2 run manip_challenge run_icp_pose_on_crop --crop-dir /path/to/perception/icp/results/<timestamp>_<object>
+```
+
 ## Saved RGB-D Data
 
 Each request creates one folder:
@@ -171,6 +254,54 @@ strawberry/textured.dae
 
 These models are intended to be converted or adapted for LINE-MOD template
 generation.
+
+## ICP Model Preparation
+
+The offline ICP preparation step converts the Gazebo meshes into small,
+ICP-ready Open3D point clouds:
+
+```bash
+cd /home/lhs/CS477_IIR_2026S
+/home/lhs/.venv/cs477/bin/python manip_challenge/manip_challenge/custom/perception/icp/prepare_icp_models.py --force
+```
+
+Generated files:
+
+```text
+icp/icp_models/
+  <object>.ply
+  <object>.json
+  prepare_report.json
+```
+
+What the script does:
+
+- Loads each mesh from `gazebo_object/`.
+- Samples the mesh surface with Open3D Poisson disk sampling.
+- Voxel-downsamples and caps the cloud to 500-1000 points by default.
+- Estimates normals and orients them outward from the model centroid.
+- Writes a JSON metadata file per object.
+- Verifies point count, finite values, unit normals, bounds, and outward normal
+  ratio.
+
+To verify existing prepared assets without rewriting them:
+
+```bash
+/home/lhs/.venv/cs477/bin/python manip_challenge/manip_challenge/custom/perception/icp/prepare_icp_models.py --verify-only
+```
+
+The preparation is healthy when `prepare_report.json` shows `status: "ok"` or
+only harmless warnings, each object has 500-1000 points, and
+`normal_outward_ratio` is close to `1.0`.
+
+To generate visual checks:
+
+```bash
+/home/lhs/.venv/cs477/bin/python manip_challenge/manip_challenge/custom/perception/icp/visualize_icp_models.py
+```
+
+Open `icp/visualizations/index.html` to inspect the object shape, bounding box,
+and normal directions.
 
 ## Planned LINE-MOD Flow
 

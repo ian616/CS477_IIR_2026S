@@ -1,0 +1,61 @@
+{
+  "cloud_bounds": {
+    "center_xyz": [
+      -0.0009227734335043123,
+      0.01575451858878997,
+      0.02260598472678912
+    ],
+    "extent_xyz": [
+      0.044897338706605866,
+      0.0449725485056742,
+      0.045207461559252864
+    ],
+    "max_xyz": [
+      0.02152589591979862,
+      0.03824079284162707,
+      0.04520971550641555
+    ],
+    "min_xyz": [
+      -0.023371442786807244,
+      -0.006731755664047129,
+      2.2539471626877453e-06
+    ]
+  },
+  "created_at": "2026-05-19T11:25:21",
+  "mesh_bounds": {
+    "center_xyz": [
+      -0.000863000750541687,
+      0.015776999527588487,
+      0.02262050007993821
+    ],
+    "extent_xyz": [
+      0.04522399976849556,
+      0.045285999309271574,
+      0.04567500014672987
+    ],
+    "max_xyz": [
+      0.021748999133706093,
+      0.038419999182224274,
+      0.045458000153303146
+    ],
+    "min_xyz": [
+      -0.023475000634789467,
+      -0.0068660001270473,
+      -0.00021699999342672527
+    ]
+  },
+  "mesh_loader": "trimesh",
+  "mesh_path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/gazebo_object/strawberry/textured.dae",
+  "mesh_unit_scale": 1.0,
+  "model_scale": 1.0,
+  "normal_max_nn": 30,
+  "normal_orientation": "outward",
+  "normal_outward_ratio": 1.0,
+  "normal_radius_m": 0.01,
+  "num_points": 1000,
+  "object": "strawberry",
+  "point_cloud_path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/icp_models/strawberry.ply",
+  "sample_points_requested": 5000,
+  "target_points": 1000,
+  "voxel_size_m": 0.0025
+}
