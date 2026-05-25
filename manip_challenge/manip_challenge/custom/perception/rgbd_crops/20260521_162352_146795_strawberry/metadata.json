@@ -1,0 +1,142 @@
+{
+  "all_detections": [
+    {
+      "bbox_xyxy": [
+        210,
+        219,
+        246,
+        280
+      ],
+      "center_xy": [
+        228,
+        249
+      ],
+      "confidence": 0.9231023788452148,
+      "label": "banana"
+    },
+    {
+      "bbox_xyxy": [
+        277,
+        298,
+        291,
+        313
+      ],
+      "center_xy": [
+        284,
+        305
+      ],
+      "confidence": 0.8959770798683167,
+      "label": "strawberry"
+    },
+    {
+      "bbox_xyxy": [
+        222,
+        357,
+        354,
+        463
+      ],
+      "center_xy": [
+        288,
+        410
+      ],
+      "confidence": 0.6179303526878357,
+      "label": "hammer"
+    },
+    {
+      "bbox_xyxy": [
+        328,
+        236,
+        433,
+        274
+      ],
+      "center_xy": [
+        380,
+        255
+      ],
+      "confidence": 0.5968303084373474,
+      "label": "hammer"
+    },
+    {
+      "bbox_xyxy": [
+        221,
+        439,
+        361,
+        479
+      ],
+      "center_xy": [
+        291,
+        459
+      ],
+      "confidence": 0.5902062654495239,
+      "label": "hammer"
+    }
+  ],
+  "detection": {
+    "bbox_xyxy": [
+      277,
+      298,
+      291,
+      313
+    ],
+    "center_xy": [
+      284,
+      305
+    ],
+    "confidence": 0.8959770798683167,
+    "label": "strawberry"
+  },
+  "frame_id": "camera_color_optical_frame",
+  "label": "strawberry",
+  "location_xyz_m": [
+    -0.10770852863788605,
+    0.20854270458221436,
+    1.4407234191894531
+  ],
+  "padded_detection": {
+    "bbox_xyxy": [
+      275,
+      296,
+      293,
+      315
+    ],
+    "center_xy": [
+      284,
+      305
+    ],
+    "confidence": 0.8959770798683167,
+    "label": "strawberry"
+  },
+  "request": "strawberry",
+  "roi": {
+    "bbox_xyxy": [
+      275,
+      296,
+      293,
+      315
+    ],
+    "centroid_xyz": [
+      -0.10770852863788605,
+      0.20854270458221436,
+      1.4407234191894531
+    ],
+    "cloud_bbox_xyxy": [
+      275,
+      296,
+      293,
+      315
+    ],
+    "crop_shape_hw": [
+      19,
+      18
+    ],
+    "mask_nonzero": 164,
+    "num_foreground_points": 164,
+    "stats": {
+      "foreground_points": 164,
+      "foreground_z_limit": 1.477883858680725,
+      "valid_points": 342,
+      "z_min": 1.432883858680725,
+      "z_percentile_95": 1.4805437743663787
+    }
+  }
+}

@@ -247,8 +247,8 @@ class GazeboCartPoleEnv(gym.Env):
         self._observation_msg = None
         
         # Concatenate the information that defines the robot state
-        angle = math.atan(math.tan(obs_message.position[0]))
-        state = [obs_message.position[1], obs_message.velocity[1], angle, obs_message.velocity[0]]        
+        angle = math.atan(math.tan(obs_message.position[1]))
+        state = [obs_message.position[0], obs_message.velocity[0], angle, obs_message.velocity[1]]        
         
         return state
         
@@ -285,7 +285,8 @@ class GazeboCartPoleEnv(gym.Env):
         # Take an observation
         state = self.take_observation()
         x, x_dot, theta, theta_dot = state
-        
+
+        # Done is when either the cart exceeds the workspace boundaries or the pole angle exceeds the failure threshold.
         done =  x < -self.x_threshold \
                 or x > self.x_threshold \
                 or theta < -self.theta_threshold_radians \
@@ -340,15 +341,17 @@ class GazeboCartPoleEnv(gym.Env):
             self._pub.publish(action_msg)
             
             # reset simulation
-            ## while not self.reset_sim.wait_for_service(timeout_sec=1.0):
-            ##     self.node.get_logger().info('/reset_simulation service not available, waiting again...')
+            while not self.reset_sim.wait_for_service(timeout_sec=1.0):
+                self.node.get_logger().info('/reset_simulation service not available, waiting again...')
 
-            ## reset_future = self.reset_sim.call_async(Empty.Request())
-            ## rclpy.spin_until_future_complete(self.node, reset_future)
-
-            ## while not self.set_model.wait_for_service(timeout_sec=1.0):
-            ##     self.node.get_logger().info('/gazebo/set_model_configuration service not available, waiting again ...')
-
+            reset_future = self.reset_sim.call_async(Empty.Request())
+            rclpy.spin_until_future_complete(self.node, reset_future)
+            time.sleep(0.5)
+            
+            while not self.set_model.wait_for_service(timeout_sec=2.0):
+                self.node.get_logger().info('/set_model_configuration service not available, waiting again ...')
+                rclpy.spin_once(self.node, timeout_sec=0.1)
+                
             angle = np.random.uniform(-0.4, 0.4)
             req = SetModelConfiguration.Request()
             req.model_name="cartpole_gazebo"
@@ -356,8 +359,8 @@ class GazeboCartPoleEnv(gym.Env):
             req.joint_names=["cart_to_pole", "slider_to_cart"]
             req.joint_positions=[float(angle), 0.0]
                                                  
-            #reset_future = self.set_model.call_async(req)
-            #rclpy.spin_until_future_complete(self.node, reset_future)
+            reset_future = self.set_model.call_async(req)
+            rclpy.spin_until_future_complete(self.node, reset_future)
 
             # unpause simulation
             while not self.unpause.wait_for_service(timeout_sec=1.0):

@@ -25,9 +25,7 @@ except ImportError:
 
 
 DEFAULT_MODEL_PATH = Path(__file__).resolve().parent / "model" / "best.pt"
-DEFAULT_SAVE_DIR = Path(
-    "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/rgbd_crops"
-)
+DEFAULT_SAVE_DIR = Path(__file__).resolve().parent / "rgbd_crops"
 
 
 @dataclass(frozen=True)
@@ -472,9 +470,9 @@ class RgbdCropServiceNode(Node):
         self.declare_parameter("display_hz", 5.0)
         self.declare_parameter("target_label", "")
         self.declare_parameter("service_name", "detect_object_rgbd_crop")
-        self.declare_parameter("image_topic", "/wrist_camera/wrist_camera/color/image_raw")
-        self.declare_parameter("depth_topic", "/wrist_camera/wrist_camera/depth/color/image_raw")
-        self.declare_parameter("points_topic", "/wrist_camera/wrist_camera/depth/color/points")
+        self.declare_parameter("image_topic", "/wrist_camera/color/image_raw")
+        self.declare_parameter("depth_topic", "/wrist_camera/depth/color/image_raw")
+        self.declare_parameter("points_topic", "/wrist_camera/depth/color/points")
         self.declare_parameter("camera_frame", "wrist_camera_color_optical_frame")
         self.declare_parameter("bbox_padding_ratio", 0.0)
         self.declare_parameter("min_roi_points", 30)
