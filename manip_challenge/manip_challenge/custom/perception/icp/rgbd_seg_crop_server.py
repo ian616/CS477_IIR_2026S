@@ -15,7 +15,7 @@ import numpy as np
 import rclpy
 import sensor_msgs_py.point_cloud2 as pc2
 import std_msgs.msg
-from cv_bridge import CvBridge
+from cv_bridge import CvBridge, CvBridgeError
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from riro_srvs.srv import StringString
@@ -139,6 +139,23 @@ def scale_bbox(bbox_xyxy, src_shape, dst_shape):
     return x1, y1, x2, y2
 
 
+def centered_crop_xyxy(shape, crop_ratio):
+    ratio = float(crop_ratio)
+    if ratio <= 0.0 or ratio >= 1.0:
+        return 0, 0, int(shape[1]), int(shape[0])
+    h, w = shape[:2]
+    crop_w = max(1, int(round(w * ratio)))
+    crop_h = max(1, int(round(h * ratio)))
+    left = max(0, (w - crop_w) // 2)
+    top = max(0, (h - crop_h) // 2)
+    return left, top, min(w, left + crop_w), min(h, top + crop_h)
+
+
+def crop_array_xyxy(array, bbox_xyxy):
+    left, top, right, bottom = bbox_xyxy
+    return array[top:bottom, left:right].copy()
+
+
 def bbox_from_mask(mask):
     ys, xs = np.nonzero(mask)
     if xs.size == 0:
@@ -170,6 +187,62 @@ def depth_to_uint16_mm(depth_crop):
     scaled = depth if finite_median > 20.0 else depth * 1000.0
     output[finite] = np.clip(scaled[finite], 0.0, np.iinfo(np.uint16).max).astype(np.uint16)
     return output
+
+
+def image_msg_to_cv2_fallback(msg, desired_encoding=None):
+    encoding = str(msg.encoding or "").lower()
+    if msg.width == 0 or msg.height == 0 or len(msg.data) == 0:
+        raise ValueError("empty image message")
+
+    specs = {
+        "rgb8": (np.uint8, 3),
+        "bgr8": (np.uint8, 3),
+        "rgba8": (np.uint8, 4),
+        "bgra8": (np.uint8, 4),
+        "mono8": (np.uint8, 1),
+        "8uc1": (np.uint8, 1),
+        "8uc3": (np.uint8, 3),
+        "8uc4": (np.uint8, 4),
+        "mono16": (np.uint16, 1),
+        "16uc1": (np.uint16, 1),
+        "32fc1": (np.float32, 1),
+    }
+    if encoding not in specs:
+        raise ValueError(f"unsupported image encoding '{msg.encoding}'")
+
+    dtype, channels = specs[encoding]
+    itemsize = np.dtype(dtype).itemsize
+    min_step = int(msg.width) * channels * itemsize
+    row_step = int(msg.step) if int(msg.step) > 0 else min_step
+    required = row_step * int(msg.height)
+    if len(msg.data) < required:
+        raise ValueError(
+            f"image data too short for encoding={msg.encoding}, "
+            f"got={len(msg.data)}, need={required}, width={msg.width}, height={msg.height}, step={msg.step}"
+        )
+
+    flat = np.frombuffer(msg.data, dtype=dtype, count=required // itemsize)
+    rows = flat.reshape(int(msg.height), row_step // itemsize)
+    pixels = rows[:, : min_step // itemsize]
+    if channels == 1:
+        image = pixels.reshape(int(msg.height), int(msg.width)).copy()
+    else:
+        image = pixels.reshape(int(msg.height), int(msg.width), channels).copy()
+
+    if desired_encoding == "bgr8":
+        if encoding in ("rgb8", "8uc3"):
+            return cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+        if encoding == "bgr8":
+            return image
+        if encoding == "rgba8":
+            return cv2.cvtColor(image, cv2.COLOR_RGBA2BGR)
+        if encoding == "bgra8":
+            return cv2.cvtColor(image, cv2.COLOR_BGRA2BGR)
+        if channels == 1 and image.dtype == np.uint8:
+            return cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+        raise ValueError(f"cannot convert encoding '{msg.encoding}' to bgr8")
+
+    return image
 
 
 def estimate_mask_center_depth(cloud_crop, valid_mask, window_ratio=0.25):
@@ -434,6 +507,7 @@ class RgbdSegCropServiceNode(Node):
         self.declare_parameter("points_topic", "/wrist_camera/wrist_camera/depth/color/points")
         self.declare_parameter("camera_frame", "wrist_camera_color_optical_frame")
         self.declare_parameter("bbox_padding_ratio", 0.02)
+        self.declare_parameter("input_crop_ratio", 1.0)
         self.declare_parameter("min_roi_points", 30)
         self.declare_parameter("max_depth_m", 1.5)
         self.declare_parameter("depth_filter", True)
@@ -448,6 +522,7 @@ class RgbdSegCropServiceNode(Node):
         self.display = bool(self.get_parameter("display").value)
         self.camera_frame = str(self.get_parameter("camera_frame").value)
         self.bbox_padding_ratio = float(self.get_parameter("bbox_padding_ratio").value)
+        self.input_crop_ratio = float(self.get_parameter("input_crop_ratio").value)
         self.min_roi_points = int(self.get_parameter("min_roi_points").value)
         self.max_depth_m = float(self.get_parameter("max_depth_m").value)
         self.depth_filter = bool(self.get_parameter("depth_filter").value)
@@ -470,6 +545,7 @@ class RgbdSegCropServiceNode(Node):
         self.latest_cloud = None
         self.annotated_img = None
         self.mask_img = None
+        self.skip_counts = {}
 
         self.create_subscription(Image, self.get_parameter("image_topic").value, self.image_callback, qos_profile)
         self.create_subscription(Image, self.get_parameter("depth_topic").value, self.depth_callback, qos_profile)
@@ -492,14 +568,89 @@ class RgbdSegCropServiceNode(Node):
         )
 
     def image_callback(self, msg):
-        self.latest_cv_img = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
+        if msg.width == 0 or msg.height == 0 or len(msg.data) == 0:
+            self.log_skipped_message("rgb_empty", "Skipping empty RGB image message.")
+            return
+        if str(msg.encoding or "").lower() in {"rgb8", "bgr8", "rgba8", "bgra8", "mono8", "8uc1", "8uc3", "8uc4"}:
+            try:
+                image = image_msg_to_cv2_fallback(msg, desired_encoding="bgr8")
+            except Exception as exc:
+                self.log_skipped_message("rgb_fallback_error", f"Skipping RGB image that fallback could not convert: {exc}")
+                return
+            if image is None or image.size == 0:
+                self.log_skipped_message("rgb_empty_array", "Skipping RGB image converted to an empty array.")
+                return
+            self.latest_cv_img = image
+            return
+        try:
+            image = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
+        except CvBridgeError as exc:
+            try:
+                image = image_msg_to_cv2_fallback(msg, desired_encoding="bgr8")
+                self.log_skipped_message(
+                    "rgb_bridge_fallback",
+                    f"cv_bridge could not convert RGB image, but manual fallback succeeded. encoding={msg.encoding}",
+                )
+            except Exception as fallback_exc:
+                self.log_skipped_message(
+                    "rgb_bridge_error",
+                    f"Skipping RGB image that neither cv_bridge nor fallback could convert: "
+                    f"cv_bridge={exc}; fallback={fallback_exc}",
+                )
+                return
+        if image is None or image.size == 0:
+            self.log_skipped_message("rgb_empty_array", "Skipping RGB image converted to an empty array.")
+            return
+        self.latest_cv_img = image
 
     def depth_callback(self, msg):
-        self.latest_depth_img = self.bridge.imgmsg_to_cv2(msg, desired_encoding="passthrough")
+        if msg.width == 0 or msg.height == 0 or len(msg.data) == 0:
+            self.log_skipped_message("depth_empty", "Skipping empty depth image message.")
+            return
+        if str(msg.encoding or "").lower() in {"16uc1", "mono16", "32fc1", "mono8", "8uc1"}:
+            try:
+                depth = image_msg_to_cv2_fallback(msg)
+            except Exception as exc:
+                self.log_skipped_message("depth_fallback_error", f"Skipping depth image that fallback could not convert: {exc}")
+                return
+            if depth is None or depth.size == 0:
+                self.log_skipped_message("depth_empty_array", "Skipping depth image converted to an empty array.")
+                return
+            self.latest_depth_img = depth
+            return
+        try:
+            depth = self.bridge.imgmsg_to_cv2(msg, desired_encoding="passthrough")
+        except CvBridgeError as exc:
+            try:
+                depth = image_msg_to_cv2_fallback(msg)
+                self.log_skipped_message(
+                    "depth_bridge_fallback",
+                    f"cv_bridge could not convert depth image, but manual fallback succeeded. encoding={msg.encoding}",
+                )
+            except Exception as fallback_exc:
+                self.log_skipped_message(
+                    "depth_bridge_error",
+                    f"Skipping depth image that neither cv_bridge nor fallback could convert: "
+                    f"cv_bridge={exc}; fallback={fallback_exc}",
+                )
+                return
+        if depth is None or depth.size == 0:
+            self.log_skipped_message("depth_empty_array", "Skipping depth image converted to an empty array.")
+            return
+        self.latest_depth_img = depth
 
     def points_callback(self, msg):
+        if msg.width == 0 or msg.height == 0 or len(msg.data) == 0:
+            self.log_skipped_message("points_empty", "Skipping empty point cloud message.")
+            return
         raw_cloud = pc2.read_points_numpy(msg, field_names=("x", "y", "z"))
         self.latest_cloud = raw_cloud.reshape(msg.height, msg.width, 3) if msg.height > 1 else raw_cloud
+
+    def log_skipped_message(self, key, message):
+        count = self.skip_counts.get(key, 0) + 1
+        self.skip_counts[key] = count
+        if count == 1:
+            self.get_logger().warn(f"{message} Further identical messages will be suppressed.")
 
     def timer_callback(self):
         if self.annotated_img is not None:
@@ -532,22 +683,35 @@ class RgbdSegCropServiceNode(Node):
 
     def detect_and_save(self, target_label, request_text):
         if self.latest_cv_img is None or self.latest_depth_img is None or self.latest_cloud is None:
-            raise RuntimeError("RGB image, depth image, or organized point cloud has not been received yet.")
+            missing = []
+            if self.latest_cv_img is None:
+                missing.append("RGB image")
+            if self.latest_depth_img is None:
+                missing.append("depth image")
+            if self.latest_cloud is None:
+                missing.append("organized point cloud")
+            raise RuntimeError(f"{', '.join(missing)} has not been received yet.")
 
         target_model = get_model(target_label)
         if target_model is None:
             raise RuntimeError(f"Unknown target='{target_label}'. Choose one of: {known_labels()}")
 
-        detections = self.detector.detect(self.latest_cv_img)
+        rgb_image, depth_image, cloud = self.get_detection_inputs()
+        detections = self.detector.detect(rgb_image)
         selected = self.detector.select(detections, target_model.name)
         if selected is None:
             seen = [detection.label for detection in detections]
-            raise RuntimeError(f"No YOLO segmentation matched target='{target_model.name}'. seen={seen}")
+            self.annotated_img = draw_seg_debug(rgb_image, detections, selected=None)
+            debug_path = self.save_failure_debug_image(target_model.name)
+            raise RuntimeError(
+                f"No YOLO segmentation matched target='{target_model.name}'. "
+                f"seen={seen}. debug_image={debug_path}"
+            )
 
         roi = extract_seg_rgbd_roi(
-            rgb_image=self.latest_cv_img,
-            depth_image=self.latest_depth_img,
-            cloud=self.latest_cloud,
+            rgb_image=rgb_image,
+            depth_image=depth_image,
+            cloud=cloud,
             detection=selected,
             bbox_padding_ratio=self.bbox_padding_ratio,
             max_depth_m=self.max_depth_m,
@@ -557,10 +721,10 @@ class RgbdSegCropServiceNode(Node):
         )
 
         request_dir = self.make_request_dir(target_model.name)
-        saved_files = self.save_rgbd_crop(request_dir, target_model.name, selected, detections, roi, request_text)
+        saved_files = self.save_rgbd_crop(request_dir, target_model.name, selected, detections, roi, request_text, rgb_image)
         self.publish_roi_cloud(roi.foreground_points)
         self.mask_img = roi.mask_full
-        self.annotated_img = draw_seg_debug(self.latest_cv_img, detections, selected, roi)
+        self.annotated_img = draw_seg_debug(rgb_image, detections, selected, roi)
 
         info = {
             "ok": True,
@@ -572,6 +736,7 @@ class RgbdSegCropServiceNode(Node):
             "frame_id": self.camera_frame,
             "detection": selected.to_dict(),
             "all_detections": [detection.to_dict() for detection in detections],
+            "input_crop_ratio": float(self.input_crop_ratio),
             "roi": roi.to_dict(),
             "location_xyz_m": roi.centroid.astype(float).tolist(),
             "save_dir": str(request_dir),
@@ -583,13 +748,35 @@ class RgbdSegCropServiceNode(Node):
         )
         return info
 
+    def get_detection_inputs(self):
+        if self.input_crop_ratio <= 0.0 or self.input_crop_ratio >= 1.0:
+            return self.latest_cv_img, self.latest_depth_img, self.latest_cloud
+
+        rgb_bbox = centered_crop_xyxy(self.latest_cv_img.shape, self.input_crop_ratio)
+        depth_bbox = scale_bbox(rgb_bbox, self.latest_cv_img.shape, self.latest_depth_img.shape)
+        cloud_bbox = scale_bbox(rgb_bbox, self.latest_cv_img.shape, self.latest_cloud.shape)
+        rgb_image = crop_array_xyxy(self.latest_cv_img, rgb_bbox)
+        depth_image = crop_array_xyxy(self.latest_depth_img, depth_bbox)
+        cloud = crop_array_xyxy(self.latest_cloud, cloud_bbox)
+        return rgb_image, depth_image, cloud
+
     def make_request_dir(self, label):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
         request_dir = self.save_dir / f"{timestamp}_{label}"
         request_dir.mkdir(parents=True, exist_ok=False)
         return request_dir
 
-    def save_rgbd_crop(self, request_dir, label, selected, detections, roi, request_text):
+    def save_failure_debug_image(self, label):
+        if self.annotated_img is None:
+            return None
+        debug_dir = self.save_dir / "_debug_failures"
+        debug_dir.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        debug_path = debug_dir / f"{timestamp}_{label}_detections.png"
+        cv2.imwrite(str(debug_path), self.annotated_img)
+        return str(debug_path)
+
+    def save_rgbd_crop(self, request_dir, label, selected, detections, roi, request_text, source_image=None):
         paths = {
             "rgb": request_dir / "rgb.png",
             "rgb_masked": request_dir / "rgb_masked.png",
@@ -631,7 +818,9 @@ class RgbdSegCropServiceNode(Node):
         cv2.imwrite(str(paths["mask_overlay"]), overlay)
         np.save(paths["cloud_npy"], roi.cloud_crop)
         np.save(paths["foreground_points_npy"], roi.foreground_points)
-        cv2.imwrite(str(paths["annotated"]), draw_seg_debug(self.latest_cv_img, detections, selected, roi))
+        if source_image is None:
+            source_image = self.latest_cv_img
+        cv2.imwrite(str(paths["annotated"]), draw_seg_debug(source_image, detections, selected, roi))
 
         polygon_payload = {
             "label": label,
@@ -648,6 +837,7 @@ class RgbdSegCropServiceNode(Node):
             "frame_id": self.camera_frame,
             "detection": selected.to_dict(),
             "all_detections": [detection.to_dict() for detection in detections],
+            "input_crop_ratio": float(self.input_crop_ratio),
             "roi": roi.to_dict(),
             "location_xyz_m": roi.centroid.astype(float).tolist(),
         }

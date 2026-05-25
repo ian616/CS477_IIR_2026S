@@ -28,4 +28,5 @@ __pycache__
 ###############
 manip_challenge/manip_challenge/custom/perception/rgbd_crops
 manip_challenge/manip_challenge/custom/perception/icp/results
+manip_challenge/manip_challenge/custom/perception/two-view/results
 manip_challenge/manip_challenge/custom/perception/results
