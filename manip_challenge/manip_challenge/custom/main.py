@@ -17,7 +17,7 @@ from tf2_ros import Buffer, TransformListener
 from assignment_2.move_joint import ArmClient
 
 from .parsing import parse_task_commands
-from .grasping import pick
+from .grasping import pick, compute_grasp_pose
 from .motion import transform_pose, execute_pick_place_sequence
 
 
@@ -160,11 +160,7 @@ def main():
                         mgr_node.get_logger().warn('[get_next_pick_data] transform failed')
                         pending_obj = None
                         return None
-                    # Compute goal_pose identical to grasping.pick()
-                    home_pose = arm_ref.fk_request([0., -np.pi / 2.0, 1., -np.pi / 3., -np.pi / 2., 0.])
-                    goal_pose = copy.deepcopy(pose_base)
-                    goal_pose.orientation = home_pose.orientation
-                    goal_pose.position.y -= 0.01
+                    goal_pose = compute_grasp_pose(arm_ref, pose_base)
                     approach_pose = copy.deepcopy(goal_pose)
                     approach_pose.position.z += 0.15
                     pan = math.atan2(goal_pose.position.y, goal_pose.position.x)
