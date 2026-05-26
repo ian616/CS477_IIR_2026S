@@ -25,7 +25,6 @@ import sys
 import threading
 import time
 import traceback
-import types
 from pathlib import Path
 
 try:
@@ -131,6 +130,8 @@ def executor_safe_gripper_open(node, force=1.0, timeout=1.0, gripper_open_pos=0.
 
 
 def executor_safe_gripper_close(node, force=1.0, timeout=3.0, gripper_close_pos=0.8, **kwargs):
+    force = float(getattr(node, "gripper_force", force))
+    gripper_close_pos = float(getattr(node, "gripper_close_pos", gripper_close_pos))
     node.get_logger().info("Closing gripper.")
     return executor_safe_gripper_goto(node, gripper_close_pos, force=force, timeout=timeout, **kwargs)
 
@@ -139,41 +140,6 @@ move_gripper.gripperGotoPos = executor_safe_gripper_goto
 move_gripper.gripper_open = executor_safe_gripper_open
 move_gripper.gripper_close = executor_safe_gripper_close
 
-
-def grasping_item(node, arm, grasp_pose, obj_name=None):
-    """Bridge custom/motion's grasp hook to the custom/grasping gripper logic."""
-    node.get_logger().info(
-        f"Grasping {obj_name or 'object'} with {CUSTOM_GRIPPER_JOINT_NAME} at the selected pose."
-    )
-    arm.execute_trajectory(
-        [grasp_pose],
-        durations=[float(getattr(node, "grasp_descend_duration", 1.0))],
-    )
-    move_gripper.gripper_close(
-        node,
-        force=float(getattr(node, "gripper_force", 0.5)),
-        gripper_close_pos=float(getattr(node, "gripper_close_pos", 0.5)),
-    )
-    time.sleep(float(getattr(node, "gripper_settle_time", 0.4)))
-
-
-def install_motion_grasping_item_shim():
-    """Provide the grasping_item module expected by custom.motion.motion."""
-    parent_name = "manip_challenge.custom.motion.grasping"
-    item_name = f"{parent_name}.grasping_item"
-    if item_name in sys.modules:
-        return
-
-    parent_module = types.ModuleType(parent_name)
-    parent_module.__path__ = []
-    item_module = types.ModuleType(item_name)
-    item_module.grasping_item = grasping_item
-    parent_module.grasping_item = item_module
-    sys.modules[parent_name] = parent_module
-    sys.modules[item_name] = item_module
-
-
-install_motion_grasping_item_shim()
 from manip_challenge.custom.motion.motion import PLACE_CONFIGS, execute_pick_place_sequence  # noqa: E402
 
 
