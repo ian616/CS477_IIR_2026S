@@ -96,7 +96,13 @@ def pick_place_storage(node, arm, grasp_pose, destination, obj_name,
                 [pick_joint, approach_pose, grasp_pose],
                 durations=[rot_time_pick, 1.5, 1.0],
             )
-        move_gripper.gripper_close(node, force=0.5, gripper_close_pos=0.5)
+        
+        # Gripper close to grasp the item.
+        # 'gripper_close_pos' should be set differently depending on the items.
+        # 'force' is not used.
+        move_gripper.gripper_close(node, gripper_close_pos=0.5)
+        
+        # move_gripper.gripper_close(node, force=0.5, gripper_close_pos=0.5)
 
     # 2. [Place Phase]
     node.get_logger().info(f"Starting PLACE phase. Destination: {destination}")

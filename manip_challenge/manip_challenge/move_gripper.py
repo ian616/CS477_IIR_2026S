@@ -41,7 +41,7 @@ def gripperGotoPos(node, pos, force=1., timeout=3,
                        enable_spin=True,
                        uuid=None, **kwargs):
     """
-    Mve the gripper finger to the designated position
+    Move the gripper finger to the designated position
 
     Parameters
     ----------
@@ -49,8 +49,8 @@ def gripperGotoPos(node, pos, force=1., timeout=3,
         a ROS2 node handle
     pos : 
         a fingertip position where
-        pos=0 indicates the status of OPEN
-        pos=0.8 indicates the status of CLOSE
+        pos=0 indicates the status of OPEN      (radian) 0    ->  0       degrees
+        pos=0.8 indicates the status of CLOSE   (radian) 0.8  ->  46.07   degrees
     """
     node.get_logger().info('run_gripper: gripperGotoPos')
     ## cur_pos = self.getGripperState()
