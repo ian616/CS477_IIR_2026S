@@ -164,7 +164,6 @@ def main():
                     home_pose = arm_ref.fk_request([0., -np.pi / 2.0, 1., -np.pi / 3., -np.pi / 2., 0.])
                     goal_pose = copy.deepcopy(pose_base)
                     goal_pose.orientation = home_pose.orientation
-                    goal_pose.position.y -= 0.01
                     approach_pose = copy.deepcopy(goal_pose)
                     approach_pose.position.z += 0.15
                     pan = math.atan2(goal_pose.position.y, goal_pose.position.x)
@@ -172,6 +171,7 @@ def main():
                     pending_pick_done = True
                     pending_grasp_pose = goal_pose
                     return {
+                        'obj_name': next_obj,
                         'pick_joint': [pan, -np.pi / 2.0, 1., -np.pi / 3.0, -np.pi / 2.0, 0.],
                         'approach_pose': approach_pose,
                         'grasp_pose': goal_pose,
