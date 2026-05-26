@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
-"""Two-view perception command server for grasp-approach motion.
+"""Two-view perception command server for pick-and-place motion.
 
 Run this server continuously, then send commands with two_view_grasp_client.py:
 
     python3 two_view_grasp_client.py banana left
 
-This first version detects the requested object with the top-view two-view
-segmentation service, chooses the ROI point-cloud centroid as the grasp target,
-transforms it into base_link, and moves the gripper through an approach pose
-down to a grasp-ready pose. It does not place the object yet.
+The server embeds the top-view perception node in this same process, chooses a
+grasp point from the segmented point cloud, transforms it into base_link, and
+then uses the custom motion/grasping pipeline to move the object to the
+requested destination.
 """
 
 import argparse
 import copy
+import importlib.util
 import json
 import math
 import os
@@ -21,8 +22,10 @@ import re
 import signal
 import subprocess
 import sys
+import threading
 import time
 import traceback
+import types
 from pathlib import Path
 
 try:
@@ -43,11 +46,15 @@ import numpy as np
 import rclpy
 import tf2_geometry_msgs  # noqa: F401  Needed for PoseStamped TF transforms.
 from geometry_msgs.msg import Pose, PoseStamped
+from rclpy.action import ActionClient
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from riro_srvs.srv import StringString
 from tf2_ros import Buffer, ConnectivityException, ExtrapolationException, LookupException, TransformListener
+from builtin_interfaces.msg import Duration
+from control_msgs.action import FollowJointTrajectory
+from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
 
 if not hasattr(np, "mat"):
@@ -66,6 +73,108 @@ for path in (str(PACKAGE_SRC), str(ASSIGNMENT2_SRC), str(WORKSPACE_ROOT)):
 from assignment_2.move_joint import ArmClient  # noqa: E402
 from manip_challenge import move_gripper  # noqa: E402
 import manip_challenge.misc as misc  # noqa: E402
+from manip_challenge.custom.grasping.gripper_control import JOINT_NAME as CUSTOM_GRIPPER_JOINT_NAME  # noqa: E402
+
+
+def executor_safe_gripper_goto(node, pos, force=1.0, timeout=3.0, **kwargs):
+    """Send a gripper action without recursively spinning an executor-owned node."""
+    if not hasattr(node, "_two_view_gripper_client"):
+        node._two_view_gripper_client = ActionClient(
+            node,
+            FollowJointTrajectory,
+            "/gripper_controller/follow_joint_trajectory",
+            callback_group=getattr(node, "callback_group", None),
+        )
+
+    client = node._two_view_gripper_client
+    if not client.wait_for_server(timeout_sec=5.0):
+        raise RuntimeError("Timed out waiting for gripper action server.")
+
+    goal = FollowJointTrajectory.Goal()
+    goal.trajectory = JointTrajectory()
+    goal.trajectory.joint_names = [CUSTOM_GRIPPER_JOINT_NAME]
+    goal.trajectory.points = [
+        JointTrajectoryPoint(
+            positions=[float(pos)],
+            velocities=[0.0],
+            time_from_start=Duration(sec=int(timeout), nanosec=int((timeout - int(timeout)) * 1e9)),
+        )
+    ]
+
+    goal_future = client.send_goal_async(goal)
+    deadline = time.monotonic() + float(timeout) + 6.0
+    while rclpy.ok() and not goal_future.done():
+        if time.monotonic() > deadline:
+            raise TimeoutError("Timed out sending gripper goal.")
+        time.sleep(0.01)
+
+    goal_handle = goal_future.result()
+    if goal_handle is None or not goal_handle.accepted:
+        raise RuntimeError("Gripper goal was rejected.")
+
+    result_future = goal_handle.get_result_async()
+    deadline = time.monotonic() + float(timeout) + 6.0
+    while rclpy.ok() and not result_future.done():
+        if time.monotonic() > deadline:
+            raise TimeoutError("Timed out waiting for gripper motion.")
+        time.sleep(0.01)
+
+    result = result_future.result()
+    if result is None:
+        raise RuntimeError(f"Gripper action failed: {result_future.exception()!r}")
+    return result
+
+
+def executor_safe_gripper_open(node, force=1.0, timeout=1.0, gripper_open_pos=0.0, **kwargs):
+    node.get_logger().info("Opening gripper.")
+    return executor_safe_gripper_goto(node, gripper_open_pos, force=force, timeout=timeout, **kwargs)
+
+
+def executor_safe_gripper_close(node, force=1.0, timeout=3.0, gripper_close_pos=0.8, **kwargs):
+    node.get_logger().info("Closing gripper.")
+    return executor_safe_gripper_goto(node, gripper_close_pos, force=force, timeout=timeout, **kwargs)
+
+
+move_gripper.gripperGotoPos = executor_safe_gripper_goto
+move_gripper.gripper_open = executor_safe_gripper_open
+move_gripper.gripper_close = executor_safe_gripper_close
+
+
+def grasping_item(node, arm, grasp_pose, obj_name=None):
+    """Bridge custom/motion's grasp hook to the custom/grasping gripper logic."""
+    node.get_logger().info(
+        f"Grasping {obj_name or 'object'} with {CUSTOM_GRIPPER_JOINT_NAME} at the selected pose."
+    )
+    arm.execute_trajectory(
+        [grasp_pose],
+        durations=[float(getattr(node, "grasp_descend_duration", 1.0))],
+    )
+    move_gripper.gripper_close(
+        node,
+        force=float(getattr(node, "gripper_force", 0.5)),
+        gripper_close_pos=float(getattr(node, "gripper_close_pos", 0.5)),
+    )
+    time.sleep(float(getattr(node, "gripper_settle_time", 0.4)))
+
+
+def install_motion_grasping_item_shim():
+    """Provide the grasping_item module expected by custom.motion.motion."""
+    parent_name = "manip_challenge.custom.motion.grasping"
+    item_name = f"{parent_name}.grasping_item"
+    if item_name in sys.modules:
+        return
+
+    parent_module = types.ModuleType(parent_name)
+    parent_module.__path__ = []
+    item_module = types.ModuleType(item_name)
+    item_module.grasping_item = grasping_item
+    parent_module.grasping_item = item_module
+    sys.modules[parent_name] = parent_module
+    sys.modules[item_name] = item_module
+
+
+install_motion_grasping_item_shim()
+from manip_challenge.custom.motion.motion import PLACE_CONFIGS, execute_pick_place_sequence  # noqa: E402
 
 
 HOME_JOINTS = [0.0, -np.pi / 2.0, 1.0, -np.pi / 3.0, -np.pi / 2.0, 0.0]
@@ -300,6 +409,47 @@ def choose_grasp_target_from_points(points, label="", min_bin_points=20):
     }
 
 
+def adjust_target_depth_from_rgbd(points, selection, clearance_m=0.008, local_radius_m=0.035, percentile=10.0):
+    """Use local RGB-D point depth to place the grasp target just above the object surface."""
+    points = finite_xyz_points(points)
+    if len(points) == 0 or "target_xyz_m" not in selection:
+        return selection
+
+    target = np.asarray(selection["target_xyz_m"], dtype=np.float64)
+    xy_distance = np.linalg.norm(points[:, :2] - target[:2], axis=1)
+    local = points[xy_distance <= float(local_radius_m)]
+
+    if len(local) < 12:
+        nearest_count = min(max(12, len(points) // 20), len(points))
+        nearest_indices = np.argsort(xy_distance)[:nearest_count]
+        local = points[nearest_indices]
+        mode = "nearest_points"
+    else:
+        mode = "local_radius"
+
+    local_depths = local[:, 2]
+    local_depths = local_depths[np.isfinite(local_depths) & (local_depths > 0.0)]
+    if len(local_depths) == 0:
+        return selection
+
+    surface_depth = float(np.percentile(local_depths, float(percentile)))
+    previous_depth = float(target[2])
+    target[2] = surface_depth - float(clearance_m)
+    selection["target_xyz_m"] = target.astype(float).tolist()
+    selection["rgbd_depth_adjustment"] = {
+        "method": mode,
+        "local_points": int(len(local_depths)),
+        "local_radius_m": float(local_radius_m),
+        "surface_depth_percentile": float(percentile),
+        "measured_surface_depth_m": surface_depth,
+        "clearance_above_surface_m": float(clearance_m),
+        "previous_target_depth_m": previous_depth,
+        "adjusted_target_depth_m": float(target[2]),
+        "delta_depth_m": float(target[2] - previous_depth),
+    }
+    return selection
+
+
 def load_grasp_points_from_detection(detection):
     files = detection.get("files") or {}
     points_path = files.get("foreground_points_npy")
@@ -400,7 +550,7 @@ def start_child_processes(args):
         )
         time.sleep(args.launch_wait)
 
-    if args.start_perception:
+    if args.external_perception and args.start_perception:
         processes.append(
             subprocess.Popen(
                 [sys.executable, str(TWO_VIEW_SERVER)],
@@ -427,6 +577,23 @@ def stop_child_processes(processes):
             proc.terminate()
 
 
+def load_top_view_perception_module():
+    spec = importlib.util.spec_from_file_location("custom_top_view_seg_server", TWO_VIEW_SERVER)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Could not load top-view perception module: {TWO_VIEW_SERVER}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def ros_args_with_embedded_perception_defaults(argv, args, top_view_module):
+    ros_argv = top_view_module.argv_with_default_params(list(argv or sys.argv))
+    default_service = top_view_module.DEFAULTS.get("service_name")
+    if args.perception_service != default_service:
+        ros_argv.extend(["--ros-args", "-p", f"service_name:={args.perception_service}"])
+    return ros_argv
+
+
 class TfNode(Node):
     def __init__(self):
         super().__init__("two_view_grasp_tf_node")
@@ -440,6 +607,11 @@ class TwoViewGraspServer(Node):
         self.args = args
         self.tf_buffer = tf_buffer
         self.arm = arm
+        self.command_lock = threading.Lock()
+        self.gripper_force = args.gripper_force
+        self.gripper_close_pos = args.gripper_close_pos
+        self.gripper_settle_time = args.gripper_settle_time
+        self.grasp_descend_duration = args.descend_duration
         self.callback_group = ReentrantCallbackGroup()
         self.perception_client = self.create_client(
             StringString,
@@ -459,12 +631,13 @@ class TwoViewGraspServer(Node):
 
         self.get_logger().info(
             f"Ready. Send commands to '{args.service_name}', e.g. 'banana left'. "
-            "Each command returns home, detects the object, then moves to a grasp-ready pose."
+            "Each command detects the object and executes pick-and-place in this single server."
         )
 
     def handle_command(self, request, response):
         try:
-            result = self.execute_command(request.data)
+            with self.command_lock:
+                result = self.execute_command(request.data)
         except Exception as exc:
             self.get_logger().error(f"Command failed: {exc}\n{traceback.format_exc()}")
             result = {"ok": False, "error": str(exc), "command": request.data}
@@ -478,6 +651,14 @@ class TwoViewGraspServer(Node):
             return {"ok": True, "action": action, "message": "Robot moved to home joints."}
 
         self.get_logger().info(f"Command parsed: object={obj_name}, destination={destination}")
+        if not destination and not self.args.approach_only:
+            raise CommandParseError(
+                "Destination is required for pick-and-place. Try: 'banana left' or 'move banana to bookshelf'."
+            )
+        if destination and destination not in PLACE_CONFIGS:
+            raise CommandParseError(
+                f"Unknown destination '{destination}'. Choose one of: {sorted(PLACE_CONFIGS)}"
+            )
         if not self.args.dry_run and not self.args.no_command_home:
             self.get_logger().info("Returning to home before starting the new command.")
             self.arm.move_joint(HOME_JOINTS)
@@ -494,14 +675,20 @@ class TwoViewGraspServer(Node):
         approach_pose = copy.deepcopy(grasp_pose)
         approach_pose.position.z += self.args.approach_height
 
-        move_gripper.gripper_open(self)
+        action_name = "grasp_ready" if self.args.approach_only else "pick_place"
+        message = "Moved to grasp-ready pose." if self.args.approach_only else "Pick-and-place sequence completed."
 
-        if not self.args.dry_run:
+        if self.args.dry_run:
+            self.get_logger().info("Dry run: skipping arm and gripper motion.")
+        elif self.args.approach_only:
+            move_gripper.gripper_open(self)
             self.move_to_grasp_approach(grasp_pose, approach_pose)
+        else:
+            execute_pick_place_sequence(self, self.arm, grasp_pose, destination, obj_name)
 
         return {
             "ok": True,
-            "action": "grasp_ready",
+            "action": action_name,
             "object": obj_name,
             "destination": destination,
             "perception_target": detection.get("target"),
@@ -512,8 +699,8 @@ class TwoViewGraspServer(Node):
             "grasp_pose_in_base": pose_to_dict(grasp_pose),
             "approach_pose_in_base": pose_to_dict(approach_pose),
             "dry_run": bool(self.args.dry_run),
-            "closed_gripper": bool(self.args.close_gripper),
-            "message": "Moved to grasp-ready pose.",
+            "closed_gripper": bool(not self.args.dry_run and (not self.args.approach_only or self.args.close_gripper)),
+            "message": message,
         }
 
     def detect_object(self, obj_name):
@@ -546,6 +733,13 @@ class TwoViewGraspServer(Node):
         label = detection.get("target") or detection.get("detected_label") or obj_name
         selection = choose_grasp_target_from_points(points, label=label)
         selection["points_path"] = points_path
+        selection = adjust_target_depth_from_rgbd(
+            points,
+            selection,
+            clearance_m=self.args.grasp_surface_clearance,
+            local_radius_m=self.args.grasp_depth_local_radius,
+            percentile=self.args.grasp_depth_percentile,
+        )
 
         output_dir = detection.get("save_dir")
         if not output_dir and points_path:
@@ -675,28 +869,54 @@ def spawn_objects(node, object_names):
 
 
 def parse_args(argv=None):
-    parser = argparse.ArgumentParser(description="Two-view grasp-approach command server.")
+    parser = argparse.ArgumentParser(description="Two-view pick-and-place command server.")
     parser.add_argument("--service-name", default="two_view_grasp_command")
     parser.add_argument("--perception-service", default="detect_object_top_rgbd_seg_crop")
     parser.add_argument("--camera-frame", default="camera_color_optical_frame")
     parser.add_argument("--perception-timeout", type=float, default=15.0)
     parser.add_argument("--tf-timeout", type=float, default=5.0)
     parser.add_argument("--approach-height", type=float, default=0.15)
-    parser.add_argument("--final-z-offset", type=float, default=0.025)
+    parser.add_argument(
+        "--final-z-offset",
+        type=float,
+        default=0.0,
+        help="Extra base-link Z offset after RGB-D depth targeting. Keep near 0 unless calibration needs a bias.",
+    )
+    parser.add_argument(
+        "--grasp-surface-clearance",
+        type=float,
+        default=-0.012,
+        help="Meters to stay above the locally measured RGB-D object surface. Negative values descend into the object.",
+    )
+    parser.add_argument(
+        "--grasp-depth-local-radius",
+        type=float,
+        default=0.035,
+        help="Meters around the selected grasp XY used to estimate local object depth.",
+    )
+    parser.add_argument(
+        "--grasp-depth-percentile",
+        type=float,
+        default=10.0,
+        help="Local depth percentile used as the top surface estimate; lower is closer to the top camera.",
+    )
     parser.add_argument("--grasp-y-offset", type=float, default=-0.01)
     parser.add_argument("--approach-duration", type=float, default=1.5)
     parser.add_argument("--descend-duration", type=float, default=1.0)
     parser.add_argument("--retreat-duration", type=float, default=1.0)
+    parser.add_argument("--approach-only", action="store_true", help="Only move to the grasp-ready pose instead of placing the object.")
     parser.add_argument("--retreat-after-command", action="store_true", help="Retreat to the approach pose after reaching grasp-ready pose.")
     parser.add_argument("--no-command-home", action="store_true", help="Do not return home before each client command.")
-    parser.add_argument("--close-gripper", action="store_true", help="Close the gripper after reaching grasp-ready pose.")
+    parser.add_argument("--close-gripper", action="store_true", help="In --approach-only mode, close the gripper after reaching grasp-ready pose.")
     parser.add_argument("--gripper-force", type=float, default=0.5)
     parser.add_argument("--gripper-close-pos", type=float, default=0.5)
+    parser.add_argument("--gripper-settle-time", type=float, default=0.4)
     parser.add_argument("--dry-run", action="store_true", help="Detect and transform, but do not move the arm.")
     parser.add_argument("--no-home", action="store_true", help="Do not move the arm to the home joint pose at startup.")
     parser.add_argument("--launch-world", action="store_true", help="Start ur5_setup_random_picking.launch.py as a child process.")
     parser.add_argument("--launch-wait", type=float, default=12.0)
-    parser.add_argument("--start-perception", action="store_true", help="Start perception/two-view/top_view_seg_server.py as a child process.")
+    parser.add_argument("--external-perception", action="store_true", help="Use an already running perception service instead of embedding top-view perception.")
+    parser.add_argument("--start-perception", action="store_true", help="With --external-perception, start perception/two-view/top_view_seg_server.py as a child process.")
     parser.add_argument("--perception-wait", type=float, default=3.0)
     parser.add_argument(
         "--spawn-object",
@@ -709,10 +929,22 @@ def parse_args(argv=None):
 
 def main(argv=None):
     args = parse_args(argv)
+    top_view_module = None
+    if not args.external_perception:
+        top_view_module = load_top_view_perception_module()
     child_processes = start_child_processes(args)
 
-    rclpy.init(args=argv)
+    ros_argv = (
+        ros_args_with_embedded_perception_defaults(argv or sys.argv, args, top_view_module)
+        if top_view_module is not None
+        else argv
+    )
+    rclpy.init(args=ros_argv)
+    perception_node = None
     tf_node = TfNode()
+    if top_view_module is not None:
+        perception_node = top_view_module.RgbdSegCropServiceNode()
+        perception_node.get_logger().info("Embedded top-view perception is running inside two_view_grasp_server.")
     arm = ArmClient()
     server = TwoViewGraspServer(args, tf_node.tf_buffer, arm)
 
@@ -722,6 +954,8 @@ def main(argv=None):
         spawn_objects(server, args.spawn_object)
 
         executor = MultiThreadedExecutor(num_threads=4)
+        if perception_node is not None:
+            executor.add_node(perception_node)
         executor.add_node(tf_node)
         executor.add_node(server)
         executor.spin()
@@ -732,6 +966,8 @@ def main(argv=None):
             executor.shutdown()
         server.destroy_node()
         tf_node.destroy_node()
+        if perception_node is not None:
+            perception_node.destroy_node()
         arm.destroy_node()
         rclpy.shutdown()
         stop_child_processes(child_processes)
