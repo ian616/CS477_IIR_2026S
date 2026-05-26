@@ -17,7 +17,7 @@ from tf2_ros import Buffer, TransformListener
 from assignment_2.move_joint import ArmClient
 
 from .parsing import parse_task_commands
-from .grasping import pick, compute_grasp_pose
+from .grasping import detect_and_execute, compute_grasp_pose
 from .motion import transform_pose, execute_pick_place_sequence
 
 
@@ -207,7 +207,7 @@ def main():
                 continue
 
             node.get_logger().info(f"Detected '{obj_name}'! Executing pick...")
-            pick(node, tf_node.tf_buffer, arm, pose, destination, obj_name,
+            detect_and_execute(node, tf_node.tf_buffer, arm, pose, destination, obj_name,
                  on_before_idle=on_before_idle,
                  get_next_pick_data=get_next_pick_data)
 

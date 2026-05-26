@@ -12,7 +12,7 @@ def compute_grasp_pose(arm, pose_in_base):
     return goal_pose
 
 
-def pick(node, tf_buffer, arm, pose, destination, obj_name,
+def detect_and_execute(node, tf_buffer, arm, pose, destination, obj_name,
          on_before_idle=None, get_next_pick_data=None):
     wait_for_tf(node, tf_buffer, 'camera_color_optical_frame', 'base_link')
 
