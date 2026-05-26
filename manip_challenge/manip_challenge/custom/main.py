@@ -171,6 +171,7 @@ def main():
                     pending_pick_done = True
                     pending_grasp_pose = goal_pose
                     return {
+                        'obj_name': next_obj,
                         'pick_joint': [pan, -np.pi / 2.0, 1., -np.pi / 3.0, -np.pi / 2.0, 0.],
                         'approach_pose': approach_pose,
                         'grasp_pose': goal_pose,

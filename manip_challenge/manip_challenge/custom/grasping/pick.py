@@ -19,7 +19,7 @@ def pick(node, tf_buffer, arm, pose, destination, obj_name,
 
     goal_pose = copy.deepcopy(pose_in_base)
     goal_pose.orientation = home_pose.orientation
-    goal_pose.position.y -= 0.01
 
+    # Move to Motion part
     execute_pick_place_sequence(node, arm, goal_pose, destination, obj_name,
                                 on_before_idle, get_next_pick_data)

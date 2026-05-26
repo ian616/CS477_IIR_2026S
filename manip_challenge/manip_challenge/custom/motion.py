@@ -11,6 +11,7 @@ from geometry_msgs.msg import Pose, PoseStamped
 from tf2_ros import Buffer, ConnectivityException, ExtrapolationException, LookupException
 
 from manip_challenge import move_gripper
+from .grasping.grasping_item import grasping_item
 
 
 PLACE_CONFIGS = {
@@ -88,21 +89,16 @@ def pick_place_storage(node, arm, grasp_pose, destination, obj_name,
         approach_pose.position.z += 0.15
 
         if abs(pick_pan_angle - current_pan) < 0.05:
-            arm.execute_trajectory([approach_pose, grasp_pose], durations=[1.5, 1.0])
+            arm.execute_trajectory([approach_pose], durations=[1.5])
         else:
             pick_joint = [pick_pan_angle, -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., 0.]
             rot_time_pick = _calc_rot_time(current_pan, pick_pan_angle)
             arm.execute_trajectory(
-                [pick_joint, approach_pose, grasp_pose],
-                durations=[rot_time_pick, 1.5, 1.0],
+                [pick_joint, approach_pose],
+                durations=[rot_time_pick, 1.5],
             )
-        
-        # Gripper close to grasp the item.
-        # 'gripper_close_pos' should be set differently depending on the items.
-        # 'force' is not used.
-        move_gripper.gripper_close(node, gripper_close_pos=0.5)
-        
-        # move_gripper.gripper_close(node, force=0.5, gripper_close_pos=0.5)
+        # Move to Grasping part
+        grasping_item(node, arm, grasp_pose, obj_name)
 
     # 2. [Place Phase]
     node.get_logger().info(f"Starting PLACE phase. Destination: {destination}")
@@ -158,10 +154,11 @@ def pick_place_storage(node, arm, grasp_pose, destination, obj_name,
         next_grasp = next_data['grasp_pose']
         rot_time_next = _calc_rot_time(place_pan_angle, next_pick_joint[0])
         arm.execute_trajectory(
-            [retreat_pose, next_pick_joint, next_approach, next_grasp],
-            durations=[1.0, rot_time_next, 1.5, 1.0],
+            [retreat_pose, next_pick_joint, next_approach],
+            durations=[1.0, rot_time_next, 1.5],
         )
-        move_gripper.gripper_close(node, force=0.5, gripper_close_pos=0.5)
+        # Move to Grasping part
+        grasping_item(node, arm, next_grasp, next_data.get('obj_name'))
     else:
         idle_joint = [0., -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., 0.]
         rot_time_idle = _calc_rot_time(place_pan_angle, 0.0)
@@ -187,15 +184,16 @@ def pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name,
         approach_pose.position.z += 0.15
 
         if abs(pick_pan_angle - current_pan) < 0.05:
-            arm.execute_trajectory([approach_pose, grasp_pose], durations=[1.5, 1.0])
+            arm.execute_trajectory([approach_pose], durations=[1.5])
         else:
             pick_joint = [pick_pan_angle, -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., 0.]
             rot_time_pick = _calc_rot_time(current_pan, pick_pan_angle)
             arm.execute_trajectory(
-                [pick_joint, approach_pose, grasp_pose],
-                durations=[rot_time_pick, 1.5, 1.0],
+                [pick_joint, approach_pose],
+                durations=[rot_time_pick, 1.5],
             )
-        move_gripper.gripper_close(node, force=0.5, gripper_close_pos=0.5)
+        # Move to Grasping part
+        grasping_item(node, arm, grasp_pose, obj_name)
 
     # 2. [Place Phase]
     node.get_logger().info(f"Starting PLACE phase. Destination: {destination}")
@@ -249,10 +247,11 @@ def pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name,
         next_grasp = next_data['grasp_pose']
         rot_time_next = _calc_rot_time(place_pan_angle, next_pick_joint[0])
         arm.execute_trajectory(
-            [retreat_pose, next_pick_joint, next_approach, next_grasp],
-            durations=[1.3, rot_time_next, 1.5, 1.0],
+            [retreat_pose, next_pick_joint, next_approach],
+            durations=[1.3, rot_time_next, 1.5],
         )
-        move_gripper.gripper_close(node, force=0.5, gripper_close_pos=0.5)
+        # Move to Grasping part
+        grasping_item(node, arm, next_grasp, next_data.get('obj_name'))
     else:
         idle_joint = [0., -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., 0.]
         arm.execute_trajectory([retreat_pose, idle_joint], durations=[1.3, 1.5])
