@@ -68,7 +68,7 @@ setup(
             'move_joint   = manip_challenge.move_joint:main',
             'custom_rgbd_crop_server = manip_challenge.custom.perception.rgbd_crop_server:main',
             'custom_rgbd_crop_client = manip_challenge.custom.perception.rgbd_crop_client:main',
-            'main         = manip_challenge.custom.main:main',
+            'main         = manip_challenge.custom.motion.main:main',
             'pose_detection = manip_challenge.custom.grasping.pose_detection:main',
             'path_planner = manip_challenge.custom.grasping.path_planner:main',
             'home_robot = manip_challenge.custom.grasping.home_robot:main',

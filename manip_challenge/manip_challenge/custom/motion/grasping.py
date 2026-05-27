@@ -3,7 +3,7 @@ import copy
 
 import numpy as np
 
-from ..motion import execute_pick_place_sequence, transform_pose, wait_for_tf
+from .motion import execute_pick_place_sequence, transform_pose, wait_for_tf
 
 
 def compute_grasp_pose(arm, pose_in_base):

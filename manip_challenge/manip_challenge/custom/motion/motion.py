@@ -11,7 +11,7 @@ from geometry_msgs.msg import Pose, PoseStamped
 from tf2_ros import Buffer, ConnectivityException, ExtrapolationException, LookupException
 
 from manip_challenge import move_gripper
-from .grasping.grasping_item import grasping_item
+from ..grasping.grasping_item import grasping_item
 
 
 PLACE_CONFIGS = {
