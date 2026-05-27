@@ -97,6 +97,10 @@ def pick_place_storage(node, arm, grasp_pose, destination, obj_name,
                 [pick_joint, approach_pose],
                 durations=[rot_time_pick, 1.5],
             )
+
+        # [Test] Wait for user confirmation before grasping
+        input("Press Enter to GRASP...") 
+
         # Move to Grasping part
         grasping_item(node, arm, grasp_pose, obj_name)
 
@@ -157,8 +161,13 @@ def pick_place_storage(node, arm, grasp_pose, destination, obj_name,
             [retreat_pose, next_pick_joint, next_approach],
             durations=[1.0, rot_time_next, 1.5],
         )
+
+        # [Test] Wait for user confirmation before grasping
+        input("Press Enter to GRASP...") 
+
         # Move to Grasping part
         grasping_item(node, arm, next_grasp, next_data.get('obj_name'))
+
     else:
         idle_joint = [0., -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., 0.]
         rot_time_idle = _calc_rot_time(place_pan_angle, 0.0)
@@ -192,6 +201,10 @@ def pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name,
                 [pick_joint, approach_pose],
                 durations=[rot_time_pick, 1.5],
             )
+
+        # [Test] Wait for user confirmation before grasping
+        input("Press Enter to GRASP...") 
+        
         # Move to Grasping part
         grasping_item(node, arm, grasp_pose, obj_name)
 
@@ -250,8 +263,13 @@ def pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name,
             [retreat_pose, next_pick_joint, next_approach],
             durations=[1.3, rot_time_next, 1.5],
         )
+
+        # [Test] Wait for user confirmation before grasping
+        input("Press Enter to GRASP...") 
+
         # Move to Grasping part
         grasping_item(node, arm, next_grasp, next_data.get('obj_name'))
+        
     else:
         idle_joint = [0., -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., 0.]
         arm.execute_trajectory([retreat_pose, idle_joint], durations=[1.3, 1.5])
