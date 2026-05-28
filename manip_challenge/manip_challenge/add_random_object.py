@@ -47,9 +47,9 @@ from rclpy.utilities import remove_ros_args
 MODEL_LIST = {
     # Gazebo model folder names and the max number of objects
     #"eraser": 3,
-    "coke_can": 1, # 3
-    "strawberry": 1, # 2
-    "meat_can": 1, # 2
+    "coke_can": 3, # 3
+    "strawberry": 2, # 2
+    "meat_can": 2, # 2
     #"mustard_bottle": 1,
     "hammer": 1, # 1
     "banana": 1, # 1

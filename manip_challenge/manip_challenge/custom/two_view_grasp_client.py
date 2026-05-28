@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Client for two_view_grasp_server.py.
 
+Publishes pick-and-place commands to the /task_commands topic.
+Subscribes to /task_results to print grasp summary when the server finishes.
+
 Examples:
     python3 two_view_grasp_client.py banana left
     python3 two_view_grasp_client.py "move coke can to right storage"
@@ -25,33 +28,29 @@ ensure_ros_python()
 
 import rclpy
 from rclpy.node import Node
-from riro_srvs.srv import StringString
+from std_msgs.msg import String
 
 
 class TwoViewGraspClient(Node):
-    def __init__(self, service_name):
+    def __init__(self, command_topic, result_topic):
         super().__init__("two_view_grasp_client")
-        self.service_name = service_name
-        self.client = self.create_client(StringString, service_name)
+        self.publisher = self.create_publisher(String, command_topic, 10)
+        self.create_subscription(String, result_topic, self._result_callback, 10)
 
-    def wait_for_server(self, timeout):
-        deadline = time.monotonic() + timeout
-        while rclpy.ok() and not self.client.wait_for_service(timeout_sec=0.5):
+    def send(self, command):
+        deadline = time.monotonic() + 5.0
+        while self.publisher.get_subscription_count() == 0:
             if time.monotonic() > deadline:
-                return False
-            self.get_logger().info(f"Waiting for service '{self.service_name}'...")
-        return True
+                self.get_logger().warn("No subscribers discovered, publishing anyway.")
+                break
+            rclpy.spin_once(self, timeout_sec=0.1)
+        msg = String()
+        msg.data = command
+        self.publisher.publish(msg)
+        self.get_logger().info(f"Published: '{command}'")
 
-    def send(self, command, timeout):
-        request = StringString.Request()
-        request.data = command
-        future = self.client.call_async(request)
-        deadline = time.monotonic() + timeout
-        while rclpy.ok() and not future.done():
-            if time.monotonic() > deadline:
-                raise TimeoutError(f"Timed out waiting for '{self.service_name}' response.")
-            rclpy.spin_once(self, timeout_sec=0.05)
-        return future.result()
+    def _result_callback(self, msg):
+        print_response(msg)
 
 
 def print_grasp_summary(payload):
@@ -85,15 +84,15 @@ def print_grasp_summary(payload):
         print(f"visualization: {visualization}")
 
 
-def print_response(response, raw=False):
+def print_response(msg, raw=False):
     if raw:
-        print(response.data)
+        print(msg.data)
         return
 
     try:
-        payload = json.loads(response.data)
+        payload = json.loads(msg.data)
     except json.JSONDecodeError:
-        print(response.data)
+        print(msg.data)
         return
 
     print(json.dumps(payload, indent=2, sort_keys=True))
@@ -119,13 +118,11 @@ def command_loop(initial_command=None):
 
 
 def parse_args(argv=None):
-    parser = argparse.ArgumentParser(description="Send pick-and-place commands to the two-view server.")
+    parser = argparse.ArgumentParser(description="Publish pick-and-place commands to the two-view server.")
     parser.add_argument("command", nargs="*", help="Command text, e.g. banana left")
-    parser.add_argument("--service-name", default="two_view_grasp_command")
-    parser.add_argument("--wait-timeout", type=float, default=10.0)
-    parser.add_argument("--response-timeout", type=float, default=240.0)
-    parser.add_argument("--loop", action="store_true", help="Keep reading commands after the first request.")
-    parser.add_argument("--raw", action="store_true", help="Print raw service response instead of pretty JSON.")
+    parser.add_argument("--command-topic", default="/task_commands")
+    parser.add_argument("--result-topic", default="/task_results")
+    parser.add_argument("--loop", action="store_true", help="Keep reading commands after the first publish.")
     return parser.parse_args(rclpy.utilities.remove_ros_args(args=argv or sys.argv)[1:])
 
 
@@ -135,12 +132,8 @@ def main(argv=None):
     interactive = args.loop or not initial_command
 
     rclpy.init(args=argv)
-    node = TwoViewGraspClient(args.service_name)
+    node = TwoViewGraspClient(args.command_topic, args.result_topic)
     try:
-        if not node.wait_for_server(args.wait_timeout):
-            node.get_logger().error(f"Service '{args.service_name}' is not available.")
-            return 1
-
         if interactive:
             print("Enter commands like 'banana left' or 'move coke can to right storage'. Type 'quit' to stop.")
             commands = command_loop(initial_command or None)
@@ -148,21 +141,20 @@ def main(argv=None):
             commands = [initial_command]
 
         for command in commands:
+            node.send(command)
+
+        # publish 후 DDS가 실제로 메시지를 전송할 시간을 줌
+        deadline = time.monotonic() + 1.0
+        while time.monotonic() < deadline:
+            rclpy.spin_once(node, timeout_sec=0.1)
+
+        if interactive:
+            # 인터랙티브 모드: 결과를 백그라운드에서 계속 수신
             try:
-                response = node.send(command, args.response_timeout)
-            except TimeoutError as exc:
-                node.get_logger().error(str(exc))
-                if not interactive:
-                    return 1
-                continue
+                rclpy.spin(node)
+            except KeyboardInterrupt:
+                pass
 
-            if response is None:
-                node.get_logger().error("Service call failed.")
-                if not interactive:
-                    return 1
-                continue
-
-            print_response(response, args.raw)
         return 0
     finally:
         node.destroy_node()

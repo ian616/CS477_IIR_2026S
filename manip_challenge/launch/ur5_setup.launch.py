@@ -79,7 +79,7 @@ def generate_launch_description():
     init_joints = Node(package='manip_challenge', executable='init_joints', output='screen')
     
     # Add manipulatable objects
-    add_object = Node(package='manip_challenge', executable='add_object',
+    add_object = Node(package='manip_challenge', executable='add_random_object',
                       output='screen',
                       )
 
