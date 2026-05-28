@@ -75,7 +75,7 @@ def wait_for_tf(node, tf_buffer, source_frame, target_frame):
 
 def pick_place_storage(node, arm, grasp_pose, destination, obj_name,
                        on_before_idle=None, get_next_pick_data=None,
-                       pick_already_done=False):
+                       pick_already_done=False, perception_info=None):
     pick_pan_angle = math.atan2(grasp_pose.position.y, grasp_pose.position.x)
 
     if not pick_already_done:
@@ -102,7 +102,7 @@ def pick_place_storage(node, arm, grasp_pose, destination, obj_name,
         input("Press Enter to GRASP...") 
 
         # Move to Grasping part
-        grasping_item(node, arm, grasp_pose, obj_name)
+        grasping_item(node, arm, grasp_pose, obj_name, perception_info=perception_info)
 
     # 2. [Place Phase]
     node.get_logger().info(f"Starting PLACE phase. Destination: {destination}")
@@ -166,7 +166,13 @@ def pick_place_storage(node, arm, grasp_pose, destination, obj_name,
         input("Press Enter to GRASP...") 
 
         # Move to Grasping part
-        grasping_item(node, arm, next_grasp, next_data.get('obj_name'))
+        grasping_item(
+            node,
+            arm,
+            next_grasp,
+            next_data.get('obj_name'),
+            perception_info=next_data.get('perception_info'),
+        )
 
     else:
         idle_joint = [0., -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., 0.]
@@ -179,7 +185,7 @@ def pick_place_storage(node, arm, grasp_pose, destination, obj_name,
 
 def pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name,
                          on_before_idle=None, get_next_pick_data=None,
-                         pick_already_done=False):
+                         pick_already_done=False, perception_info=None):
     pick_pan_angle = math.atan2(grasp_pose.position.y, grasp_pose.position.x)
 
     if not pick_already_done:
@@ -206,7 +212,7 @@ def pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name,
         input("Press Enter to GRASP...") 
         
         # Move to Grasping part
-        grasping_item(node, arm, grasp_pose, obj_name)
+        grasping_item(node, arm, grasp_pose, obj_name, perception_info=perception_info)
 
     # 2. [Place Phase]
     node.get_logger().info(f"Starting PLACE phase. Destination: {destination}")
@@ -268,7 +274,13 @@ def pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name,
         input("Press Enter to GRASP...") 
 
         # Move to Grasping part
-        grasping_item(node, arm, next_grasp, next_data.get('obj_name'))
+        grasping_item(
+            node,
+            arm,
+            next_grasp,
+            next_data.get('obj_name'),
+            perception_info=next_data.get('perception_info'),
+        )
         
     else:
         idle_joint = [0., -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., 0.]
@@ -280,10 +292,12 @@ def pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name,
 
 def execute_pick_place_sequence(node, arm, grasp_pose, destination, obj_name,
                                 on_before_idle=None, get_next_pick_data=None,
-                                pick_already_done=False):
+                                pick_already_done=False, perception_info=None):
     if destination == "bookshelf":
         pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name,
-                             on_before_idle, get_next_pick_data, pick_already_done)
+                             on_before_idle, get_next_pick_data, pick_already_done,
+                             perception_info=perception_info)
     else:
         pick_place_storage(node, arm, grasp_pose, destination, obj_name,
-                           on_before_idle, get_next_pick_data, pick_already_done)
+                           on_before_idle, get_next_pick_data, pick_already_done,
+                           perception_info=perception_info)

@@ -29,8 +29,15 @@ except ImportError:
 
 try:
     from ..rgbd_crop_server import get_model, known_labels, make_depth_visual, parse_target_label, point_bounds
+    from ..pca_bbox_visualization import compute_all_detection_pca_bboxes, draw_pca_bbox_debug
 except ImportError:
+    import sys
+
+    perception_dir = Path(__file__).resolve().parent.parent
+    if str(perception_dir) not in sys.path:
+        sys.path.insert(0, str(perception_dir))
     from rgbd_crop_server import get_model, known_labels, make_depth_visual, parse_target_label, point_bounds
+    from pca_bbox_visualization import compute_all_detection_pca_bboxes, draw_pca_bbox_debug
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -720,8 +727,39 @@ class RgbdSegCropServiceNode(Node):
             min_points=self.min_roi_points,
         )
 
+        pca_bboxes = compute_all_detection_pca_bboxes(
+            rgb_image=rgb_image,
+            depth_image=depth_image,
+            cloud=cloud,
+            detections=detections,
+            bbox_padding_ratio=self.bbox_padding_ratio,
+            max_depth_m=self.max_depth_m,
+            depth_filter=self.depth_filter,
+            depth_margin_m=self.depth_margin_m,
+            min_points=self.min_roi_points,
+            extract_roi=extract_seg_rgbd_roi,
+        )
+        position_points = [
+            {
+                "label": item.get("label"),
+                "confidence": item.get("confidence"),
+                **item.get("position_point"),
+            }
+            for item in pca_bboxes
+            if item.get("ok") and (item.get("position_point") or {}).get("ok")
+        ]
+
         request_dir = self.make_request_dir(target_model.name)
-        saved_files = self.save_rgbd_crop(request_dir, target_model.name, selected, detections, roi, request_text, rgb_image)
+        saved_files = self.save_rgbd_crop(
+            request_dir,
+            target_model.name,
+            selected,
+            detections,
+            roi,
+            request_text,
+            rgb_image,
+            pca_bboxes=pca_bboxes,
+        )
         self.publish_roi_cloud(roi.foreground_points)
         self.mask_img = roi.mask_full
         self.annotated_img = draw_seg_debug(rgb_image, detections, selected, roi)
@@ -736,6 +774,8 @@ class RgbdSegCropServiceNode(Node):
             "frame_id": self.camera_frame,
             "detection": selected.to_dict(),
             "all_detections": [detection.to_dict() for detection in detections],
+            "all_pca_bboxes": pca_bboxes,
+            "all_position_points": position_points,
             "input_crop_ratio": float(self.input_crop_ratio),
             "roi": roi.to_dict(),
             "location_xyz_m": roi.centroid.astype(float).tolist(),
@@ -776,7 +816,17 @@ class RgbdSegCropServiceNode(Node):
         cv2.imwrite(str(debug_path), self.annotated_img)
         return str(debug_path)
 
-    def save_rgbd_crop(self, request_dir, label, selected, detections, roi, request_text, source_image=None):
+    def save_rgbd_crop(
+        self,
+        request_dir,
+        label,
+        selected,
+        detections,
+        roi,
+        request_text,
+        source_image=None,
+        pca_bboxes=None,
+    ):
         paths = {
             "rgb": request_dir / "rgb.png",
             "rgb_masked": request_dir / "rgb_masked.png",
@@ -793,6 +843,7 @@ class RgbdSegCropServiceNode(Node):
             "cloud_npy": request_dir / "cloud.npy",
             "foreground_points_npy": request_dir / "foreground_points.npy",
             "annotated": request_dir / "annotated.png",
+            "annotated_pca_bbox": request_dir / "annotated_pca_bbox.png",
             "polygon_json": request_dir / "polygon.json",
             "metadata": request_dir / "metadata.json",
         }
@@ -821,6 +872,17 @@ class RgbdSegCropServiceNode(Node):
         if source_image is None:
             source_image = self.latest_cv_img
         cv2.imwrite(str(paths["annotated"]), draw_seg_debug(source_image, detections, selected, roi))
+        cv2.imwrite(str(paths["annotated_pca_bbox"]), draw_pca_bbox_debug(source_image, pca_bboxes or []))
+
+        position_points = [
+            {
+                "label": item.get("label"),
+                "confidence": item.get("confidence"),
+                **item.get("position_point"),
+            }
+            for item in (pca_bboxes or [])
+            if item.get("ok") and (item.get("position_point") or {}).get("ok")
+        ]
 
         polygon_payload = {
             "label": label,
@@ -837,6 +899,8 @@ class RgbdSegCropServiceNode(Node):
             "frame_id": self.camera_frame,
             "detection": selected.to_dict(),
             "all_detections": [detection.to_dict() for detection in detections],
+            "all_pca_bboxes": pca_bboxes or [],
+            "all_position_points": position_points,
             "input_crop_ratio": float(self.input_crop_ratio),
             "roi": roi.to_dict(),
             "location_xyz_m": roi.centroid.astype(float).tolist(),
