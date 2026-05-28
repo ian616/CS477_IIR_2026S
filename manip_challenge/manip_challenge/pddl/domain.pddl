@@ -1,0 +1,103 @@
+(define (domain manip-tamp)
+  ;; Action/predicate editing guide:
+  ;; - Declare new predicates in :predicates.
+  ;; - Emit those predicates in predicate_builder.py::_build_predicates().
+  ;; - Add or modify action schemas here.
+  ;; - Add matching Python execution handlers in actions.py::ACTION_HANDLERS.
+  (:requirements :strips :typing :negative-preconditions)
+
+  (:types
+    item location
+  )
+
+  (:predicates
+    ;; Object role predicates. Generated in predicate_builder.py::_build_predicates().
+    (target ?o - item)
+    (obstacle ?o - item)
+    ;; Location/goal predicates. at(...) and goal-at(...) are generated per object/goal.
+    (at ?o - item ?l - location)
+    (goal-at ?o - item ?l - location)
+    ;; Robot hand state. Current implementation replans after full pick-place actions.
+    (handempty)
+    (holding ?o - item)
+    ;; Manipulation feasibility predicates from predicate_builder.py.
+    (clear ?o - item)
+    (graspable ?o - item)
+    (safe ?o - item)
+    ;; Clutter relation predicates from predicate_builder.py::_annotate_relations().
+    (blocks ?a - item ?b - item)
+    (near ?a - item ?b - item)
+    ;; Destination resources. Generated in predicate_builder.py::_build_predicates().
+    (buffer ?l - location)
+    (buffer-free ?l - location)
+    (storage ?l - location)
+  )
+
+  ;; Physical action implemented by actions.py::move_target_to_goal.
+  (:action move-target-to-goal
+    :parameters (?o - item ?from - location ?to - location)
+    :precondition (and
+      (target ?o)
+      (goal-at ?o ?to)
+      (handempty)
+      (at ?o ?from)
+      (clear ?o)
+      (graspable ?o)
+      (safe ?o)
+      (storage ?to)
+    )
+    :effect (and
+      (at ?o ?to)
+      (not (at ?o ?from))
+      (handempty)
+    )
+  )
+
+  ;; Physical action implemented by actions.py::move_obstacle_to_buffer.
+  (:action move-obstacle-to-buffer
+    :parameters (?o - item ?from - location ?buf - location)
+    :precondition (and
+      (obstacle ?o)
+      (handempty)
+      (at ?o ?from)
+      (clear ?o)
+      (graspable ?o)
+      (buffer ?buf)
+      (buffer-free ?buf)
+    )
+    :effect (and
+      (at ?o ?buf)
+      (not (at ?o ?from))
+      (not (buffer-free ?buf))
+      (handempty)
+    )
+  )
+
+  ;; Logical relation-cleanup action for external planners.
+  ;; In the robot loop, perception usually recomputes this after every action.
+  (:action clear-blocking-relation
+    :parameters (?blocker - item ?blocked - item)
+    :precondition (and
+      (blocks ?blocker ?blocked)
+      (not (at ?blocker table))
+    )
+    :effect (and
+      (not (blocks ?blocker ?blocked))
+      (clear ?blocked)
+    )
+  )
+
+  ;; Logical relation-cleanup action for external planners.
+  ;; In the robot loop, perception usually recomputes this after every action.
+  (:action clear-near-relation
+    :parameters (?moved - item ?other - item)
+    :precondition (and
+      (near ?moved ?other)
+      (not (at ?moved table))
+    )
+    :effect (and
+      (not (near ?moved ?other))
+      (safe ?other)
+    )
+  )
+)
