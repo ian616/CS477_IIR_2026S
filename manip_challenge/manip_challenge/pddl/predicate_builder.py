@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import math
+from dataclasses import replace
 from typing import Callable
 
 import numpy as np
@@ -86,7 +87,14 @@ def _roi_stats(detection: dict) -> tuple[int, int, float | None]:
     return mask_pixels, points, float(depth) if depth is not None else None
 
 
-def object_from_detection(name: str, detection: dict | None, is_target: bool, error: str | None = None) -> ObjectState:
+def object_from_detection(
+    name: str,
+    detection: dict | None,
+    is_target: bool,
+    error: str | None = None,
+    class_name: str | None = None,
+    instance_index: int | None = None,
+) -> ObjectState:
     # Builds per-object base predicates from one perception result.
     #
     # CHANGE SINGLE-OBJECT PREDICATES HERE:
@@ -96,8 +104,17 @@ def object_from_detection(name: str, detection: dict | None, is_target: bool, er
     #   approach score, or object pose validity flag, consume it here and update
     #   graspable/pose_known accordingly.
     name = pddl_name(name)
+    class_name = pddl_name(class_name or (detection or {}).get("target") or name)
     if not detection or not detection.get("ok"):
-        return ObjectState(name=name, is_target=is_target, detected=False, error=error or (detection or {}).get("error"))
+        return ObjectState(
+            name=name,
+            class_name=class_name,
+            instance_index=instance_index,
+            is_target=is_target,
+            detected=False,
+            error=error or (detection or {}).get("error"),
+            detection=detection,
+        )
     det = detection.get("detection") or {}
     roi = detection.get("roi") or {}
     confidence = float(det.get("confidence", 0.0))
@@ -111,6 +128,8 @@ def object_from_detection(name: str, detection: dict | None, is_target: bool, er
     graspable = visible and pose_known
     return ObjectState(
         name=name,
+        class_name=class_name,
+        instance_index=instance_index,
         is_target=is_target,
         detected=True,
         visible=visible,
@@ -128,7 +147,7 @@ def object_from_detection(name: str, detection: dict | None, is_target: bool, er
     )
 
 
-def obstacle_from_yolo(detection: dict) -> ObjectState:
+def obstacle_from_yolo(detection: dict, instance_index: int | None = None) -> ObjectState:
     # Builds non-target obstacle facts from YOLO's all_detections list.
     #
     # CHANGE NON-TARGET OBSTACLE PREDICATES HERE:
@@ -137,10 +156,13 @@ def obstacle_from_yolo(detection: dict) -> ObjectState:
     # - If you add a service/path that returns centroid/foreground points for
     #   soap/book/glue/etc., set pose_known=True and graspable=True here so
     #   move-obstacle-to-buffer can execute in actions.py.
-    name = pddl_name(detection.get("label", "unknown"))
+    class_name = pddl_name(detection.get("label", "unknown"))
+    name = f"{class_name}_{instance_index}" if instance_index is not None else class_name
     bbox = detection.get("bbox_xyxy")
     return ObjectState(
         name=name,
+        class_name=class_name,
+        instance_index=instance_index,
         is_target=False,
         detected=True,
         visible=float(detection.get("confidence", 0.0)) >= MIN_CONFIDENCE,
@@ -158,11 +180,17 @@ def obstacle_from_yolo(detection: dict) -> ObjectState:
 def _merge_all_detections(objects: dict[str, ObjectState], detection: dict) -> None:
     # Adds target-external objects seen in the same top-view YOLO frame.
     # Edit here to filter obstacle classes or rename unknown objects.
+    label_counts: dict[str, int] = {}
     for raw in detection.get("all_detections") or []:
-        name = pddl_name(raw.get("label", "unknown"))
-        if name in objects or name in TARGET_OBJECTS:
+        class_name = pddl_name(raw.get("label", "unknown"))
+        index = label_counts.get(class_name, 0)
+        label_counts[class_name] = index + 1
+        if class_name in TARGET_OBJECTS:
             continue
-        objects[name] = obstacle_from_yolo(raw)
+        obstacle = obstacle_from_yolo(raw, instance_index=index)
+        if obstacle.name in objects:
+            continue
+        objects[obstacle.name] = obstacle
 
 
 def _annotate_relations(objects: dict[str, ObjectState]) -> None:
@@ -254,11 +282,79 @@ def _build_predicates(state: PredicateState) -> set[str]:
         for other in sorted(obj.near):
             predicates.add(f"near {obj.name} {other}")
     for goal in state.unfinished_goals():
-        predicates.add(f"goal-at {goal.object_name} {goal.location}")
+        predicates.add(f"goal-at {goal.target_name} {goal.location}")
     predicates.update({"storage left_storage", "storage right_storage", "storage bookshelf"})
     predicates.update(f"buffer {buffer}" for buffer in BUFFER_LOCATIONS)
     predicates.update(f"buffer-free {buffer}" for buffer in state.free_buffers())
     return predicates
+
+
+def _objects_from_detection(class_name: str, detection: dict | None, is_target: bool) -> list[ObjectState]:
+    class_name = pddl_name(class_name)
+    objects = []
+    for index, instance in enumerate((detection or {}).get("instances") or []):
+        instance_index = int(instance.get("instance_index", index))
+        instance_name = pddl_name(instance.get("instance_name") or f"{class_name}_{instance_index}")
+        objects.append(
+            object_from_detection(
+                instance_name,
+                instance,
+                is_target=is_target,
+                class_name=class_name,
+                instance_index=instance_index,
+            )
+        )
+    if objects:
+        return objects
+    return [
+        object_from_detection(
+            class_name,
+            detection,
+            is_target=is_target,
+            class_name=class_name,
+            instance_index=None,
+        )
+    ]
+
+
+def _goal_instance_score(obj: ObjectState) -> tuple:
+    ready = obj.graspable and obj.clear and obj.safe
+    return (
+        int(ready),
+        int(obj.graspable and obj.clear),
+        int(obj.graspable),
+        int(obj.safe),
+        -len(obj.blocked_by),
+        -len(obj.near),
+        -len(obj.blocks),
+        obj.confidence,
+        -float(obj.instance_index if obj.instance_index is not None else 9999),
+    )
+
+
+def _bind_goals_to_instances(goals: list[Goal], objects: dict[str, ObjectState], completed: set[str]) -> list[Goal]:
+    bound_goals = []
+    reserved: set[str] = set()
+    for goal in goals:
+        if goal.object_name in completed:
+            bound_goals.append(goal)
+            continue
+        candidates = [
+            obj
+            for obj in objects.values()
+            if obj.is_target
+            and obj.class_name == goal.object_name
+            and obj.name not in reserved
+            and obj.detected
+        ]
+        if not candidates:
+            bound_goals.append(replace(goal, bound_object_name=None))
+            continue
+        candidates.sort(key=_goal_instance_score, reverse=True)
+        selected = candidates[0]
+        reserved.add(selected.name)
+        bound_goals.append(replace(goal, bound_object_name=selected.name))
+    return bound_goals
 
 
 def build_predicate_state(
@@ -282,15 +378,18 @@ def build_predicate_state(
             continue
         try:
             detection = detect_fn(name)
-            fact = object_from_detection(name, detection, is_target=name in TARGET_OBJECTS)
-            objects[name] = fact
+            facts = _objects_from_detection(name, detection, is_target=name in TARGET_OBJECTS)
+            for fact in facts:
+                objects[fact.name] = fact
             if detection and detection.get("ok"):
                 _merge_all_detections(objects, detection)
         except Exception as exc:
-            objects[name] = object_from_detection(name, None, is_target=name in TARGET_OBJECTS, error=str(exc))
+            fact = object_from_detection(name, None, is_target=name in TARGET_OBJECTS, class_name=name, error=str(exc))
+            objects[fact.name] = fact
 
     _annotate_relations(objects)
-    state = PredicateState(goals=goals, objects=objects, completed=completed, occupied_buffers=occupied_buffers)
+    bound_goals = _bind_goals_to_instances(goals, objects, completed)
+    state = PredicateState(goals=bound_goals, objects=objects, completed=completed, occupied_buffers=occupied_buffers)
     state.predicates = _build_predicates(state)
     for obj in objects.values():
         if obj.error:

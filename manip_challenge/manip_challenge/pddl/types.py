@@ -32,11 +32,18 @@ LOCATION_TO_DESTINATION = {
 class Goal:
     object_name: str
     location: str
+    bound_object_name: str | None = None
+
+    @property
+    def target_name(self) -> str:
+        return self.bound_object_name or self.object_name
 
 
 @dataclass
 class ObjectState:
     name: str
+    class_name: str = ""
+    instance_index: int | None = None
     is_target: bool = False
     location: str = "table"
     detected: bool = False

@@ -17,9 +17,9 @@ def write_problem(state: PredicateState, path: Path | None = None) -> Path:
     # Edit here if you add object types, locations, goal forms, or want
     # completed/buffer state to persist differently across replans.
     path = path or PDDL_DIR / "problem.pddl"
-    object_names = sorted(set(state.objects) | {goal.object_name for goal in state.unfinished_goals()})
+    object_names = sorted(set(state.objects) | {goal.target_name for goal in state.unfinished_goals()})
     init = sorted(state.predicates)
-    goals = [f"(at {goal.object_name} {goal.location})" for goal in state.unfinished_goals()]
+    goals = [f"(at {goal.target_name} {goal.location})" for goal in state.unfinished_goals()]
     text = [
         "(define (problem manip-generated)",
         "  (:domain manip-tamp)",

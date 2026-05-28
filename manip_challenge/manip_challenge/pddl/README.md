@@ -74,6 +74,18 @@ pddl/debug/latest_debug.png
 `--debug-window` also opens an OpenCV window named `PDDL TAMP Debug` when a GUI
 display is usable.
 
+Initial predicate inspection:
+
+```bash
+python3 inspect_initial_predicates.py
+python3 inspect_initial_predicates.py "Move the banana to the left storage."
+python3 inspect_initial_predicates.py --json-out debug/initial_predicates.json
+```
+
+This runs the same top-view perception and `predicate_builder.py` path used by
+`server.py`, then prints every object judgement and every true predicate before
+any robot action is executed.
+
 Combined PDDL log stream:
 
 ```bash

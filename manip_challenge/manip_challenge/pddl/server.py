@@ -5,6 +5,7 @@ import argparse
 import json
 import math
 import os
+import shutil
 import sys
 import threading
 import time
@@ -104,6 +105,8 @@ def object_summary(obj) -> dict:
     files = (obj.detection or {}).get("files") or {}
     return {
         "target": obj.is_target,
+        "class_name": obj.class_name,
+        "instance_index": obj.instance_index,
         "location": obj.location,
         "detected": obj.detected,
         "visible": obj.visible,
@@ -123,7 +126,17 @@ def object_summary(obj) -> dict:
         "error": obj.error,
         "debug_files": {
             key: files[key]
-            for key in ("annotated", "mask_overlay", "rgb", "rgb_masked")
+            for key in (
+                "annotated",
+                "rgb",
+                "rgb_masked",
+                "mask_overlay",
+                "mask",
+                "mask_full",
+                "mask_raw",
+                "depth_png",
+                "depth_visualization",
+            )
             if key in files
         },
     }
@@ -296,6 +309,7 @@ class PddlTampServer(Node):
                 "predicates": sorted(state.predicates),
                 "notes": state.notes,
             }
+            self.save_step_artifacts(scene_summary, state, step_idx, command_text)
             scenes.append(scene_summary)
             self.log_state(scene_summary)
             self.publish_json(self.pred_pub, scene_summary)
@@ -386,7 +400,8 @@ class PddlTampServer(Node):
             )
 
             if action.name == "move-target-to-goal" and result.get("ok"):
-                completed.add(action.args[0])
+                moved = state.objects.get(action.args[0])
+                completed.add(moved.class_name if moved is not None and moved.class_name else action.args[0])
             elif action.name == "move-obstacle-to-buffer" and result.get("ok"):
                 occupied_buffers.add(action.args[2])
 
@@ -440,7 +455,7 @@ class PddlTampServer(Node):
         for name, obj in sorted(summary["objects"].items()):
             self.get_logger().info(
                 "[PDDL]   "
-                f"{name}: target={obj['target']}, detected={obj['detected']}, "
+                f"{name}: class={obj['class_name']}, target={obj['target']}, detected={obj['detected']}, "
                 f"visible={obj['visible']}, pose_known={obj['pose_known']}, "
                 f"graspable={obj['graspable']}, clear={obj['clear']}, safe={obj['safe']}, "
                 f"conf={obj['confidence']:.3f}, bbox={obj['bbox_xyxy']}, "
@@ -462,7 +477,7 @@ class PddlTampServer(Node):
         for name, obj in sorted(summary["objects"].items()):
             lines.append(
                 f"  {name}: target={obj['target']} detected={obj['detected']} visible={obj['visible']} "
-                f"pose_known={obj['pose_known']} graspable={obj['graspable']} clear={obj['clear']} "
+                f"class={obj['class_name']} pose_known={obj['pose_known']} graspable={obj['graspable']} clear={obj['clear']} "
                 f"safe={obj['safe']} conf={obj['confidence']:.3f}"
             )
             lines.append(
@@ -486,7 +501,7 @@ class PddlTampServer(Node):
             f"  source: {action.source}",
             "  unfinished goal objects:",
         ]
-        unfinished = {goal.object_name for goal in state.unfinished_goals()}
+        unfinished = {goal.target_name for goal in state.unfinished_goals()}
         for name in sorted(unfinished):
             obj = state.objects.get(name)
             if obj is None:
@@ -494,7 +509,7 @@ class PddlTampServer(Node):
                 continue
             ready = obj.graspable and obj.clear and obj.safe
             lines.append(
-                f"    {name}: ready={ready} detected={obj.detected} visible={obj.visible} "
+                f"    {name}: class={obj.class_name} ready={ready} detected={obj.detected} visible={obj.visible} "
                 f"pose_known={obj.pose_known} graspable={obj.graspable} clear={obj.clear} "
                 f"safe={obj.safe} conf={obj.confidence:.3f}"
             )
@@ -632,6 +647,67 @@ class PddlTampServer(Node):
         elif self.args.debug_window:
             self.get_logger().info("[PDDL] No usable GUI display found; debug image was saved only.")
 
+    def save_step_artifacts(self, summary: dict, state, step_idx: int, command_text: str) -> None:
+        debug_dir = PDDL_DIR / "debug"
+        step_dir = debug_dir / f"step_{step_idx:02d}"
+        step_dir.mkdir(parents=True, exist_ok=True)
+
+        images = []
+        for object_name, obj in sorted(summary["objects"].items()):
+            for key, source_text in sorted((obj.get("debug_files") or {}).items()):
+                source = Path(source_text)
+                if not source.is_file():
+                    continue
+                suffix = source.suffix or ".png"
+                filename = f"{self.safe_debug_filename(object_name)}_{self.safe_debug_filename(key)}{suffix}"
+                destination = step_dir / filename
+                try:
+                    shutil.copyfile(source, destination)
+                except OSError as exc:
+                    self.get_logger().warn(f"[PDDL] Could not save debug image '{source}': {exc}")
+                    continue
+                images.append({
+                    "object": object_name,
+                    "class_name": obj.get("class_name"),
+                    "instance_index": obj.get("instance_index"),
+                    "kind": key,
+                    "source": str(source),
+                    "path": str(destination),
+                })
+
+        payload = {
+            "event": "planning_step_start",
+            "step": int(step_idx),
+            "stamp_sec": time.time(),
+            "command": command_text,
+            "goals": [
+                {
+                    "object_name": goal.object_name,
+                    "location": goal.location,
+                    "bound_object_name": goal.bound_object_name,
+                    "target_name": goal.target_name,
+                }
+                for goal in state.goals
+            ],
+            "completed": summary["completed"],
+            "occupied_buffers": summary.get("occupied_buffers", []),
+            "objects": summary["objects"],
+            "predicates": summary["predicates"],
+            "notes": summary["notes"],
+            "images": images,
+        }
+        predicates_path = step_dir / "predicates.json"
+        latest_path = debug_dir / "latest_predicates.json"
+        text = json.dumps(payload, indent=2, sort_keys=True)
+        predicates_path.write_text(text + "\n", encoding="utf-8")
+        latest_path.write_text(text + "\n", encoding="utf-8")
+        self.get_logger().info(f"[PDDL] Step artifacts saved: {predicates_path}")
+
+    @staticmethod
+    def safe_debug_filename(text: str) -> str:
+        safe = "".join(ch if ch.isalnum() or ch in {"_", "-"} else "_" for ch in str(text or "unknown"))
+        return safe.strip("_") or "unknown"
+
     def load_debug_image(self, summary: dict):
         for obj in summary["objects"].values():
             files = obj.get("debug_files") or {}
@@ -656,7 +732,7 @@ class PddlTampServer(Node):
                 status_color = (80, 120, 255)
             lines.append((
                 f"{name}: target={obj['target']} det={obj['detected']} vis={obj['visible']} "
-                f"pose={obj['pose_known']} grasp={obj['graspable']} clear={obj['clear']} safe={obj['safe']} "
+                f"class={obj['class_name']} pose={obj['pose_known']} grasp={obj['graspable']} clear={obj['clear']} safe={obj['safe']} "
                 f"conf={obj['confidence']:.2f}",
                 status_color,
             ))

@@ -110,15 +110,17 @@ def move_target_to_goal(context: ActionContext, action: PlanAction, state) -> di
     object_name, _from, to = action.args
     destination = LOCATION_TO_DESTINATION[to]
     fact = state.objects.get(object_name)
-    prepared = _prepare_grasp(context.server, object_name, fact=fact)
+    class_name = fact.class_name if fact is not None and fact.class_name else object_name
+    prepared = _prepare_grasp(context.server, class_name, fact=fact)
     if not context.server.args.dry_run:
         # 여기다 바뀐 grasp 로직 추가하시면 됩니다!!!
         # You can add the changed grasp logic here!!!
         # if object_name == "banana" 뭐 이런 느낌으로
-        execute_pick_place_sequence(context.server, context.server.arm, prepared["grasp_pose"], destination, object_name)
+        execute_pick_place_sequence(context.server, context.server.arm, prepared["grasp_pose"], destination, class_name)
     return {
         "ok": True,
         "action": action.to_dict(),
+        "class_name": class_name,
         "destination": destination,
         "grasp_selection": prepared["grasp_selection"],
         "detected_pose_in_source": pose_to_dict(prepared["detected_pose"]),
@@ -138,15 +140,17 @@ def move_obstacle_to_buffer(context: ActionContext, action: PlanAction, state) -
         raise RuntimeError(f"Unknown buffer location: {buffer_name}")
     motion_module.PLACE_CONFIGS.setdefault(buffer_name, BUFFER_CONFIGS[buffer_name])
     fact = state.objects.get(object_name)
+    class_name = fact.class_name if fact is not None and fact.class_name else object_name
     if fact is not None and not fact.graspable:
         raise RuntimeError(f"Obstacle {object_name} is not graspable. Note: {fact.error}")
-    prepared = _prepare_grasp(context.server, object_name, fact=fact)
+    prepared = _prepare_grasp(context.server, class_name, fact=fact)
     if not context.server.args.dry_run:
         # Low-level implementation reused from custom/motion/motion.py.
-        execute_pick_place_sequence(context.server, context.server.arm, prepared["grasp_pose"], buffer_name, object_name)
+        execute_pick_place_sequence(context.server, context.server.arm, prepared["grasp_pose"], buffer_name, class_name)
     return {
         "ok": True,
         "action": action.to_dict(),
+        "class_name": class_name,
         "destination": buffer_name,
         "grasp_selection": prepared["grasp_selection"],
         "detected_pose_in_source": pose_to_dict(prepared["detected_pose"]),

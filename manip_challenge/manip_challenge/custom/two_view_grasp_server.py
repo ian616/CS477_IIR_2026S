@@ -291,9 +291,17 @@ def finite_xyz_points(points):
     return points[np.isfinite(points).all(axis=1) & (points[:, 2] > 0.0)]
 
 
+def raw_centroid_xyz(points):
+    points = finite_xyz_points(points)
+    if len(points) == 0:
+        return np.asarray([0.0, 0.0, 0.0], dtype=np.float64)
+    return np.mean(points[:, :3], axis=0)
+
+
 def pca_axes_xy(points):
+    points = finite_xyz_points(points)
     xy = points[:, :2].astype(np.float64)
-    center = np.median(xy, axis=0)
+    center = raw_centroid_xyz(points)[:2]
     centered = xy - center
     _, _, vt = np.linalg.svd(centered, full_matrices=False)
     major = vt[0]
@@ -313,9 +321,9 @@ def choose_grasp_target_from_points(points, label="", min_bin_points=20):
     """
     points = finite_xyz_points(points)
     if len(points) < max(8, min_bin_points):
-        centroid = np.median(points, axis=0) if len(points) else np.asarray([0.0, 0.0, 0.0])
+        centroid = raw_centroid_xyz(points)
         return {
-            "method": "median_fallback",
+            "method": "raw_centroid_fallback",
             "target_xyz_m": centroid.astype(float).tolist(),
             "raw_centroid_xyz_m": centroid.astype(float).tolist(),
             "reason": f"too_few_points:{len(points)}",
@@ -325,13 +333,13 @@ def choose_grasp_target_from_points(points, label="", min_bin_points=20):
     centered = points[:, :2] - xy_center
     along = centered @ major
     across = centered @ minor
-    raw_centroid = np.median(points[:, :3], axis=0)
+    raw_centroid = raw_centroid_xyz(points)
 
     low, high = np.percentile(along, [12.0, 88.0])
     if high <= low:
         target = raw_centroid
         return {
-            "method": "median_fallback",
+            "method": "raw_centroid_fallback",
             "target_xyz_m": target.astype(float).tolist(),
             "raw_centroid_xyz_m": raw_centroid.astype(float).tolist(),
             "reason": "degenerate_major_axis",
@@ -383,7 +391,7 @@ def choose_grasp_target_from_points(points, label="", min_bin_points=20):
             method = "central_band_median"
         else:
             target = raw_centroid
-            method = "median_fallback"
+            method = "raw_centroid_fallback"
         return {
             "method": method,
             "target_xyz_m": target.astype(float).tolist(),

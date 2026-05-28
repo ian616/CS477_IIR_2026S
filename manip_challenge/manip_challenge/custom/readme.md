@@ -1,4 +1,5 @@
 1. Launch GAZEBO (Terminal 1)
+ros2 launch manip_challenge ur5_setup_set2_picking.launch.py
 ros2 launch manip_challenge ur5_setup.launch.py
 
 2. Launch Server (Terminal 2)

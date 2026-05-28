@@ -58,7 +58,7 @@ def fallback_plan(state: PredicateState) -> list[PlanAction]:
     #   2. blockers of an unfinished goal
     #   3. non-target obstacles near an unsafe target
     #   4. recovery: best clear/graspable target even if safe is false
-    goals_by_object = {goal.object_name: goal for goal in state.unfinished_goals()}
+    goals_by_object = {goal.target_name: goal for goal in state.unfinished_goals()}
     unfinished = set(goals_by_object)
     free_buffer = _first_free_buffer(state)
 

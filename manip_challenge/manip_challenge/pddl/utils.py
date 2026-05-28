@@ -11,7 +11,11 @@ PDDL_DIR = Path(__file__).resolve().parent
 PACKAGE_DIR = PDDL_DIR.parent
 PACKAGE_ROOT = PACKAGE_DIR.parent
 WORKSPACE_ROOT = PACKAGE_ROOT.parent
+ASSIGNMENT1_SRC = WORKSPACE_ROOT / "assignment_1"
 ASSIGNMENT2_SRC = WORKSPACE_ROOT / "assignment_2"
+RIRO_KDL_ROOT = WORKSPACE_ROOT / "utils" / "riro-kdl"
+PYKDL_UTILS_SRC = RIRO_KDL_ROOT / "pykdl_utils"
+HRL_GEOM_SRC = RIRO_KDL_ROOT / "hrl_geom"
 
 
 def ensure_ros_python() -> None:
@@ -21,9 +25,16 @@ def ensure_ros_python() -> None:
 
 
 def ensure_project_paths() -> None:
-    for path in (PACKAGE_ROOT, ASSIGNMENT2_SRC, WORKSPACE_ROOT):
+    for path in (
+        PACKAGE_ROOT,
+        ASSIGNMENT1_SRC,
+        ASSIGNMENT2_SRC,
+        PYKDL_UTILS_SRC,
+        HRL_GEOM_SRC,
+        WORKSPACE_ROOT,
+    ):
         text = str(path)
-        if text not in sys.path:
+        if path.exists() and text not in sys.path:
             sys.path.insert(0, text)
 
 

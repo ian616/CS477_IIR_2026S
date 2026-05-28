@@ -351,6 +351,27 @@ class YoloSegDetector:
                 return detection
         return None
 
+    def matches(self, detections, target_label):
+        if not detections:
+            return []
+        if not target_label:
+            return list(detections)
+
+        normalized_target = normalize_label(target_label)
+        exact = [
+            detection
+            for detection in detections
+            if normalize_label(detection.label) == normalized_target
+        ]
+        if exact:
+            return exact
+        return [
+            detection
+            for detection in detections
+            if normalized_target in normalize_label(detection.label)
+            or normalize_label(detection.label) in normalized_target
+        ]
+
 
 def extract_seg_rgbd_roi(
     rgb_image,
@@ -698,8 +719,8 @@ class RgbdSegCropServiceNode(Node):
 
         rgb_image, depth_image, cloud = self.get_detection_inputs()
         detections = self.detector.detect(rgb_image)
-        selected = self.detector.select(detections, target_model.name)
-        if selected is None:
+        matching_detections = self.detector.matches(detections, target_model.name)
+        if not matching_detections:
             seen = [detection.label for detection in detections]
             self.annotated_img = draw_seg_debug(rgb_image, detections, selected=None)
             debug_path = self.save_failure_debug_image(target_model.name)
@@ -708,23 +729,80 @@ class RgbdSegCropServiceNode(Node):
                 f"seen={seen}. debug_image={debug_path}"
             )
 
-        roi = extract_seg_rgbd_roi(
-            rgb_image=rgb_image,
-            depth_image=depth_image,
-            cloud=cloud,
-            detection=selected,
-            bbox_padding_ratio=self.bbox_padding_ratio,
-            max_depth_m=self.max_depth_m,
-            depth_filter=self.depth_filter,
-            depth_margin_m=self.depth_margin_m,
-            min_points=self.min_roi_points,
-        )
-
         request_dir = self.make_request_dir(target_model.name)
-        saved_files = self.save_rgbd_crop(request_dir, target_model.name, selected, detections, roi, request_text, rgb_image)
-        self.publish_roi_cloud(roi.foreground_points)
-        self.mask_img = roi.mask_full
-        self.annotated_img = draw_seg_debug(rgb_image, detections, selected, roi)
+        instances = []
+        selected = None
+        selected_roi = None
+        saved_files = {}
+        for index, detection in enumerate(matching_detections):
+            instance_name = f"{target_model.name}_{index}"
+            candidate_dir = request_dir / instance_name
+            candidate_dir.mkdir(parents=True, exist_ok=False)
+            try:
+                roi = extract_seg_rgbd_roi(
+                    rgb_image=rgb_image,
+                    depth_image=depth_image,
+                    cloud=cloud,
+                    detection=detection,
+                    bbox_padding_ratio=self.bbox_padding_ratio,
+                    max_depth_m=self.max_depth_m,
+                    depth_filter=self.depth_filter,
+                    depth_margin_m=self.depth_margin_m,
+                    min_points=self.min_roi_points,
+                )
+                files = self.save_rgbd_crop(
+                    candidate_dir,
+                    target_model.name,
+                    detection,
+                    detections,
+                    roi,
+                    request_text,
+                    rgb_image,
+                )
+                instance = {
+                    "ok": True,
+                    "target": target_model.name,
+                    "instance_name": instance_name,
+                    "instance_index": int(index),
+                    "detected_label": detection.label,
+                    "frame_id": self.camera_frame,
+                    "detection": detection.to_dict(),
+                    "roi": roi.to_dict(),
+                    "location_xyz_m": roi.centroid.astype(float).tolist(),
+                    "save_dir": str(candidate_dir),
+                    "files": files,
+                }
+                if selected is None:
+                    selected = detection
+                    selected_roi = roi
+                    saved_files = files
+                instances.append(instance)
+            except Exception as exc:
+                instances.append({
+                    "ok": False,
+                    "target": target_model.name,
+                    "instance_name": instance_name,
+                    "instance_index": int(index),
+                    "detected_label": detection.label,
+                    "frame_id": self.camera_frame,
+                    "detection": detection.to_dict(),
+                    "error": str(exc),
+                    "save_dir": str(candidate_dir),
+                })
+
+        valid_instances = [instance for instance in instances if instance.get("ok")]
+        if not valid_instances:
+            self.annotated_img = draw_seg_debug(rgb_image, detections, selected=None)
+            debug_path = self.save_failure_debug_image(target_model.name)
+            raise RuntimeError(
+                f"YOLO matched target='{target_model.name}', but no instance produced a usable RGB-D ROI. "
+                f"errors={[instance.get('error') for instance in instances]}. debug_image={debug_path}"
+            )
+
+        self.publish_roi_cloud(selected_roi.foreground_points)
+        self.mask_img = selected_roi.mask_full
+        self.annotated_img = draw_seg_debug(rgb_image, detections, selected, selected_roi)
+        selected_info = valid_instances[0]
 
         info = {
             "ok": True,
@@ -732,19 +810,21 @@ class RgbdSegCropServiceNode(Node):
             "message": "YOLO segmentation polygon mask and RGB-D crop were saved.",
             "request": request_text,
             "target": target_model.name,
-            "detected_label": selected.label,
+            "detected_label": selected_info["detected_label"],
             "frame_id": self.camera_frame,
-            "detection": selected.to_dict(),
+            "detection": selected_info["detection"],
             "all_detections": [detection.to_dict() for detection in detections],
             "input_crop_ratio": float(self.input_crop_ratio),
-            "roi": roi.to_dict(),
-            "location_xyz_m": roi.centroid.astype(float).tolist(),
+            "roi": selected_info["roi"],
+            "location_xyz_m": selected_info["location_xyz_m"],
+            "instances": instances,
             "save_dir": str(request_dir),
             "files": saved_files,
         }
         self.get_logger().info(
-            f"Saved seg RGB-D crop for {target_model.name}: bbox={roi.bbox_xyxy}, "
-            f"points={len(roi.foreground_points)}, centroid=({roi.centroid[0]:.3f}, {roi.centroid[1]:.3f}, {roi.centroid[2]:.3f})"
+            f"Saved {len(valid_instances)}/{len(instances)} seg RGB-D instance crops for {target_model.name}: "
+            f"selected_bbox={selected_roi.bbox_xyxy}, points={len(selected_roi.foreground_points)}, "
+            f"centroid=({selected_roi.centroid[0]:.3f}, {selected_roi.centroid[1]:.3f}, {selected_roi.centroid[2]:.3f})"
         )
         return info
 
