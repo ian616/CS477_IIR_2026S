@@ -45,6 +45,7 @@ import numpy as np
 import rclpy
 import tf2_geometry_msgs  # noqa: F401  Needed for PoseStamped TF transforms.
 from geometry_msgs.msg import Pose, PoseStamped
+from std_msgs.msg import String
 from rclpy.action import ActionClient
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
@@ -175,7 +176,7 @@ def normalize_destination(name):
 
 
 def parse_command(text):
-    """Return (action, object_name, destination) from a short client command."""
+    """Return (action, object_name, destination) from a single short command."""
     raw = str(text or "").strip()
     if not raw:
         raise CommandParseError("Empty command. Try: banana left")
@@ -202,6 +203,63 @@ def parse_command(text):
                 return "approach", normalize_object_name(obj), destination
 
     return "approach", normalize_object_name(lowered), None
+
+
+def parse_commands(text):
+    """Parse one or more sentences into a list of (action, object_name, destination).
+
+    Handles:
+      - Simple commands: "banana left", "home"
+      - Natural language: "Move a banana to left storage."
+      - Multiple objects: "Move a banana, a coke can, and a hammer to left storage."
+      - Multiple sentences: "Move a banana to left. Move a coke can to right."
+    """
+    raw = str(text or "").strip()
+    if not raw:
+        raise CommandParseError("Empty command.")
+
+    lowered = raw.lower().strip()
+    if lowered in {"home", "idle", "reset"}:
+        return [(lowered, None, None)]
+
+    results = []
+
+    # 문장 단위로 분리
+    sentences = re.split(r"[.!?\n]+", raw)
+    for sentence in sentences:
+        sentence = sentence.strip()
+        if not sentence:
+            continue
+
+        lowered_s = sentence.lower()
+
+        # "Move X, Y, and Z to destination" — 여러 물체 동시 처리 (parsing.py 로직)
+        multi_match = re.search(
+            r"(?:move|pick|grasp)\s+(.*?)\s+(?:to|into|onto)\s+(?:the\s+)?([\w\s]+?)$",
+            lowered_s,
+            re.IGNORECASE,
+        )
+        if multi_match:
+            objects_str = multi_match.group(1)
+            destination = normalize_destination(multi_match.group(2).strip())
+            objects_str = re.sub(r"\band\b", ",", objects_str, flags=re.IGNORECASE)
+            for raw_obj in objects_str.split(","):
+                obj = re.sub(r"^\s*(a|an|the)\s+", "", raw_obj.strip(), flags=re.IGNORECASE).strip()
+                obj = normalize_object_name(obj)
+                if obj:
+                    results.append(("approach", obj, destination))
+            continue
+
+        # 단순 단일 명령 fallback
+        try:
+            results.append(parse_command(sentence))
+        except CommandParseError:
+            pass
+
+    if not results:
+        raise CommandParseError(f"Could not parse: '{text}'")
+
+    return results
 
 
 def pose_from_xyz(xyz):
@@ -584,34 +642,207 @@ class TwoViewGraspServer(Node):
             args.perception_service,
             callback_group=self.callback_group,
         )
-        self.command_service = self.create_service(
-            StringString,
-            args.service_name,
-            self.handle_command,
+        self.task_queue = []
+        self.task_queue_lock = threading.Lock()
+        self.command_subscription = self.create_subscription(
+            String,
+            args.command_topic,
+            self._command_callback,
+            10,
             callback_group=self.callback_group,
         )
+        self.result_publisher = self.create_publisher(String, args.result_topic, 10)
+        self._worker_thread = threading.Thread(target=self._worker_loop, daemon=True)
+        self._worker_thread.start()
 
         self.get_logger().info(f"Waiting for perception service '{args.perception_service}'...")
         while rclpy.ok() and not self.perception_client.wait_for_service(timeout_sec=1.0):
             self.get_logger().info(f"Still waiting for '{args.perception_service}'...")
 
         self.get_logger().info(
-            f"Ready. Send commands to '{args.service_name}', e.g. 'banana left'. "
+            f"Ready. Listening on topic '{args.command_topic}', e.g. 'banana left'. "
             "Each command detects the object and executes pick-and-place in this single server."
         )
 
-    def handle_command(self, request, response):
-        try:
-            with self.command_lock:
-                result = self.execute_command(request.data)
-        except Exception as exc:
-            self.get_logger().error(f"Command failed: {exc}\n{traceback.format_exc()}")
-            result = {"ok": False, "error": str(exc), "command": request.data}
-        response.data = json.dumps(result, sort_keys=True)
-        return response
+    def _publish_result(self, result):
+        msg = String()
+        msg.data = json.dumps(result, sort_keys=True)
+        self.result_publisher.publish(msg)
 
-    def execute_command(self, command_text):
-        action, obj_name, destination = parse_command(command_text)
+    def _command_callback(self, msg):
+        try:
+            parsed_list = parse_commands(msg.data)
+        except CommandParseError as exc:
+            self.get_logger().error(f"Parse error: {exc}")
+            return
+        with self.task_queue_lock:
+            self.task_queue.extend(parsed_list)
+        self.get_logger().info(f"Queued {len(parsed_list)} command(s) from: '{msg.data}'")
+
+    def _worker_loop(self):
+        # Pipeline state (mirrors main.py pattern)
+        pending_future = None   # async detection future for the next queued object
+        pending_obj = None      # object name the future is for
+        next_pick_done = False  # True when the next item's pick was already done inline
+        next_grasp_pose = None  # grasp pose used in that inline pick
+
+        while rclpy.ok():
+            item = None
+            with self.task_queue_lock:
+                if self.task_queue:
+                    item = self.task_queue.pop(0)
+            if item is None:
+                time.sleep(0.01)
+                continue
+
+            action, obj_name, destination = item
+            result = None
+            try:
+                with self.command_lock:
+                    # --- home / idle ---
+                    if action in {"home", "idle", "reset"}:
+                        self.arm.move_joint(HOME_JOINTS)
+                        result = {"ok": True, "action": action, "message": "Robot moved to home joints."}
+                        pending_future = None
+                        pending_obj = None
+                        next_pick_done = False
+                        next_grasp_pose = None
+                        self._publish_result(result)
+                        continue
+
+                    # --- validation ---
+                    if not destination and not self.args.approach_only:
+                        raise CommandParseError(
+                            "Destination is required. Try: 'banana left' or 'move banana to bookshelf'."
+                        )
+                    if destination and destination not in PLACE_CONFIGS:
+                        raise CommandParseError(
+                            f"Unknown destination '{destination}'. Choose one of: {sorted(PLACE_CONFIGS)}"
+                        )
+
+                    # --- get grasp pose (use pre-fetched result if available) ---
+                    if next_pick_done and pending_obj == obj_name:
+                        # Pick phase already executed inline during previous place
+                        self.get_logger().info(f"[Pipeline] Pick already done for '{obj_name}', skipping to place.")
+                        grasp_pose = next_grasp_pose
+                        pick_already_done = True
+                        next_pick_done = False
+                        next_grasp_pose = None
+                        pending_obj = None
+                    else:
+                        if not self.args.dry_run and not self.args.no_command_home:
+                            self.get_logger().info("Returning to home before new command.")
+                            self.arm.move_joint(HOME_JOINTS)
+
+                        # Use pre-fetched future if it's for the right object
+                        if pending_future is not None and pending_obj == obj_name:
+                            self.get_logger().info(f"[Pipeline] Using pre-fetched detection for '{obj_name}'.")
+                            detection = self._collect_detection(pending_future, obj_name)
+                            pending_future = None
+                            pending_obj = None
+                        else:
+                            detection = self.detect_object(obj_name)
+
+                        grasp_pose, _ = self._compute_grasp_pose(detection, obj_name)
+                        pick_already_done = False
+
+                    # --- build pipeline callbacks (mirrors main.py make_callbacks) ---
+                    def on_before_idle():
+                        nonlocal pending_future, pending_obj
+                        with self.task_queue_lock:
+                            if not self.task_queue:
+                                return
+                            _, next_obj, _ = self.task_queue[0]
+                        self.get_logger().info(f"[Pipeline] Starting detection for next: '{next_obj}'")
+                        pending_future = self._detect_async(next_obj)
+                        pending_obj = next_obj
+
+                    def get_next_pick_data():
+                        nonlocal pending_future, pending_obj, next_pick_done, next_grasp_pose
+                        if pending_future is None:
+                            return None
+                        with self.task_queue_lock:
+                            if not self.task_queue:
+                                pending_future = None
+                                pending_obj = None
+                                return None
+                            _, next_obj, _ = self.task_queue[0]
+
+                        if next_obj != pending_obj:
+                            self.get_logger().warn(
+                                f"[Pipeline] Queue head changed: expected '{pending_obj}', got '{next_obj}'"
+                            )
+                            pending_future = None
+                            pending_obj = None
+                            return None
+
+                        try:
+                            det = self._collect_detection(pending_future, next_obj)
+                            pending_future = None
+                        except Exception as exc:
+                            self.get_logger().warn(f"[Pipeline] Detection failed for '{next_obj}': {exc}")
+                            pending_future = None
+                            pending_obj = None
+                            return None
+
+                        try:
+                            ng_pose, _ = self._compute_grasp_pose(det, next_obj)
+                        except Exception as exc:
+                            self.get_logger().warn(f"[Pipeline] Grasp compute failed for '{next_obj}': {exc}")
+                            pending_obj = None
+                            return None
+
+                        approach = copy.deepcopy(ng_pose)
+                        approach.position.z += self.args.approach_height
+                        pan = math.atan2(ng_pose.position.y, ng_pose.position.x)
+
+                        next_pick_done = True
+                        next_grasp_pose = ng_pose
+                        self.get_logger().info(f"[Pipeline] Next pick ready for '{next_obj}', pan={pan:.3f}")
+                        return {
+                            "obj_name": next_obj,
+                            "pick_joint": [pan, -np.pi / 2.0, 1.0, -np.pi / 3.0, -np.pi / 2.0, 0.0],
+                            "approach_pose": approach,
+                            "grasp_pose": ng_pose,
+                        }
+
+                    # --- execute ---
+                    if self.args.dry_run:
+                        self.get_logger().info("Dry run: skipping motion.")
+                    elif self.args.approach_only:
+                        approach_pose = copy.deepcopy(grasp_pose)
+                        approach_pose.position.z += self.args.approach_height
+                        move_gripper.gripper_open(self)
+                        self.move_to_grasp_approach(grasp_pose, approach_pose)
+                    else:
+                        execute_pick_place_sequence(
+                            self, self.arm, grasp_pose, destination, obj_name,
+                            on_before_idle=on_before_idle,
+                            get_next_pick_data=get_next_pick_data,
+                            pick_already_done=pick_already_done,
+                        )
+
+                    result = {
+                        "ok": True,
+                        "action": "grasp_ready" if self.args.approach_only else "pick_place",
+                        "object": obj_name,
+                        "destination": destination,
+                        "message": "Pick-and-place sequence completed.",
+                    }
+
+            except Exception as exc:
+                self.get_logger().error(f"Command failed: {exc}\n{traceback.format_exc()}")
+                result = {"ok": False, "error": str(exc), "object": obj_name, "destination": destination}
+                # Reset pipeline state on error
+                pending_future = None
+                pending_obj = None
+                next_pick_done = False
+                next_grasp_pose = None
+
+            if result is not None:
+                self._publish_result(result)
+
+    def execute_command(self, action, obj_name, destination):
         if action in {"home", "idle", "reset"}:
             self.arm.move_joint(HOME_JOINTS)
             return {"ok": True, "action": action, "message": "Robot moved to home joints."}
@@ -630,14 +861,9 @@ class TwoViewGraspServer(Node):
             self.arm.move_joint(HOME_JOINTS)
 
         detection = self.detect_object(obj_name)
-        if not detection.get("ok"):
-            raise RuntimeError(detection.get("error", "Perception failed."))
-
+        grasp_pose, grasp_selection = self._compute_grasp_pose(detection, obj_name)
         source_frame = detection.get("frame_id") or self.args.camera_frame
-        grasp_selection = self.select_grasp_target(detection, obj_name)
         detected_pose = pose_from_xyz(grasp_selection["target_xyz_m"])
-        base_pose = self.transform_pose(detected_pose, source_frame, "base_link")
-        grasp_pose = self.make_grasp_pose(base_pose)
         approach_pose = copy.deepcopy(grasp_pose)
         approach_pose.position.z += self.args.approach_height
 
@@ -669,20 +895,36 @@ class TwoViewGraspServer(Node):
             "message": message,
         }
 
-    def detect_object(self, obj_name):
+    def _detect_async(self, obj_name):
+        """Start detection asynchronously and return the future."""
         req = StringString.Request()
         req.data = obj_name
-        future = self.perception_client.call_async(req)
+        return self.perception_client.call_async(req)
+
+    def _collect_detection(self, future, obj_name):
+        """Wait for a detection future and return the result dict."""
         deadline = time.monotonic() + self.args.perception_timeout
         while rclpy.ok() and not future.done():
             if time.monotonic() > deadline:
                 raise TimeoutError(f"Timed out waiting for perception result for '{obj_name}'.")
             time.sleep(0.02)
-
         result = future.result()
         if result is None:
             raise RuntimeError(f"Perception service returned no result for '{obj_name}'.")
         return json.loads(result.data)
+
+    def detect_object(self, obj_name):
+        return self._collect_detection(self._detect_async(obj_name), obj_name)
+
+    def _compute_grasp_pose(self, detection, obj_name):
+        """Detection dict → (grasp_pose, grasp_selection). Raises on failure."""
+        if not detection.get("ok"):
+            raise RuntimeError(detection.get("error", "Perception failed."))
+        source_frame = detection.get("frame_id") or self.args.camera_frame
+        grasp_selection = self.select_grasp_target(detection, obj_name)
+        detected_pose = pose_from_xyz(grasp_selection["target_xyz_m"])
+        base_pose = self.transform_pose(detected_pose, source_frame, "base_link")
+        return self.make_grasp_pose(base_pose), grasp_selection
 
     def select_grasp_target(self, detection, obj_name):
         points, points_path = load_grasp_points_from_detection(detection)
@@ -836,7 +1078,8 @@ def spawn_objects(node, object_names):
 
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description="Two-view pick-and-place command server.")
-    parser.add_argument("--service-name", default="two_view_grasp_command")
+    parser.add_argument("--command-topic", default="/task_commands")
+    parser.add_argument("--result-topic", default="/task_results")
     parser.add_argument("--perception-service", default="detect_object_top_rgbd_seg_crop")
     parser.add_argument("--camera-frame", default="camera_color_optical_frame")
     parser.add_argument("--perception-timeout", type=float, default=15.0)
