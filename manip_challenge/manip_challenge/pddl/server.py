@@ -38,7 +38,8 @@ if not hasattr(np, "mat"):
 
 import rclpy
 import tf2_geometry_msgs  # noqa: F401
-from geometry_msgs.msg import Pose, PoseStamped
+from geometry_msgs.msg import Pose, PoseStamped, Point
+from visualization_msgs.msg import Marker, MarkerArray
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
@@ -154,10 +155,10 @@ def grasp_pose_xyz_from_selection(selection):
     raw = selection.get("raw_centroid_xyz_m")
     if raw is not None:
         raw = np.asarray(raw, dtype=np.float64)
-        if raw.shape[0] >= 2 and np.isfinite(raw[:2]).all():
+        if raw.shape[0] >= 3 and np.isfinite(raw[:3]).all():
             return (
-                np.asarray([raw[0], raw[1], target[2]], dtype=np.float64),
-                "raw_centroid_xy_with_adjusted_target_z",
+                np.asarray([raw[0], raw[1], raw[2]], dtype=np.float64),
+                "raw_centroid_xyz",
             )
     return target[:3].copy(), "target_xyz_m"
 
@@ -290,6 +291,8 @@ class PddlTampServer(Node):
         self.action_pub = self.create_publisher(String, "/planned_action", 10)
         self.result_pub = self.create_publisher(String, "/action_result", 10)
         self.pddl_log_pub = self.create_publisher(String, args.log_topic, 10)
+        self.grasp_pose_publisher = self.create_publisher(PoseStamped, '/grasp_target_pose', 10)
+        self.pca_debug_publisher = self.create_publisher(MarkerArray, '/grasp_pca_debug', 10)
 
         self.get_logger().info(f"Waiting for perception service '{args.perception_service}'...")
         while rclpy.ok() and not self.perception_client.wait_for_service(timeout_sec=1.0):
@@ -1077,15 +1080,11 @@ class PddlTampServer(Node):
         label = detection.get("target") or detection.get("detected_label") or obj_name
         selection = choose_grasp_target_from_points(points, label=label)
         selection["points_path"] = points_path
-        selection = adjust_target_depth_from_rgbd(
-            points,
-            selection,
-            clearance_m=self.args.grasp_surface_clearance,
-            local_radius_m=self.args.grasp_depth_local_radius,
-            percentile=self.args.grasp_depth_percentile,
-        )
+        # Removed adjust_target_depth_from_rgbd per user request; use exact centroid height.
         store_grasp_pose_reference(selection)
         output_dir = detection.get("save_dir")
+        if not output_dir and points_path:
+            output_dir = str(Path(points_path).expanduser().parent)
         if output_dir:
             try:
                 visualization = save_grasp_selection_visualization(points, selection, output_dir, label)
@@ -1169,26 +1168,167 @@ class PddlTampServer(Node):
         grasp_xyz, _ = store_grasp_pose_reference(selection)
         detected_pose = pose_from_xyz(grasp_xyz)
         base_pose = self.transform_pose(detected_pose, source_frame, "base_link")
-        pca_major_axis_base_xy = self.transform_selection_axis_to_base_xy(
-            selection, source_frame, base_pose, grasp_xyz,
-        )
-        gripper_axis_base_xy = None
-        if pca_major_axis_base_xy is not None:
-            gripper_axis_base_xy = np.asarray(
-                [-pca_major_axis_base_xy[1], pca_major_axis_base_xy[0]],
-                dtype=np.float64,
+        
+        xyz_major_axis = selection.get("xyz_major_axis")
+        major_axis_base_3d = None
+        if xyz_major_axis is not None:
+            major_axis_base_3d = self.transform_vector_to_base(xyz_major_axis, source_frame)
+            
+        if major_axis_base_3d is not None and np.linalg.norm(major_axis_base_3d) > 1e-6:
+            selection["xyz_major_axis_base"] = major_axis_base_3d.tolist()
+            
+            z_vertical = np.array([0.0, 0.0, -1.0])
+            z_approach = z_vertical - np.dot(z_vertical, major_axis_base_3d) * major_axis_base_3d
+            if np.linalg.norm(z_approach) < 1e-6:
+                z_approach = np.array([1.0, 0.0, 0.0])
+            z_approach = normalize_vector(z_approach)
+            
+            x_closing = normalize_vector(np.cross(major_axis_base_3d, z_approach))
+            y_dir = normalize_vector(np.cross(z_approach, x_closing))
+            
+            matrix = np.column_stack((x_closing, y_dir, z_approach))
+            quat = matrix_to_quaternion(matrix)
+            
+            grasp_pose = copy.deepcopy(base_pose)
+            grasp_pose.orientation.x = float(quat[0])
+            grasp_pose.orientation.y = float(quat[1])
+            grasp_pose.orientation.z = float(quat[2])
+            grasp_pose.orientation.w = float(quat[3])
+            
+            # Apply the surface clearance offset along the 3D approach vector
+            # grasp_surface_clearance is negative (e.g. -0.012), meaning push INTO the object.
+            # z_approach points into the object. So we move in direction of z_approach by abs(clearance).
+            clearance = self.args.grasp_surface_clearance
+            grasp_pose.position.x += -clearance * float(z_approach[0])
+            grasp_pose.position.y += -clearance * float(z_approach[1])
+            grasp_pose.position.z += -clearance * float(z_approach[2])
+            
+            # The Y offset is likely a camera/base calibration offset, so apply it in global base_link Y.
+            grasp_pose.position.y += self.args.grasp_y_offset
+            
+            selection["gripper_axis_rule"] = "3d_perpendicular_to_pca_major_axis"
+        else:
+            pca_major_axis_base_xy = self.transform_selection_axis_to_base_xy(
+                selection, source_frame, base_pose, grasp_xyz,
             )
-            selection["pca_major_axis_base_xy"] = pca_major_axis_base_xy.astype(float).tolist()
-            selection["pca_major_axis_base_yaw_rad"] = float(
-                math.atan2(pca_major_axis_base_xy[1], pca_major_axis_base_xy[0])
-            )
-            selection["gripper_axis_base_xy"] = gripper_axis_base_xy.astype(float).tolist()
-            selection["gripper_axis_base_yaw_rad"] = float(
-                math.atan2(gripper_axis_base_xy[1], gripper_axis_base_xy[0])
-            )
-            selection["gripper_axis_rule"] = "perpendicular_to_pca_major_axis"
-        grasp_pose = self.make_grasp_pose(base_pose, gripper_axis_base_xy)
+            gripper_axis_base_xy = None
+            if pca_major_axis_base_xy is not None:
+                gripper_axis_base_xy = np.asarray(
+                    [-pca_major_axis_base_xy[1], pca_major_axis_base_xy[0]],
+                    dtype=np.float64,
+                )
+                selection["pca_major_axis_base_xy"] = pca_major_axis_base_xy.astype(float).tolist()
+                selection["pca_major_axis_base_yaw_rad"] = float(
+                    math.atan2(pca_major_axis_base_xy[1], pca_major_axis_base_xy[0])
+                )
+                selection["gripper_axis_base_xy"] = gripper_axis_base_xy.astype(float).tolist()
+                selection["gripper_axis_base_yaw_rad"] = float(
+                    math.atan2(gripper_axis_base_xy[1], gripper_axis_base_xy[0])
+                )
+                selection["gripper_axis_rule"] = "perpendicular_to_pca_major_axis"
+                
+            grasp_pose = self.make_grasp_pose(base_pose, gripper_axis_base_xy)
+        
+        # Publish the final grasp pose for RViz
+        pose_msg = PoseStamped()
+        pose_msg.header.frame_id = "base_link"
+        pose_msg.header.stamp = self.get_clock().now().to_msg()
+        pose_msg.pose = grasp_pose
+        self.grasp_pose_publisher.publish(pose_msg)
+        
+        # Visualize actual PCA and centroid
+        marker_array = MarkerArray()
+        
+        # Centroid Sphere (Yellow)
+        centroid_marker = Marker()
+        centroid_marker.header.frame_id = "base_link"
+        centroid_marker.header.stamp = pose_msg.header.stamp
+        centroid_marker.ns = "pca_debug"
+        centroid_marker.id = 0
+        centroid_marker.type = Marker.SPHERE
+        centroid_marker.action = Marker.ADD
+        centroid_marker.pose.position = base_pose.position
+        centroid_marker.scale.x = 0.02
+        centroid_marker.scale.y = 0.02
+        centroid_marker.scale.z = 0.02
+        centroid_marker.color.r = 1.0
+        centroid_marker.color.g = 1.0
+        centroid_marker.color.b = 0.0
+        centroid_marker.color.a = 0.8
+        marker_array.markers.append(centroid_marker)
+        
+        if major_axis_base_3d is not None:
+            # 3D PCA Arrow (Cyan)
+            pca_arrow = Marker()
+            pca_arrow.header.frame_id = "base_link"
+            pca_arrow.header.stamp = pose_msg.header.stamp
+            pca_arrow.ns = "pca_debug"
+            pca_arrow.id = 1
+            pca_arrow.type = Marker.ARROW
+            pca_arrow.action = Marker.ADD
+            p1 = base_pose.position
+            p2 = Point()
+            p2.x = p1.x + major_axis_base_3d[0] * 0.15
+            p2.y = p1.y + major_axis_base_3d[1] * 0.15
+            p2.z = p1.z + major_axis_base_3d[2] * 0.15
+            pca_arrow.points = [p1, p2]
+            pca_arrow.scale.x = 0.005
+            pca_arrow.scale.y = 0.01
+            pca_arrow.scale.z = 0.02
+            pca_arrow.color.r = 0.0
+            pca_arrow.color.g = 1.0
+            pca_arrow.color.b = 1.0
+            pca_arrow.color.a = 1.0
+            marker_array.markers.append(pca_arrow)
+            
+        points_path = selection.get("points_path")
+        if points_path and os.path.isfile(points_path):
+            try:
+                points = np.load(points_path)
+                pc_marker = Marker()
+                pc_marker.header.frame_id = source_frame
+                pc_marker.header.stamp = pose_msg.header.stamp
+                pc_marker.ns = "pca_debug"
+                pc_marker.id = 2
+                pc_marker.type = Marker.POINTS
+                pc_marker.action = Marker.ADD
+                pc_marker.scale.x = 0.005
+                pc_marker.scale.y = 0.005
+                pc_marker.color.r = 1.0
+                pc_marker.color.g = 0.5
+                pc_marker.color.b = 0.0
+                pc_marker.color.a = 0.5
+                
+                step = max(1, len(points) // 3000)
+                for pt in points[::step]:
+                    p = Point()
+                    p.x = float(pt[0])
+                    p.y = float(pt[1])
+                    p.z = float(pt[2])
+                    pc_marker.points.append(p)
+                marker_array.markers.append(pc_marker)
+            except Exception as e:
+                self.get_logger().error(f"Failed to load point cloud for visualization: {e}")
+            
+        self.pca_debug_publisher.publish(marker_array)
+        
         return grasp_pose, selection
+
+    def transform_vector_to_base(self, vector_source, source_frame):
+        p1 = pose_from_xyz([0.0, 0.0, 0.0])
+        p2 = pose_from_xyz(vector_source)
+        try:
+            p1_base = self.transform_pose(p1, source_frame, "base_link")
+            p2_base = self.transform_pose(p2, source_frame, "base_link")
+        except Exception as exc:
+            self.get_logger().error(f"Failed to transform vector: {exc}")
+            return None
+        v_base = np.array([
+            p2_base.position.x - p1_base.position.x,
+            p2_base.position.y - p1_base.position.y,
+            p2_base.position.z - p1_base.position.z,
+        ], dtype=np.float64)
+        return normalize_vector(v_base)
 
     def transform_selection_axis_to_base_xy(self, grasp_selection, source_frame, base_pose, axis_origin_xyz_m):
         axis = grasp_selection.get("xy_major_axis")
@@ -1240,9 +1380,9 @@ def parse_args(argv=None):
     parser.add_argument("--approach-height", type=float, default=0.15)
     parser.add_argument("--final-z-offset", type=float, default=0.0)
     parser.add_argument("--grasp-surface-clearance", type=float, default=-0.012)
-    parser.add_argument("--grasp-depth-local-radius", type=float, default=0.035)
+    parser.add_argument("--grasp-depth-local-radius", type=float, default=0.0005)
     parser.add_argument("--grasp-depth-percentile", type=float, default=10.0)
-    parser.add_argument("--grasp-y-offset", type=float, default=-0.01)
+    parser.add_argument("--grasp-y-offset", type=float, default=-0.0)
     parser.add_argument("--gripper-force", type=float, default=0.5)
     parser.add_argument("--gripper-close-pos", type=float, default=0.5)
     parser.add_argument("--gripper-settle-time", type=float, default=0.4)

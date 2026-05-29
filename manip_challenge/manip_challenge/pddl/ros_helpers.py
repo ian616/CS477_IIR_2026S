@@ -147,6 +147,25 @@ def pca_axes_xy(points):
     return center, major, minor
 
 
+def pca_axes_3d(points):
+    xyz = points[:, :3].astype(np.float64)
+    if len(xyz) == 0:
+        return np.zeros(3), np.array([0.0, 1.0, 0.0]), np.array([1.0, 0.0, 0.0])
+    center = np.median(xyz, axis=0)
+    centered = xyz - center
+    try:
+        _, _, vt = np.linalg.svd(centered, full_matrices=False)
+        major = vt[0]
+        minor = vt[1]
+        if major[0] < 0:
+            major = -major
+            minor = -minor
+    except np.linalg.LinAlgError:
+        major = np.array([0.0, 1.0, 0.0])
+        minor = np.array([1.0, 0.0, 0.0])
+    return center, major, minor
+
+
 def choose_grasp_target_from_points(points, label="", min_bin_points=20):
     points = finite_xyz_points(points)
     if len(points) < max(8, min_bin_points):
@@ -156,8 +175,10 @@ def choose_grasp_target_from_points(points, label="", min_bin_points=20):
             "target_xyz_m": centroid.astype(float).tolist(),
             "raw_centroid_xyz_m": centroid.astype(float).tolist(),
             "reason": f"too_few_points:{len(points)}",
+            "xyz_major_axis": [0.0, 1.0, 0.0],
         }
     xy_center, major, minor = pca_axes_xy(points)
+    _, major_3d, _ = pca_axes_3d(points)
     centered = points[:, :2] - xy_center
     along = centered @ major
     across = centered @ minor
@@ -171,6 +192,7 @@ def choose_grasp_target_from_points(points, label="", min_bin_points=20):
             "reason": "degenerate_major_axis",
             "xy_major_axis": major.astype(float).tolist(),
             "xy_minor_axis": minor.astype(float).tolist(),
+            "xyz_major_axis": major_3d.astype(float).tolist(),
         }
     edges = np.linspace(low, high, 19)
     min_points = max(min_bin_points, int(round(len(points) * 0.025)))
@@ -206,16 +228,29 @@ def choose_grasp_target_from_points(points, label="", min_bin_points=20):
             "raw_centroid_xyz_m": raw_centroid.astype(float).tolist(),
             "xy_major_axis": major.astype(float).tolist(),
             "xy_minor_axis": minor.astype(float).tolist(),
+            "xyz_major_axis": major_3d.astype(float).tolist(),
             "reason": "no_dense_axis_bin",
         }
     selected = points[best["mask"], :3]
     target = np.median(selected, axis=0)
+    
+    # Ensure consistent axis direction: make major axis point from the heavy head to the handle.
+    # raw_centroid is near the heavy head, target is on the thin handle.
+    head_to_handle = target - raw_centroid
+    if np.linalg.norm(head_to_handle) > 1e-3:
+        if np.dot(major_3d, head_to_handle) < 0:
+            major_3d = -major_3d
+        if np.dot(major, head_to_handle[:2]) < 0:
+            major = -major
+            minor = -minor
+            
     return {
         "method": "local_thick_axis_band",
         "target_xyz_m": target.astype(float).tolist(),
         "raw_centroid_xyz_m": raw_centroid.astype(float).tolist(),
         "xy_major_axis": major.astype(float).tolist(),
         "xy_minor_axis": minor.astype(float).tolist(),
+        "xyz_major_axis": major_3d.astype(float).tolist(),
         "selected_band": {
             "along_min_m": best["along_min_m"],
             "along_max_m": best["along_max_m"],
