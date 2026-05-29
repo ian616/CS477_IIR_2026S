@@ -1,0 +1,121 @@
+{
+  "action": {
+    "args": [
+      "hammer_0",
+      "table",
+      "right_storage"
+    ],
+    "name": "move-target-to-goal",
+    "pddl": "(move-target-to-goal hammer_0 table right_storage)",
+    "source": "external"
+  },
+  "event": "action_result",
+  "result": {
+    "action": {
+      "args": [
+        "hammer_0",
+        "table",
+        "right_storage"
+      ],
+      "name": "move-target-to-goal",
+      "pddl": "(move-target-to-goal hammer_0 table right_storage)",
+      "source": "external"
+    },
+    "class_name": "hammer",
+    "command_id": "step4-3f86358a",
+    "destination": "right storage",
+    "detected_pose_in_source": {
+      "orientation": {
+        "w": 1.0,
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "position": {
+        "x": 0.28220751881599426,
+        "y": 0.25986385345458984,
+        "z": 1.4707152481079102
+      }
+    },
+    "dry_run": false,
+    "grasp_pose_in_base": {
+      "orientation": {
+        "w": 0.0,
+        "x": 0.0025323943147114833,
+        "y": 0.9999967934843765,
+        "z": 0.0
+      },
+      "position": {
+        "x": 0.3952331768833347,
+        "y": -0.2647075188159941,
+        "z": -0.08006000084859544
+      }
+    },
+    "grasp_selection": {
+      "delta_from_raw_centroid_m": [
+        -0.14482641220092773,
+        -0.007305219769477844,
+        0.012013279914856012
+      ],
+      "grasp_pose_source": "raw_centroid_xy_with_adjusted_target_z",
+      "grasp_pose_xyz_m": [
+        0.28220751881599426,
+        0.25986385345458984,
+        1.4707152481079102
+      ],
+      "gripper_axis_base_xy": [
+        0.9999871739580697,
+        -0.005064772389099097
+      ],
+      "gripper_axis_base_yaw_rad": -0.0050647940428712,
+      "gripper_axis_rule": "perpendicular_to_pca_major_axis",
+      "method": "local_thick_axis_band",
+      "pca_major_axis_base_xy": [
+        -0.005064772389099097,
+        -0.9999871739580697
+      ],
+      "pca_major_axis_base_yaw_rad": -1.5758611208377677,
+      "points_path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260529_203320_781560_hammer/hammer_0/foreground_points.npy",
+      "raw_centroid_xyz_m": [
+        0.28220751881599426,
+        0.25986385345458984,
+        1.4587019681930542
+      ],
+      "rgbd_depth_adjustment": {
+        "adjusted_target_depth_m": 1.4707152481079102,
+        "clearance_above_surface_m": -0.012,
+        "delta_depth_m": 0.011166238307952936,
+        "local_points": 262,
+        "local_radius_m": 0.035,
+        "measured_surface_depth_m": 1.4587152481079102,
+        "method": "local_radius",
+        "previous_target_depth_m": 1.4595490097999573,
+        "surface_depth_percentile": 10.0
+      },
+      "selected_band": {
+        "along_max_m": -0.13548941885598345,
+        "along_min_m": -0.15113722627964019,
+        "point_count": 132,
+        "score": 0.09396476790940808,
+        "width_m": 0.09752655681803202,
+        "z_spread_m": 0.021678924560546875
+      },
+      "target_xyz_m": [
+        0.13738110661506653,
+        0.252558633685112,
+        1.4707152481079102
+      ],
+      "xy_major_axis": [
+        0.9999871736374615,
+        0.005064835689514956
+      ],
+      "xy_minor_axis": [
+        -0.005064835689514956,
+        0.9999871736374615
+      ]
+    },
+    "ok": true
+  },
+  "stamp_sec": 1780054437.4649374,
+  "step": 4
+}

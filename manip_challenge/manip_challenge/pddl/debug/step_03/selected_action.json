@@ -1,0 +1,15 @@
+{
+  "action": {
+    "args": [
+      "meat_can_0",
+      "table",
+      "left_storage"
+    ],
+    "name": "move-target-to-goal",
+    "pddl": "(move-target-to-goal meat_can_0 table left_storage)",
+    "source": "fallback"
+  },
+  "event": "selected_action",
+  "stamp_sec": 1780054364.1367488,
+  "step": 3
+}

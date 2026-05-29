@@ -1,0 +1,121 @@
+{
+  "action": {
+    "args": [
+      "meat_can_0",
+      "table",
+      "left_storage"
+    ],
+    "name": "move-target-to-goal",
+    "pddl": "(move-target-to-goal meat_can_0 table left_storage)",
+    "source": "fallback"
+  },
+  "event": "action_result",
+  "result": {
+    "action": {
+      "args": [
+        "meat_can_0",
+        "table",
+        "left_storage"
+      ],
+      "name": "move-target-to-goal",
+      "pddl": "(move-target-to-goal meat_can_0 table left_storage)",
+      "source": "fallback"
+    },
+    "class_name": "meat_can",
+    "command_id": "step3-c6c7ab9a",
+    "destination": "left storage",
+    "detected_pose_in_source": {
+      "orientation": {
+        "w": 1.0,
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "position": {
+        "x": 0.3781679570674896,
+        "y": 0.10038010030984879,
+        "z": 1.4219416971206664
+      }
+    },
+    "dry_run": false,
+    "grasp_pose_in_base": {
+      "orientation": {
+        "w": 0.0,
+        "x": -0.15524073278523157,
+        "y": 0.9878766698754984,
+        "z": 0.0
+      },
+      "position": {
+        "x": 0.5549587875459709,
+        "y": -0.36066795706748944,
+        "z": -0.032084422775101595
+      }
+    },
+    "grasp_selection": {
+      "delta_from_raw_centroid_m": [
+        0.0016511380672454834,
+        -0.0008375421166419983,
+        0.0022096033096312695
+      ],
+      "grasp_pose_source": "raw_centroid_xy_with_adjusted_target_z",
+      "grasp_pose_xyz_m": [
+        0.3781679570674896,
+        0.10038010030984879,
+        1.4219416971206664
+      ],
+      "gripper_axis_base_xy": [
+        0.9518006297686086,
+        0.3067173962658133
+      ],
+      "gripper_axis_base_yaw_rad": 0.3117422715300974,
+      "gripper_axis_rule": "perpendicular_to_pca_major_axis",
+      "method": "local_thick_axis_band",
+      "pca_major_axis_base_xy": [
+        0.3067173962658133,
+        -0.9518006297686086
+      ],
+      "pca_major_axis_base_yaw_rad": -1.2590540552647993,
+      "points_path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260529_203243_336764_meat_can/meat_can_0/foreground_points.npy",
+      "raw_centroid_xyz_m": [
+        0.3781679570674896,
+        0.10038010030984879,
+        1.4197320938110352
+      ],
+      "rgbd_depth_adjustment": {
+        "adjusted_target_depth_m": 1.4219416971206664,
+        "clearance_above_surface_m": -0.012,
+        "delta_depth_m": 0.005917906284332197,
+        "local_points": 385,
+        "local_radius_m": 0.035,
+        "measured_surface_depth_m": 1.4099416971206664,
+        "method": "local_radius",
+        "previous_target_depth_m": 1.4160237908363342,
+        "surface_depth_percentile": 10.0
+      },
+      "selected_band": {
+        "along_max_m": 0.0037657521057139973,
+        "along_min_m": -0.0003977343350276344,
+        "point_count": 36,
+        "score": 0.07467532958798048,
+        "width_m": 0.0663112689438738,
+        "z_spread_m": 0.007720649242401123
+      },
+      "target_xyz_m": [
+        0.3798190951347351,
+        0.09954255819320679,
+        1.4219416971206664
+      ],
+      "xy_major_axis": [
+        0.9517995106335068,
+        -0.30672086912666574
+      ],
+      "xy_minor_axis": [
+        -0.30672086912666574,
+        -0.9517995106335068
+      ]
+    },
+    "ok": true
+  },
+  "stamp_sec": 1780054399.3331716,
+  "step": 3
+}

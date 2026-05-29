@@ -11,6 +11,7 @@ import sys
 import threading
 import time
 import traceback
+import uuid
 from pathlib import Path
 
 try:
@@ -63,7 +64,7 @@ from manip_challenge.pddl.ros_helpers import (
     save_grasp_selection_visualization,
     stop_child_processes,
 )
-from manip_challenge.pddl.pddl_types import PlanAction
+from manip_challenge.pddl.pddl_types import ObjectState, PlanAction, PredicateState
 from manip_challenge.pddl.utils import PDDL_DIR, load_dotenv
 
 
@@ -141,6 +142,65 @@ def object_summary(obj) -> dict:
             if key in files
         },
     }
+
+
+def object_command_payload(obj) -> dict | None:
+    if obj is None:
+        return None
+    return {
+        "name": obj.name,
+        "class_name": obj.class_name,
+        "instance_index": obj.instance_index,
+        "is_target": obj.is_target,
+        "location": obj.location,
+        "detected": obj.detected,
+        "visible": obj.visible,
+        "pose_known": obj.pose_known,
+        "graspable": obj.graspable,
+        "clear": obj.clear,
+        "safe": obj.safe,
+        "confidence": obj.confidence,
+        "mask_pixels": obj.mask_pixels,
+        "foreground_points": obj.foreground_points,
+        "bbox_xyxy": list(obj.bbox_xyxy) if obj.bbox_xyxy is not None else None,
+        "centroid_xyz": list(obj.centroid_xyz) if obj.centroid_xyz is not None else None,
+        "depth_median": obj.depth_median,
+        "blocks": sorted(obj.blocks),
+        "blocked_by": sorted(obj.blocked_by),
+        "near": sorted(obj.near),
+        "detection": obj.detection,
+        "error": obj.error,
+    }
+
+
+def object_state_from_command(payload: dict | None, fallback_name: str) -> ObjectState:
+    payload = payload or {}
+    bbox = payload.get("bbox_xyxy")
+    centroid = payload.get("centroid_xyz")
+    return ObjectState(
+        name=str(payload.get("name") or fallback_name),
+        class_name=str(payload.get("class_name") or fallback_name),
+        instance_index=payload.get("instance_index"),
+        is_target=bool(payload.get("is_target", True)),
+        location=str(payload.get("location") or "table"),
+        detected=bool(payload.get("detected", False)),
+        visible=bool(payload.get("visible", False)),
+        pose_known=bool(payload.get("pose_known", False)),
+        graspable=bool(payload.get("graspable", False)),
+        clear=bool(payload.get("clear", False)),
+        safe=bool(payload.get("safe", True)),
+        confidence=float(payload.get("confidence") or 0.0),
+        mask_pixels=int(payload.get("mask_pixels") or 0),
+        foreground_points=int(payload.get("foreground_points") or 0),
+        bbox_xyxy=tuple(int(v) for v in bbox) if bbox and len(bbox) == 4 else None,
+        centroid_xyz=tuple(float(v) for v in centroid) if centroid and len(centroid) >= 3 else None,
+        depth_median=float(payload["depth_median"]) if payload.get("depth_median") is not None else None,
+        blocks=set(payload.get("blocks") or []),
+        blocked_by=set(payload.get("blocked_by") or []),
+        near=set(payload.get("near") or []),
+        detection=payload.get("detection"),
+        error=payload.get("error"),
+    )
 
 
 VERTICAL_DOWN_GRASP_QUATERNION = np.asarray([0.0, 1.0, 0.0, 0.0], dtype=np.float64)
@@ -290,6 +350,16 @@ class PddlTampServer(Node):
         self.action_pub = self.create_publisher(String, "/planned_action", 10)
         self.result_pub = self.create_publisher(String, "/action_result", 10)
         self.pddl_log_pub = self.create_publisher(String, args.log_topic, 10)
+        self.executor_command_pub = self.create_publisher(String, args.executor_command_topic, 10)
+        self.executor_result_sub = self.create_subscription(
+            String,
+            args.executor_result_topic,
+            self.handle_executor_result,
+            10,
+            callback_group=self.callback_group,
+        )
+        self.executor_results: dict[str, dict] = {}
+        self.executor_condition = threading.Condition()
 
         self.get_logger().info(f"Waiting for perception service '{args.perception_service}'...")
         while rclpy.ok() and not self.perception_client.wait_for_service(timeout_sec=1.0):
@@ -298,6 +368,60 @@ class PddlTampServer(Node):
             f"PDDL TAMP server ready. Publish natural-language commands to '{args.command_topic}' "
             f"or call service '{args.service_name}'."
         )
+
+    def handle_executor_result(self, msg: String) -> None:
+        try:
+            payload = json.loads(msg.data)
+        except json.JSONDecodeError as exc:
+            self.get_logger().warn(f"[Executor] Ignoring malformed executor result: {exc}")
+            return
+        command_id = payload.get("command_id")
+        if not command_id:
+            self.get_logger().warn("[Executor] Ignoring executor result without command_id.")
+            return
+        with self.executor_condition:
+            self.executor_results[str(command_id)] = payload
+            self.executor_condition.notify_all()
+
+    def dispatch_action_to_executor(self, action: PlanAction, state: PredicateState, step_idx: int) -> dict:
+        command_id = f"step{step_idx}-{uuid.uuid4().hex[:8]}"
+        selected_object = state.objects.get(action.args[0]) if action.args else None
+        payload = {
+            "event": "execute_action",
+            "command_id": command_id,
+            "step": int(step_idx),
+            "stamp_sec": time.time(),
+            "action": action.to_dict(),
+            "selected_object": object_command_payload(selected_object),
+        }
+        msg = String()
+        msg.data = json.dumps(payload, sort_keys=True)
+        self.get_logger().info(
+            f"[Executor] Dispatching committed action {action.pddl()} command_id={command_id}"
+        )
+        self.executor_command_pub.publish(msg)
+
+        deadline = time.monotonic() + float(self.args.action_timeout)
+        with self.executor_condition:
+            while command_id not in self.executor_results:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0.0:
+                    raise TimeoutError(
+                        f"Timed out waiting for manipulator executor result for command_id={command_id}."
+                    )
+                self.executor_condition.wait(timeout=min(0.2, remaining))
+            payload = self.executor_results.pop(command_id)
+
+        result = payload.get("result")
+        if not isinstance(result, dict):
+            return {
+                "ok": False,
+                "action": action.to_dict(),
+                "error": f"Malformed executor result for command_id={command_id}: {payload}",
+                "command_id": command_id,
+            }
+        result.setdefault("command_id", command_id)
+        return result
 
     def publish_json(self, publisher, payload: dict) -> None:
         msg = String()
@@ -400,13 +524,6 @@ class PddlTampServer(Node):
         scenes = []
         domain_path = ensure_domain(PDDL_DIR / "domain.pddl")
         problem_path = PDDL_DIR / "problem.pddl"
-
-        # Pipeline state persisted across loop iterations for async prefetch.
-        pipeline_pending_future = None
-        pipeline_next_pick_done = False
-        pipeline_next_grasp_pose = None
-        pipeline_next_class_name = None
-        pipeline_next_action = None
 
         for step_idx in range(1, self.args.max_steps + 1):
             self.get_logger().info(f"[PDDL] ===== planning step {step_idx}/{self.args.max_steps} =====")
@@ -550,85 +667,7 @@ class PddlTampServer(Node):
                 latest_name="latest_executing_action.json",
             )
 
-            # --- Async prefetch pipeline ---
-            # Find the next physical action in the planner's full plan.
-            next_physical_action = next(
-                (a for a in actions[1:] if a.name in {"move-target-to-goal", "move-obstacle-to-buffer"}),
-                None,
-            )
-
-            # Check whether the previous iteration already executed the pick inline.
-            current_pick_done = (
-                pipeline_next_pick_done
-                and pipeline_next_action is not None
-                and pipeline_next_action.args[0] == action.args[0]
-            )
-            if pipeline_next_pick_done and not current_pick_done:
-                self.get_logger().error(
-                    f"[Pipeline] Pick mismatch: prefetched '{pipeline_next_action.args[0] if pipeline_next_action else None}'"
-                    f" but selected '{action.args[0]}' — falling back to fresh detection"
-                )
-            current_grasp_pose = pipeline_next_grasp_pose if current_pick_done else None
-            current_class_name = pipeline_next_class_name if current_pick_done else None
-            pipeline_next_pick_done = False
-            pipeline_next_grasp_pose = None
-            pipeline_next_class_name = None
-            pipeline_next_action = None
-
-            def on_before_idle(_npa=next_physical_action, _state=state):
-                nonlocal pipeline_pending_future, pipeline_next_action
-                if _npa is None:
-                    return
-                fact = _state.objects.get(_npa.args[0])
-                next_class = fact.class_name if fact is not None and fact.class_name else _npa.args[0]
-                self.get_logger().info(f"[Pipeline] Prefetch detection starting for '{next_class}'")
-                pipeline_pending_future = self._detect_async(next_class)
-                pipeline_next_action = _npa
-
-            def get_next_pick_data(_state=state):
-                nonlocal pipeline_pending_future, pipeline_next_pick_done, pipeline_next_grasp_pose, pipeline_next_class_name, pipeline_next_action
-                if pipeline_pending_future is None or pipeline_next_action is None:
-                    return None
-                fact = _state.objects.get(pipeline_next_action.args[0])
-                next_class = fact.class_name if fact is not None and fact.class_name else pipeline_next_action.args[0]
-                try:
-                    det = self._collect_detection(pipeline_pending_future, next_class)
-                    pipeline_pending_future = None
-                except Exception as exc:
-                    self.get_logger().warn(f"[Pipeline] Prefetch detection failed for '{next_class}': {exc}")
-                    pipeline_pending_future = None
-                    pipeline_next_action = None
-                    return None
-                try:
-                    grasp_pose, _ = self._compute_grasp_pose(det, next_class)
-                except Exception as exc:
-                    self.get_logger().warn(f"[Pipeline] Prefetch grasp compute failed for '{next_class}': {exc}")
-                    pipeline_next_action = None
-                    return None
-                approach = copy.deepcopy(grasp_pose)
-                approach.position.z += self.args.approach_height
-                pan = math.atan2(grasp_pose.position.y, grasp_pose.position.x)
-                pick_joint = [pan, -math.pi / 2.0, 1.0, -math.pi / 3.0, -math.pi / 2.0, 0.0]
-                pipeline_next_pick_done = True
-                pipeline_next_grasp_pose = grasp_pose
-                pipeline_next_class_name = next_class
-                self.get_logger().info(f"[Pipeline] Next pick ready for '{next_class}', pan={pan:.3f}")
-                return {
-                    "obj_name": next_class,
-                    "pick_joint": pick_joint,
-                    "approach_pose": approach,
-                    "grasp_pose": grasp_pose,
-                }
-
-            context = ActionContext(
-                self,
-                on_before_idle=on_before_idle,
-                get_next_pick_data=get_next_pick_data,
-                pick_already_done=current_pick_done,
-                prefetch_grasp_pose=current_grasp_pose,
-                prefetch_class_name=current_class_name,
-            )
-            result = execute_action(context, action, state)
+            result = self.dispatch_action_to_executor(action, state, step_idx)
             steps.append(result)
             self.publish_json(self.result_pub, {"event": "action_result", "result": result})
             self.get_logger().info("[PDDL] Action execution result: " + json.dumps(result, sort_keys=True))
@@ -1145,22 +1184,6 @@ class PddlTampServer(Node):
         grasp_pose.position.y += -0.015
         return grasp_pose
 
-    def _detect_async(self, obj_name: str):
-        req = StringString.Request()
-        req.data = obj_name
-        return self.perception_client.call_async(req)
-
-    def _collect_detection(self, future, obj_name: str) -> dict:
-        deadline = time.monotonic() + self.args.perception_timeout
-        while rclpy.ok() and not future.done():
-            if time.monotonic() > deadline:
-                raise TimeoutError(f"Timed out waiting for prefetch detection for '{obj_name}'.")
-            time.sleep(0.02)
-        result = future.result()
-        if result is None:
-            raise RuntimeError(f"Prefetch perception returned no result for '{obj_name}'.")
-        return json.loads(result.data)
-
     def _compute_grasp_pose(self, detection: dict, obj_name: str):
         if not detection.get("ok"):
             raise RuntimeError(f"Detection failed for '{obj_name}': {detection.get('error')}")
@@ -1218,6 +1241,80 @@ class PddlTampServer(Node):
         return axis_base[:2]
 
 
+class ManipulatorExecutor(Node):
+    """Topic-based executor for one committed PDDL action at a time."""
+
+    def __init__(self, args, coordinator: PddlTampServer):
+        super().__init__("pddl_manipulator_executor")
+        self.args = args
+        self.coordinator = coordinator
+        self.command_lock = threading.Lock()
+        self.result_pub = self.create_publisher(String, args.executor_result_topic, 10)
+        self.command_sub = self.create_subscription(
+            String,
+            args.executor_command_topic,
+            self.handle_command,
+            10,
+        )
+        self.get_logger().info(
+            f"Manipulator executor ready. Listening on '{args.executor_command_topic}', "
+            f"publishing results on '{args.executor_result_topic}'."
+        )
+
+    def publish_result(self, payload: dict) -> None:
+        msg = String()
+        msg.data = json.dumps(payload, sort_keys=True)
+        self.result_pub.publish(msg)
+
+    def handle_command(self, msg: String) -> None:
+        try:
+            payload = json.loads(msg.data)
+        except json.JSONDecodeError as exc:
+            self.get_logger().warn(f"[Executor] Ignoring malformed command: {exc}")
+            return
+        command_id = str(payload.get("command_id") or "")
+        action_payload = payload.get("action") or {}
+        if not command_id or not action_payload:
+            self.get_logger().warn("[Executor] Ignoring command without command_id/action.")
+            return
+
+        with self.command_lock:
+            try:
+                action = PlanAction(
+                    str(action_payload["name"]),
+                    tuple(str(arg) for arg in action_payload.get("args", [])),
+                    source=str(action_payload.get("source") or "executor-command"),
+                )
+                if not action.args:
+                    raise ValueError("Action has no arguments.")
+                obj = object_state_from_command(payload.get("selected_object"), action.args[0])
+                state = PredicateState(goals=[], objects={obj.name: obj})
+                context = ActionContext(self.coordinator)
+                self.get_logger().info(
+                    f"[Executor] Executing committed action {action.pddl()} command_id={command_id}"
+                )
+                result = execute_action(context, action, state)
+            except Exception as exc:
+                self.get_logger().error(
+                    f"[Executor] Command failed command_id={command_id}: {exc}\n{traceback.format_exc()}"
+                )
+                result = {
+                    "ok": False,
+                    "action": action_payload,
+                    "error": str(exc),
+                    "dry_run": bool(self.args.dry_run),
+                }
+
+        self.publish_result(
+            {
+                "event": "executor_result",
+                "command_id": command_id,
+                "stamp_sec": time.time(),
+                "result": result,
+            }
+        )
+
+
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description="PDDL-based TAMP command server.")
     parser.add_argument("--service-name", default="pddl_tamp_command")
@@ -1227,6 +1324,9 @@ def parse_args(argv=None):
     parser.add_argument("--camera-frame", default="camera_color_optical_frame")
     parser.add_argument("--perception-timeout", type=float, default=15.0)
     parser.add_argument("--tf-timeout", type=float, default=5.0)
+    parser.add_argument("--action-timeout", type=float, default=300.0)
+    parser.add_argument("--executor-command-topic", default="/pddl_action_commands")
+    parser.add_argument("--executor-result-topic", default="/pddl_action_results")
     parser.add_argument("--max-steps", type=int, default=int(os.environ.get("PDDL_TAMP_MAX_STEPS", "8")))
     parser.add_argument("--one-step", action="store_true", help="Execute only the first selected physical action.")
     parser.add_argument("--scan-goals-only", action="store_true", help="Only scan requested targets instead of all five fixed targets.")
@@ -1268,6 +1368,7 @@ def main(argv=None):
         perception_node.get_logger().info("Embedded top-view perception is running inside PDDL TAMP server.")
     arm = ArmClient()
     server = PddlTampServer(args, tf_node.tf_buffer, arm)
+    manipulator_executor = ManipulatorExecutor(args, server)
     child_processes = []
     try:
         if not args.no_home:
@@ -1277,6 +1378,7 @@ def main(argv=None):
             executor.add_node(perception_node)
         executor.add_node(tf_node)
         executor.add_node(server)
+        executor.add_node(manipulator_executor)
         executor.spin()
     except KeyboardInterrupt:
         pass
@@ -1284,6 +1386,7 @@ def main(argv=None):
         if "executor" in locals():
             executor.shutdown()
         server.destroy_node()
+        manipulator_executor.destroy_node()
         tf_node.destroy_node()
         if perception_node is not None:
             perception_node.destroy_node()
