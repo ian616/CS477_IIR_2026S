@@ -66,6 +66,14 @@ from manip_challenge.pddl.ros_helpers import (
 )
 from manip_challenge.pddl.pddl_types import PlanAction
 from manip_challenge.pddl.utils import PDDL_DIR, load_dotenv
+from manip_challenge.custom.grasping.grasping_item import (
+    _load_grasp_database,
+    _lookup_object_grasp_configs,
+    _select_state_config,
+    _extract_grasp_transform,
+)
+from manip_challenge.custom.grasping.pose_math import apply_grasp_transform
+from manip_challenge.custom.grasping.perception_features import extract_perception_features
 
 
 patch_move_gripper()
@@ -292,6 +300,7 @@ class PddlTampServer(Node):
         self.result_pub = self.create_publisher(String, "/action_result", 10)
         self.pddl_log_pub = self.create_publisher(String, args.log_topic, 10)
         self.grasp_pose_publisher = self.create_publisher(PoseStamped, '/grasp_target_pose', 10)
+        self.corrected_grasp_pose_publisher = self.create_publisher(PoseStamped, '/corrected_grasp_pose', 10)
         self.pca_debug_publisher = self.create_publisher(MarkerArray, '/grasp_pca_debug', 10)
 
         self.get_logger().info(f"Waiting for perception service '{args.perception_service}'...")
@@ -1235,6 +1244,31 @@ class PddlTampServer(Node):
         pose_msg.header.stamp = self.get_clock().now().to_msg()
         pose_msg.pose = grasp_pose
         self.grasp_pose_publisher.publish(pose_msg)
+        
+        # PREVIEW CORRECTED POSE (from grasp_database.json)
+        try:
+            perception_features = extract_perception_features(detection)
+            pca_bbox_width = perception_features.get("pca_bbox_width_m")
+            pca_bbox_length = perception_features.get("pca_bbox_length_m")
+            pca_bbox_area = perception_features.get("pca_bbox_area_m2")
+            if pca_bbox_area is None and pca_bbox_width is not None and pca_bbox_length is not None:
+                pca_bbox_area = float(pca_bbox_width) * float(pca_bbox_length)
+                
+            database = _load_grasp_database()
+            matched_name, object_configs = _lookup_object_grasp_configs(database, obj_name)
+            item_state, grasp_config, _ = _select_state_config(object_configs, pca_bbox_area)
+            grasp_transform = _extract_grasp_transform(grasp_config)
+            
+            corrected_grasp_pose = apply_grasp_transform(grasp_pose, grasp_transform)
+            
+            corrected_msg = PoseStamped()
+            corrected_msg.header = pose_msg.header
+            corrected_msg.pose = corrected_grasp_pose
+            self.corrected_grasp_pose_publisher.publish(corrected_msg)
+            
+            self.get_logger().info(f"Published preview of corrected grasp pose for '{obj_name}' (state={item_state})")
+        except Exception as e:
+            self.get_logger().warn(f"Failed to publish preview of corrected grasp pose: {e}")
         
         # Visualize actual PCA and centroid
         marker_array = MarkerArray()
