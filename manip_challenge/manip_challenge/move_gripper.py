@@ -20,6 +20,7 @@ from control_msgs.action import FollowJointTrajectory
 from trajectory_msgs.msg import JointTrajectory
 from trajectory_msgs.msg import JointTrajectoryPoint
 from builtin_interfaces.msg import Duration
+from sensor_msgs.msg import JointState
 
 def gripper_open(node, force=1, timeout=1, gripper_open_pos=0.0):
     """ Open the parallel jaw gripper """
@@ -39,6 +40,8 @@ def gripperGotoPos(node, pos, force=1., timeout=3,
                        check_contact=False,
                        enable_wait=True,
                        enable_spin=True,
+                       tolerance=0.05,
+                       max_retries=10,
                        uuid=None, **kwargs):
     """
     Move the gripper finger to the designated position
@@ -53,19 +56,16 @@ def gripperGotoPos(node, pos, force=1., timeout=3,
         pos=0.8 indicates the status of CLOSE   (radian) 0.8  ->  46.07   degrees
     """
     node.get_logger().info('run_gripper: gripperGotoPos')
-    ## cur_pos = self.getGripperState()
-
-    # Joint trajectory control
-    g = FollowJointTrajectory.Goal()
-    g.trajectory = JointTrajectory()
-    g.trajectory.joint_names = ['robotiq_85_left_knuckle_joint']
-    g.trajectory.points = [
-        ## JointTrajectoryPoint(positions=[cur_pos], velocities=[0],
-        ##                          time_from_start=Duration(nanosec=100000000)),
-        JointTrajectoryPoint(positions=[pos], velocities=[0],
-                                 time_from_start=Duration(sec=timeout)),]
-
-
+    
+    # Setup joint state subscriber if it doesn't exist
+    if not hasattr(node, '_gripper_pos'):
+        node._gripper_pos = None
+        def js_callback(msg):
+            if 'robotiq_85_left_knuckle_joint' in msg.name:
+                idx = msg.name.index('robotiq_85_left_knuckle_joint')
+                node._gripper_pos = msg.position[idx]
+        
+        node._js_sub = node.create_subscription(JointState, '/joint_states', js_callback, 10)
 
     try:
         client = ActionClient(node, FollowJointTrajectory,
@@ -73,29 +73,57 @@ def gripperGotoPos(node, pos, force=1., timeout=3,
         client.wait_for_server(5)
         node.get_logger().info("Connected to gripper server")
 
-        goal_future = client.send_goal_async(g)
-        # Return result when the command is delivered
-        rclpy.spin_until_future_complete(node, goal_future)
+        for attempt in range(max_retries):
+            # Joint trajectory control
+            g = FollowJointTrajectory.Goal()
+            g.trajectory = JointTrajectory()
+            g.trajectory.joint_names = ['robotiq_85_left_knuckle_joint']
+            g.trajectory.points = [
+                JointTrajectoryPoint(positions=[float(pos)], velocities=[0.0],
+                                     time_from_start=Duration(sec=int(timeout), nanosec=int((timeout - int(timeout)) * 1e9))),
+            ]
 
-        goal_handle = goal_future.result()
-        node.get_logger().info('goal_handle:\n {}'.format(goal_handle))
-    
-        # Wait until the execution ends and return the result
-        result_future = goal_handle.get_result_async()
-        rclpy.spin_until_future_complete(node, result_future)
-    
-        result = result_future.result()
-        if result is None:
-            raise RuntimeError(
-                'Exception while getting result: {!r}'.format(result_future.exception()))
-        node.get_logger().info('Result:\n    {}'.format(message_to_yaml(result.result)))
+            node.get_logger().info(f'Attempt {attempt + 1}: Executing trajectory to pos {pos}')
+            goal_future = client.send_goal_async(g)
+            # Return result when the command is delivered
+            rclpy.spin_until_future_complete(node, goal_future)
+
+            goal_handle = goal_future.result()
+            node.get_logger().info('goal_handle:\n {}'.format(goal_handle))
+        
+            # Wait until the execution ends and return the result
+            result_future = goal_handle.get_result_async()
+            rclpy.spin_until_future_complete(node, result_future)
+        
+            result = result_future.result()
+            if result is None:
+                raise RuntimeError(
+                    'Exception while getting result: {!r}'.format(result_future.exception()))
+            node.get_logger().info('Result:\n    {}'.format(message_to_yaml(result.result)))
+
+            # Spin to process joint states
+            for _ in range(10):
+                rclpy.spin_once(node, timeout_sec=0.01)
+                
+            if node._gripper_pos is not None:
+                error = abs(node._gripper_pos - pos)
+                if error <= tolerance:
+                    node.get_logger().info(f"Gripper reached target {pos} within tolerance (Error: {error:.4f}).")
+                    return True
+                else:
+                    node.get_logger().warn(f"Tolerance not met. Target: {pos}, Actual: {node._gripper_pos:.4f}, Error: {error:.4f} > {tolerance}")
+            else:
+                node.get_logger().warn("Current position unknown (no joint states received).")
+                
+            time.sleep(0.5)
 
     except KeyboardInterrupt:
         rclpy.shutdown("KeyboardInterrupt")
         raise
     
+    node.get_logger().error(f"Failed to reach target {pos} within tolerance after {max_retries} attempts.")
     rclpy.spin_once(node, timeout_sec=1)
-    return
+    return False
 
 
 def main(args=None):
