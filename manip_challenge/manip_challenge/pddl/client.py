@@ -35,13 +35,18 @@ class PddlTampClient(Node):
         self.service_name = service_name
         self.client = self.create_client(StringString, service_name)
 
-    def publish_command(self, command, settle_time=0.5):
+    def publish_command(self, command, settle_time=3.0):
         msg = String()
         msg.data = command
         deadline = time.monotonic() + float(settle_time)
         while rclpy.ok() and time.monotonic() < deadline and self.publisher.get_subscription_count() == 0:
             rclpy.spin_once(self, timeout_sec=0.05)
             time.sleep(0.05)
+        if self.publisher.get_subscription_count() == 0:
+            self.get_logger().warn(
+                f"No subscribers on '{self.command_topic}' after {settle_time:.1f}s — "
+                "message may be dropped. Is the server running?"
+            )
         self.publisher.publish(msg)
         rclpy.spin_once(self, timeout_sec=0.1)
         self.get_logger().info(f"Published command to '{self.command_topic}': {command}")
@@ -74,7 +79,7 @@ def parse_args(argv=None):
     parser.add_argument("--service-name", default="pddl_tamp_command")
     parser.add_argument("--wait-timeout", type=float, default=10.0)
     parser.add_argument("--response-timeout", type=float, default=360.0)
-    parser.add_argument("--publish-settle-time", type=float, default=0.5)
+    parser.add_argument("--publish-settle-time", type=float, default=3.0)
     parser.add_argument("--raw", action="store_true")
     return parser.parse_args(rclpy.utilities.remove_ros_args(args=argv or sys.argv)[1:])
 

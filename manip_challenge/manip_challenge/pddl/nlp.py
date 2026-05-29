@@ -6,7 +6,7 @@ import os
 import re
 from typing import Iterable
 
-from .types import DESTINATION_TO_LOCATION, Goal, TARGET_OBJECTS
+from .pddl_types import DESTINATION_TO_LOCATION, Goal, TARGET_OBJECTS
 from .utils import load_dotenv, pddl_name
 
 

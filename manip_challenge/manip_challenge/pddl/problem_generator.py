@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .types import LOCATIONS, PredicateState
+from .pddl_types import LOCATIONS, PredicateState
 from .utils import PDDL_DIR
 
 

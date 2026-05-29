@@ -9,7 +9,7 @@ from geometry_msgs.msg import Pose
 from manip_challenge.custom.motion import motion as motion_module
 from manip_challenge.custom.motion.motion import execute_pick_place_sequence
 from manip_challenge.pddl.ros_helpers import pose_to_dict
-from .types import LOCATION_TO_DESTINATION, PlanAction
+from .pddl_types import LOCATION_TO_DESTINATION, PlanAction
 
 
 # This file is the main swap point between symbolic PDDL actions and the real
@@ -64,8 +64,14 @@ def pose_from_xyz(xyz) -> Pose:
 
 
 class ActionContext:
-    def __init__(self, server):
+    def __init__(self, server, on_before_idle=None, get_next_pick_data=None,
+                 pick_already_done=False, prefetch_grasp_pose=None, prefetch_class_name=None):
         self.server = server
+        self.on_before_idle = on_before_idle
+        self.get_next_pick_data = get_next_pick_data
+        self.pick_already_done = pick_already_done
+        self.prefetch_grasp_pose = prefetch_grasp_pose
+        self.prefetch_class_name = prefetch_class_name
 
 
 def _prepare_grasp(server, object_name: str, fact=None) -> dict[str, Any]:
@@ -73,25 +79,20 @@ def _prepare_grasp(server, object_name: str, fact=None) -> dict[str, Any]:
     #   detection -> grasp target -> TF transform -> grasp pose.
     #
     # CHANGE GRASP SELECTION HERE:
-    # - server.select_grasp_target() chooses the point to grasp from top-view
-    #   RGB-D/foreground points.  That implementation lives in server.py and
-    #   ros_helpers.py.
-    # - server.make_grasp_pose() converts that base-frame point into the final
-    #   end-effector pose.  If the grasp pose convention changes, edit that
-    #   method or replace this block with a custom.grasping wrapper.
+    # - server._compute_grasp_pose() runs the full pipeline: select_grasp_target,
+    #   raw-centroid XY correction, PCA axis TF transform, and make_grasp_pose.
+    #   All grasp logic lives in server.py / ros_helpers.py.
     #
     # Do not add raw gripper/trajectory code here unless there is no existing
     # primitive to reuse.  Prefer calling custom.grasping/custom.motion helpers.
     detection = fact.detection if fact is not None and fact.detection else server.detect_object(object_name)
     if not detection or not detection.get("ok"):
         raise RuntimeError(f"No usable detection for {object_name}: {(detection or {}).get('error')}")
-    source_frame = detection.get("frame_id") or server.args.camera_frame
-    selection = server.select_grasp_target(detection, object_name)
-    detected_pose = pose_from_xyz(selection["target_xyz_m"])
-    base_pose = server.transform_pose(detected_pose, source_frame, "base_link")
-    grasp_pose = server.make_grasp_pose(base_pose)
+    grasp_pose, selection = server._compute_grasp_pose(detection, object_name)
     approach_pose = copy.deepcopy(grasp_pose)
     approach_pose.position.z += server.args.approach_height
+    source_frame = detection.get("frame_id") or server.args.camera_frame
+    detected_pose = pose_from_xyz(selection.get("grasp_pose_xyz_m") or selection["target_xyz_m"])
     return {
         "detection": detection,
         "source_frame": source_frame,
@@ -106,17 +107,40 @@ def move_target_to_goal(context: ActionContext, action: PlanAction, state) -> di
     # Handler for PDDL action:
     #   (move-target-to-goal ?o ?from ?to)
 
-    
+
     object_name, _from, to = action.args
     destination = LOCATION_TO_DESTINATION[to]
     fact = state.objects.get(object_name)
     class_name = fact.class_name if fact is not None and fact.class_name else object_name
+
+    if context.pick_already_done and context.prefetch_grasp_pose is not None:
+        # Pick was executed inline at the end of the previous place trajectory.
+        if not context.server.args.dry_run:
+            execute_pick_place_sequence(
+                context.server, context.server.arm, context.prefetch_grasp_pose, destination, class_name,
+                on_before_idle=context.on_before_idle,
+                get_next_pick_data=context.get_next_pick_data,
+                pick_already_done=True,
+            )
+        return {
+            "ok": True,
+            "action": action.to_dict(),
+            "class_name": class_name,
+            "destination": destination,
+            "pick_already_done": True,
+            "dry_run": bool(context.server.args.dry_run),
+        }
+
     prepared = _prepare_grasp(context.server, class_name, fact=fact)
     if not context.server.args.dry_run:
         # 여기다 바뀐 grasp 로직 추가하시면 됩니다!!!
         # You can add the changed grasp logic here!!!
         # if object_name == "banana" 뭐 이런 느낌으로
-        execute_pick_place_sequence(context.server, context.server.arm, prepared["grasp_pose"], destination, class_name)
+        execute_pick_place_sequence(
+            context.server, context.server.arm, prepared["grasp_pose"], destination, class_name,
+            on_before_idle=context.on_before_idle,
+            get_next_pick_data=context.get_next_pick_data,
+        )
     return {
         "ok": True,
         "action": action.to_dict(),
@@ -143,10 +167,31 @@ def move_obstacle_to_buffer(context: ActionContext, action: PlanAction, state) -
     class_name = fact.class_name if fact is not None and fact.class_name else object_name
     if fact is not None and not fact.graspable:
         raise RuntimeError(f"Obstacle {object_name} is not graspable. Note: {fact.error}")
+    if context.pick_already_done and context.prefetch_grasp_pose is not None:
+        if not context.server.args.dry_run:
+            execute_pick_place_sequence(
+                context.server, context.server.arm, context.prefetch_grasp_pose, buffer_name, class_name,
+                on_before_idle=context.on_before_idle,
+                get_next_pick_data=context.get_next_pick_data,
+                pick_already_done=True,
+            )
+        return {
+            "ok": True,
+            "action": action.to_dict(),
+            "class_name": class_name,
+            "destination": buffer_name,
+            "pick_already_done": True,
+            "dry_run": bool(context.server.args.dry_run),
+        }
+
     prepared = _prepare_grasp(context.server, class_name, fact=fact)
     if not context.server.args.dry_run:
         # Low-level implementation reused from custom/motion/motion.py.
-        execute_pick_place_sequence(context.server, context.server.arm, prepared["grasp_pose"], buffer_name, class_name)
+        execute_pick_place_sequence(
+            context.server, context.server.arm, prepared["grasp_pose"], buffer_name, class_name,
+            on_before_idle=context.on_before_idle,
+            get_next_pick_data=context.get_next_pick_data,
+        )
     return {
         "ok": True,
         "action": action.to_dict(),

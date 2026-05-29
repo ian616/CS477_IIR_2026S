@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import math
 import os
@@ -62,7 +63,7 @@ from manip_challenge.pddl.ros_helpers import (
     save_grasp_selection_visualization,
     stop_child_processes,
 )
-from manip_challenge.pddl.types import PlanAction
+from manip_challenge.pddl.pddl_types import PlanAction
 from manip_challenge.pddl.utils import PDDL_DIR, load_dotenv
 
 
@@ -140,6 +141,114 @@ def object_summary(obj) -> dict:
             if key in files
         },
     }
+
+
+VERTICAL_DOWN_GRASP_QUATERNION = np.asarray([0.0, 1.0, 0.0, 0.0], dtype=np.float64)
+GRASP_AXIS_ENDPOINT_OFFSET_M = 0.05
+
+
+def grasp_pose_xyz_from_selection(selection):
+    target = np.asarray(selection["target_xyz_m"], dtype=np.float64)
+    if target.shape[0] < 3:
+        raise ValueError("target_xyz_m must contain at least 3 values")
+    raw = selection.get("raw_centroid_xyz_m")
+    if raw is not None:
+        raw = np.asarray(raw, dtype=np.float64)
+        if raw.shape[0] >= 2 and np.isfinite(raw[:2]).all():
+            return (
+                np.asarray([raw[0], raw[1], target[2]], dtype=np.float64),
+                "raw_centroid_xy_with_adjusted_target_z",
+            )
+    return target[:3].copy(), "target_xyz_m"
+
+
+def store_grasp_pose_reference(selection):
+    grasp_xyz, source = grasp_pose_xyz_from_selection(selection)
+    selection["grasp_pose_xyz_m"] = [float(v) for v in grasp_xyz]
+    selection["grasp_pose_source"] = source
+    return grasp_xyz, source
+
+
+def normalize_vector(vector, min_norm=1e-9):
+    vector = np.asarray(vector, dtype=np.float64)
+    norm = float(np.linalg.norm(vector))
+    if norm < min_norm or not np.isfinite(norm):
+        return None
+    return vector / norm
+
+
+def quaternion_to_matrix(quaternion):
+    x, y, z, w = (float(quaternion[i]) for i in range(4))
+    norm = math.sqrt(x * x + y * y + z * z + w * w)
+    if norm <= 0.0:
+        return np.eye(3, dtype=np.float64)
+    x /= norm; y /= norm; z /= norm; w /= norm
+    return np.asarray([
+        [1.0 - 2.0 * (y * y + z * z), 2.0 * (x * y - z * w), 2.0 * (x * z + y * w)],
+        [2.0 * (x * y + z * w), 1.0 - 2.0 * (x * x + z * z), 2.0 * (y * z - x * w)],
+        [2.0 * (x * z - y * w), 2.0 * (y * z + x * w), 1.0 - 2.0 * (x * x + y * y)],
+    ], dtype=np.float64)
+
+
+def matrix_to_quaternion(matrix):
+    matrix = np.asarray(matrix, dtype=np.float64)
+    trace = float(np.trace(matrix))
+    if trace > 0.0:
+        scale = math.sqrt(trace + 1.0) * 2.0
+        w = 0.25 * scale
+        x = (matrix[2, 1] - matrix[1, 2]) / scale
+        y = (matrix[0, 2] - matrix[2, 0]) / scale
+        z = (matrix[1, 0] - matrix[0, 1]) / scale
+    elif matrix[0, 0] > matrix[1, 1] and matrix[0, 0] > matrix[2, 2]:
+        scale = math.sqrt(1.0 + matrix[0, 0] - matrix[1, 1] - matrix[2, 2]) * 2.0
+        w = (matrix[2, 1] - matrix[1, 2]) / scale
+        x = 0.25 * scale
+        y = (matrix[0, 1] + matrix[1, 0]) / scale
+        z = (matrix[0, 2] + matrix[2, 0]) / scale
+    elif matrix[1, 1] > matrix[2, 2]:
+        scale = math.sqrt(1.0 + matrix[1, 1] - matrix[0, 0] - matrix[2, 2]) * 2.0
+        w = (matrix[0, 2] - matrix[2, 0]) / scale
+        x = (matrix[0, 1] + matrix[1, 0]) / scale
+        y = 0.25 * scale
+        z = (matrix[1, 2] + matrix[2, 1]) / scale
+    else:
+        scale = math.sqrt(1.0 + matrix[2, 2] - matrix[0, 0] - matrix[1, 1]) * 2.0
+        w = (matrix[1, 0] - matrix[0, 1]) / scale
+        x = (matrix[0, 2] + matrix[2, 0]) / scale
+        y = (matrix[1, 2] + matrix[2, 1]) / scale
+        z = 0.25 * scale
+    q = normalize_vector([x, y, z, w])
+    return q if q is not None else np.asarray([0.0, 0.0, 0.0, 1.0], dtype=np.float64)
+
+
+def set_pose_orientation_from_quaternion(pose, quaternion):
+    pose.orientation.x = float(quaternion[0])
+    pose.orientation.y = float(quaternion[1])
+    pose.orientation.z = float(quaternion[2])
+    pose.orientation.w = float(quaternion[3])
+
+
+def build_grasp_orientation_perpendicular_to_axis(reference_quaternion, gripper_axis_base_xy):
+    reference_matrix = quaternion_to_matrix(reference_quaternion)
+    tool_z_axis = normalize_vector(reference_matrix[:, 2])
+    desired_tool_x = normalize_vector([gripper_axis_base_xy[0], gripper_axis_base_xy[1], 0.0])
+    if tool_z_axis is None or desired_tool_x is None:
+        return None, None
+    desired_tool_x = desired_tool_x - np.dot(desired_tool_x, tool_z_axis) * tool_z_axis
+    desired_tool_x = normalize_vector(desired_tool_x)
+    if desired_tool_x is None:
+        return None, None
+    reference_tool_x = reference_matrix[:, 0]
+    if float(np.dot(desired_tool_x, reference_tool_x)) < 0.0:
+        desired_tool_x = -desired_tool_x
+    desired_tool_y = normalize_vector(np.cross(tool_z_axis, desired_tool_x))
+    if desired_tool_y is None:
+        return None, None
+    desired_tool_x = normalize_vector(np.cross(desired_tool_y, tool_z_axis))
+    if desired_tool_x is None:
+        return None, None
+    orientation_matrix = np.column_stack((desired_tool_x, desired_tool_y, tool_z_axis))
+    return matrix_to_quaternion(orientation_matrix), desired_tool_x
 
 
 class PddlTampServer(Node):
@@ -291,7 +400,13 @@ class PddlTampServer(Node):
         scenes = []
         domain_path = ensure_domain(PDDL_DIR / "domain.pddl")
         problem_path = PDDL_DIR / "problem.pddl"
-        context = ActionContext(self)
+
+        # Pipeline state persisted across loop iterations for async prefetch.
+        pipeline_pending_future = None
+        pipeline_next_pick_done = False
+        pipeline_next_grasp_pose = None
+        pipeline_next_class_name = None
+        pipeline_next_action = None
 
         for step_idx in range(1, self.args.max_steps + 1):
             self.get_logger().info(f"[PDDL] ===== planning step {step_idx}/{self.args.max_steps} =====")
@@ -386,6 +501,85 @@ class PddlTampServer(Node):
                 self.executing_action_log_lines(action, step_idx),
                 step=step_idx,
                 action=action.to_dict(),
+            )
+
+            # --- Async prefetch pipeline ---
+            # Find the next physical action in the planner's full plan.
+            next_physical_action = next(
+                (a for a in actions[1:] if a.name in {"move-target-to-goal", "move-obstacle-to-buffer"}),
+                None,
+            )
+
+            # Check whether the previous iteration already executed the pick inline.
+            current_pick_done = (
+                pipeline_next_pick_done
+                and pipeline_next_action is not None
+                and pipeline_next_action.args[0] == action.args[0]
+            )
+            if pipeline_next_pick_done and not current_pick_done:
+                self.get_logger().error(
+                    f"[Pipeline] Pick mismatch: prefetched '{pipeline_next_action.args[0] if pipeline_next_action else None}'"
+                    f" but selected '{action.args[0]}' — falling back to fresh detection"
+                )
+            current_grasp_pose = pipeline_next_grasp_pose if current_pick_done else None
+            current_class_name = pipeline_next_class_name if current_pick_done else None
+            pipeline_next_pick_done = False
+            pipeline_next_grasp_pose = None
+            pipeline_next_class_name = None
+            pipeline_next_action = None
+
+            def on_before_idle(_npa=next_physical_action, _state=state):
+                nonlocal pipeline_pending_future, pipeline_next_action
+                if _npa is None:
+                    return
+                fact = _state.objects.get(_npa.args[0])
+                next_class = fact.class_name if fact is not None and fact.class_name else _npa.args[0]
+                self.get_logger().info(f"[Pipeline] Prefetch detection starting for '{next_class}'")
+                pipeline_pending_future = self._detect_async(next_class)
+                pipeline_next_action = _npa
+
+            def get_next_pick_data(_state=state):
+                nonlocal pipeline_pending_future, pipeline_next_pick_done, pipeline_next_grasp_pose, pipeline_next_class_name, pipeline_next_action
+                if pipeline_pending_future is None or pipeline_next_action is None:
+                    return None
+                fact = _state.objects.get(pipeline_next_action.args[0])
+                next_class = fact.class_name if fact is not None and fact.class_name else pipeline_next_action.args[0]
+                try:
+                    det = self._collect_detection(pipeline_pending_future, next_class)
+                    pipeline_pending_future = None
+                except Exception as exc:
+                    self.get_logger().warn(f"[Pipeline] Prefetch detection failed for '{next_class}': {exc}")
+                    pipeline_pending_future = None
+                    pipeline_next_action = None
+                    return None
+                try:
+                    grasp_pose, _ = self._compute_grasp_pose(det, next_class)
+                except Exception as exc:
+                    self.get_logger().warn(f"[Pipeline] Prefetch grasp compute failed for '{next_class}': {exc}")
+                    pipeline_next_action = None
+                    return None
+                approach = copy.deepcopy(grasp_pose)
+                approach.position.z += self.args.approach_height
+                pan = math.atan2(grasp_pose.position.y, grasp_pose.position.x)
+                pick_joint = [pan, -math.pi / 2.0, 1.0, -math.pi / 3.0, -math.pi / 2.0, 0.0]
+                pipeline_next_pick_done = True
+                pipeline_next_grasp_pose = grasp_pose
+                pipeline_next_class_name = next_class
+                self.get_logger().info(f"[Pipeline] Next pick ready for '{next_class}', pan={pan:.3f}")
+                return {
+                    "obj_name": next_class,
+                    "pick_joint": pick_joint,
+                    "approach_pose": approach,
+                    "grasp_pose": grasp_pose,
+                }
+
+            context = ActionContext(
+                self,
+                on_before_idle=on_before_idle,
+                get_next_pick_data=get_next_pick_data,
+                pick_already_done=current_pick_done,
+                prefetch_grasp_pose=current_grasp_pose,
+                prefetch_class_name=current_class_name,
             )
             result = execute_action(context, action, state)
             steps.append(result)
@@ -820,6 +1014,7 @@ class PddlTampServer(Node):
             local_radius_m=self.args.grasp_depth_local_radius,
             percentile=self.args.grasp_depth_percentile,
         )
+        store_grasp_pose_reference(selection)
         output_dir = detection.get("save_dir")
         if output_dir:
             try:
@@ -860,14 +1055,97 @@ class PddlTampServer(Node):
         except (LookupException, ConnectivityException, ExtrapolationException) as exc:
             raise RuntimeError(f"TF transform failed: {exc}") from exc
 
-    def make_grasp_pose(self, base_pose: Pose) -> Pose:
-        home_pose = self.arm.fk_request(HOME_JOINTS)
-        grasp_pose = Pose()
-        grasp_pose.position = base_pose.position
-        grasp_pose.orientation = home_pose.orientation
-        grasp_pose.position.y += self.args.grasp_y_offset
-        grasp_pose.position.z += self.args.final_z_offset
+    def make_grasp_pose(self, base_pose: Pose, gripper_axis_base_xy=None) -> Pose:
+        grasp_pose = copy.deepcopy(base_pose)
+        orientation_quat = VERTICAL_DOWN_GRASP_QUATERNION.copy()
+        applied_gripper_axis = None
+        if gripper_axis_base_xy is not None:
+            pca_aligned_quat, applied_gripper_axis = build_grasp_orientation_perpendicular_to_axis(
+                VERTICAL_DOWN_GRASP_QUATERNION,
+                gripper_axis_base_xy,
+            )
+            if pca_aligned_quat is not None:
+                orientation_quat = pca_aligned_quat
+        set_pose_orientation_from_quaternion(grasp_pose, orientation_quat)
+        if applied_gripper_axis is not None:
+            axis_yaw = math.atan2(applied_gripper_axis[1], applied_gripper_axis[0])
+            self.get_logger().info(
+                f"Using PCA-aligned grasp orientation: gripper_axis_yaw={math.degrees(axis_yaw):.1f} deg"
+            )
+        grasp_pose.position.y += -0.015
         return grasp_pose
+
+    def _detect_async(self, obj_name: str):
+        req = StringString.Request()
+        req.data = obj_name
+        return self.perception_client.call_async(req)
+
+    def _collect_detection(self, future, obj_name: str) -> dict:
+        deadline = time.monotonic() + self.args.perception_timeout
+        while rclpy.ok() and not future.done():
+            if time.monotonic() > deadline:
+                raise TimeoutError(f"Timed out waiting for prefetch detection for '{obj_name}'.")
+            time.sleep(0.02)
+        result = future.result()
+        if result is None:
+            raise RuntimeError(f"Prefetch perception returned no result for '{obj_name}'.")
+        return json.loads(result.data)
+
+    def _compute_grasp_pose(self, detection: dict, obj_name: str):
+        if not detection.get("ok"):
+            raise RuntimeError(f"Detection failed for '{obj_name}': {detection.get('error')}")
+        source_frame = detection.get("frame_id") or self.args.camera_frame
+        selection = self.select_grasp_target(detection, obj_name)
+        grasp_xyz, _ = store_grasp_pose_reference(selection)
+        detected_pose = pose_from_xyz(grasp_xyz)
+        base_pose = self.transform_pose(detected_pose, source_frame, "base_link")
+        pca_major_axis_base_xy = self.transform_selection_axis_to_base_xy(
+            selection, source_frame, base_pose, grasp_xyz,
+        )
+        gripper_axis_base_xy = None
+        if pca_major_axis_base_xy is not None:
+            gripper_axis_base_xy = np.asarray(
+                [-pca_major_axis_base_xy[1], pca_major_axis_base_xy[0]],
+                dtype=np.float64,
+            )
+            selection["pca_major_axis_base_xy"] = pca_major_axis_base_xy.astype(float).tolist()
+            selection["pca_major_axis_base_yaw_rad"] = float(
+                math.atan2(pca_major_axis_base_xy[1], pca_major_axis_base_xy[0])
+            )
+            selection["gripper_axis_base_xy"] = gripper_axis_base_xy.astype(float).tolist()
+            selection["gripper_axis_base_yaw_rad"] = float(
+                math.atan2(gripper_axis_base_xy[1], gripper_axis_base_xy[0])
+            )
+            selection["gripper_axis_rule"] = "perpendicular_to_pca_major_axis"
+        grasp_pose = self.make_grasp_pose(base_pose, gripper_axis_base_xy)
+        return grasp_pose, selection
+
+    def transform_selection_axis_to_base_xy(self, grasp_selection, source_frame, base_pose, axis_origin_xyz_m):
+        axis = grasp_selection.get("xy_major_axis")
+        if axis is None:
+            return None
+        try:
+            axis_source = np.asarray([float(axis[0]), float(axis[1]), 0.0], dtype=np.float64)
+            origin = np.asarray(axis_origin_xyz_m, dtype=np.float64)
+        except (TypeError, ValueError, IndexError):
+            return None
+        if origin.shape[0] < 3:
+            return None
+        axis_source = normalize_vector(axis_source)
+        if axis_source is None:
+            return None
+        endpoint = origin[:3].copy()
+        endpoint[:3] += axis_source * GRASP_AXIS_ENDPOINT_OFFSET_M
+        endpoint_base = self.transform_pose(pose_from_xyz(endpoint), source_frame, "base_link")
+        axis_base = np.asarray([
+            endpoint_base.position.x - base_pose.position.x,
+            endpoint_base.position.y - base_pose.position.y,
+            0.0,
+        ], dtype=np.float64)
+        axis_base = normalize_vector(axis_base)
+        if axis_base is None:
+            return None
+        return axis_base[:2]
 
 
 def parse_args(argv=None):

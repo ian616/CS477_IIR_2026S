@@ -14,7 +14,11 @@ It keeps symbolic planning separate from physical execution:
 Terminal 1:
 
 ```bash
+# fixed object set
 ros2 launch manip_challenge ur5_setup.launch.py
+
+# random objects (5 objects spawned randomly)
+ros2 launch manip_challenge ur5_setup_random_picking.launch.py
 ```
 
 Terminal 2:

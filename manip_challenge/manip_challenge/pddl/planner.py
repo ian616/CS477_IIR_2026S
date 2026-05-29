@@ -7,7 +7,7 @@ import shlex
 import subprocess
 from pathlib import Path
 
-from .types import PlanAction, PredicateState
+from .pddl_types import PlanAction, PredicateState
 
 
 def parse_plan_text(text: str, source: str = "external") -> list[PlanAction]:

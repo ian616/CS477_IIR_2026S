@@ -23,7 +23,7 @@ from manip_challenge import move_gripper
 from manip_challenge.custom.grasping.gripper_control import JOINT_NAME as CUSTOM_GRIPPER_JOINT_NAME
 
 
-HOME_JOINTS = [0.0, -np.pi / 2.0, 1.0, -np.pi / 3.0, -np.pi / 2.0, 0.0]
+HOME_JOINTS = [0.0, -np.pi / 2.0, 1.0, -1.0, -np.pi / 2.0, 0.0]
 PACKAGE_DIR = Path(__file__).resolve().parents[1]
 CUSTOM_DIR = PACKAGE_DIR / "custom"
 TWO_VIEW_SERVER = CUSTOM_DIR / "perception" / "two-view" / "top_view_seg_server.py"

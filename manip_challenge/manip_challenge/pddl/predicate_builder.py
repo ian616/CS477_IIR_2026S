@@ -7,7 +7,7 @@ from typing import Callable
 
 import numpy as np
 
-from .types import BUFFER_LOCATIONS, Goal, ObjectState, PredicateState, TARGET_OBJECTS
+from .pddl_types import BUFFER_LOCATIONS, Goal, ObjectState, PredicateState, TARGET_OBJECTS
 from .utils import pddl_name
 
 

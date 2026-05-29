@@ -1,0 +1,88 @@
+{
+  "command": "Move the banana and the meat can to the left storage. Move the strawberry and the hammer in the right storage. Move the coke can on the shelf.",
+  "completed": [
+    "banana",
+    "coke_can",
+    "hammer",
+    "meat_can"
+  ],
+  "event": "planning_step_start",
+  "goals": [
+    {
+      "bound_object_name": null,
+      "location": "left_storage",
+      "object_name": "banana",
+      "target_name": "banana"
+    },
+    {
+      "bound_object_name": null,
+      "location": "left_storage",
+      "object_name": "meat_can",
+      "target_name": "meat_can"
+    },
+    {
+      "bound_object_name": null,
+      "location": "right_storage",
+      "object_name": "strawberry",
+      "target_name": "strawberry"
+    },
+    {
+      "bound_object_name": null,
+      "location": "right_storage",
+      "object_name": "hammer",
+      "target_name": "hammer"
+    },
+    {
+      "bound_object_name": null,
+      "location": "bookshelf",
+      "object_name": "coke_can",
+      "target_name": "coke_can"
+    }
+  ],
+  "images": [],
+  "notes": [
+    "strawberry: No YOLO segmentation matched target='strawberry'. seen=['hammer', 'banana', 'meat_can']. debug_image=/home/ubuntu/cs477_ws/src/cs477_IIR/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/_debug_failures/20260529_020730_365569_strawberry_detections.png"
+  ],
+  "objects": {
+    "strawberry": {
+      "bbox_xyxy": null,
+      "blocked_by": [],
+      "blocks": [],
+      "centroid_xyz": null,
+      "class_name": "strawberry",
+      "clear": false,
+      "confidence": 0.0,
+      "debug_files": {},
+      "depth_median": null,
+      "detected": false,
+      "error": "No YOLO segmentation matched target='strawberry'. seen=['hammer', 'banana', 'meat_can']. debug_image=/home/ubuntu/cs477_ws/src/cs477_IIR/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/_debug_failures/20260529_020730_365569_strawberry_detections.png",
+      "foreground_points": 0,
+      "graspable": false,
+      "instance_index": null,
+      "location": "table",
+      "mask_pixels": 0,
+      "near": [],
+      "pose_known": false,
+      "safe": true,
+      "target": true,
+      "visible": false
+    }
+  },
+  "occupied_buffers": [],
+  "predicates": [
+    "at strawberry table",
+    "buffer buffer1",
+    "buffer buffer2",
+    "buffer-free buffer1",
+    "buffer-free buffer2",
+    "goal-at strawberry right_storage",
+    "handempty",
+    "safe strawberry",
+    "storage bookshelf",
+    "storage left_storage",
+    "storage right_storage",
+    "target strawberry"
+  ],
+  "stamp_sec": 1780020450.3843768,
+  "step": 5
+}
