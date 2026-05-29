@@ -10,6 +10,10 @@
     item location
   )
 
+  (:constants
+    table - location
+  )
+
   (:predicates
     ;; Object role predicates. Generated in predicate_builder.py::_build_predicates().
     (target ?o - item)

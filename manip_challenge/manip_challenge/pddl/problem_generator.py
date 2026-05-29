@@ -18,6 +18,7 @@ def write_problem(state: PredicateState, path: Path | None = None) -> Path:
     # completed/buffer state to persist differently across replans.
     path = path or PDDL_DIR / "problem.pddl"
     object_names = sorted(set(state.objects) | {goal.target_name for goal in state.unfinished_goals()})
+    problem_locations = [location for location in LOCATIONS if location != "table"]
     init = sorted(state.predicates)
     goals = [f"(at {goal.target_name} {goal.location})" for goal in state.unfinished_goals()]
     text = [
@@ -26,7 +27,7 @@ def write_problem(state: PredicateState, path: Path | None = None) -> Path:
         "",
         "  (:objects",
         "    " + " ".join(object_names) + " - item",
-        "    " + " ".join(LOCATIONS) + " - location",
+        "    " + " ".join(problem_locations) + " - location",
         "  )",
         "",
         "  (:init",
@@ -59,6 +60,10 @@ DOMAIN_TEXT = """(define (domain manip-tamp)
 
   (:types
     item location
+  )
+
+  (:constants
+    table - location
   )
 
   (:predicates

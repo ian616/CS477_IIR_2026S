@@ -452,6 +452,19 @@ class PddlTampServer(Node):
             actions, raw_output = plan(domain_path, generated_problem, state)
             self.get_logger().info("[PDDL] Planner raw output:\n" + raw_output)
             plan_payload = [action.to_dict() for action in actions]
+            self.save_step_json(
+                step_idx,
+                "planner.json",
+                {
+                    "event": "planner_output",
+                    "step": int(step_idx),
+                    "stamp_sec": time.time(),
+                    "problem": str(generated_problem),
+                    "raw_output": raw_output,
+                    "plan": plan_payload,
+                },
+                latest_name="latest_planner.json",
+            )
             self.publish_json(
                 self.status_pub,
                 {
@@ -470,6 +483,18 @@ class PddlTampServer(Node):
                 plan=plan_payload,
             )
             if not actions:
+                self.save_step_json(
+                    step_idx,
+                    "planning_failed.json",
+                    {
+                        "event": "planning_failed",
+                        "step": int(step_idx),
+                        "stamp_sec": time.time(),
+                        "completed": sorted(completed),
+                        "message": "No executable PDDL action found.",
+                    },
+                    latest_name="latest_planning_failed.json",
+                )
                 self.publish_pddl_log(
                     "planning_failed",
                     ["[PDDL] no executable action found", f"completed: {', '.join(sorted(completed)) or '<none>'}"],
@@ -488,6 +513,17 @@ class PddlTampServer(Node):
 
             action = self.select_executable_action(actions)
             self.get_logger().info(f"[PDDL] Selected next action: {action.pddl()} from {action.source}")
+            self.save_step_json(
+                step_idx,
+                "selected_action.json",
+                {
+                    "event": "selected_action",
+                    "step": int(step_idx),
+                    "stamp_sec": time.time(),
+                    "action": action.to_dict(),
+                },
+                latest_name="latest_selected_action.json",
+            )
             self.publish_json(self.action_pub, {"event": "selected_action", "action": action.to_dict()})
             self.publish_pddl_log(
                 "selected_action",
@@ -501,6 +537,17 @@ class PddlTampServer(Node):
                 self.executing_action_log_lines(action, step_idx),
                 step=step_idx,
                 action=action.to_dict(),
+            )
+            self.save_step_json(
+                step_idx,
+                "executing_action.json",
+                {
+                    "event": "executing_action",
+                    "step": int(step_idx),
+                    "stamp_sec": time.time(),
+                    "action": action.to_dict(),
+                },
+                latest_name="latest_executing_action.json",
             )
 
             # --- Async prefetch pipeline ---
@@ -585,6 +632,18 @@ class PddlTampServer(Node):
             steps.append(result)
             self.publish_json(self.result_pub, {"event": "action_result", "result": result})
             self.get_logger().info("[PDDL] Action execution result: " + json.dumps(result, sort_keys=True))
+            self.save_step_json(
+                step_idx,
+                "action_result.json",
+                {
+                    "event": "action_result",
+                    "step": int(step_idx),
+                    "stamp_sec": time.time(),
+                    "action": action.to_dict(),
+                    "result": result,
+                },
+                latest_name="latest_action_result.json",
+            )
             self.publish_pddl_log(
                 "action_result",
                 self.action_result_log_lines(action, result, step_idx),
@@ -896,6 +955,17 @@ class PddlTampServer(Node):
         predicates_path.write_text(text + "\n", encoding="utf-8")
         latest_path.write_text(text + "\n", encoding="utf-8")
         self.get_logger().info(f"[PDDL] Step artifacts saved: {predicates_path}")
+
+    def save_step_json(self, step_idx: int, filename: str, payload: dict, latest_name: str | None = None) -> None:
+        debug_dir = PDDL_DIR / "debug"
+        step_dir = debug_dir / f"step_{step_idx:02d}"
+        step_dir.mkdir(parents=True, exist_ok=True)
+        text = json.dumps(payload, indent=2, sort_keys=True)
+        path = step_dir / filename
+        path.write_text(text + "\n", encoding="utf-8")
+        if latest_name:
+            (debug_dir / latest_name).write_text(text + "\n", encoding="utf-8")
+        self.get_logger().info(f"[PDDL] Step JSON saved: {path}")
 
     @staticmethod
     def safe_debug_filename(text: str) -> str:

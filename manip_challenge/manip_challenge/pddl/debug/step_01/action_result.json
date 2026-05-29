@@ -1,0 +1,113 @@
+{
+  "action": {
+    "args": [
+      "strawberry_0",
+      "table",
+      "right_storage"
+    ],
+    "name": "move-target-to-goal",
+    "pddl": "(move-target-to-goal strawberry_0 table right_storage)",
+    "source": "external"
+  },
+  "event": "action_result",
+  "result": {
+    "action": {
+      "args": [
+        "strawberry_0",
+        "table",
+        "right_storage"
+      ],
+      "name": "move-target-to-goal",
+      "pddl": "(move-target-to-goal strawberry_0 table right_storage)",
+      "source": "external"
+    },
+    "class_name": "strawberry",
+    "destination": "right storage",
+    "detected_pose_in_source": {
+      "orientation": {
+        "w": 1.0,
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "position": {
+        "x": -0.10395257920026779,
+        "y": 0.206454798579216,
+        "z": 1.447811460018158
+      }
+    },
+    "dry_run": false,
+    "grasp_pose_in_base": {
+      "orientation": {
+        "w": 0.0,
+        "x": 0.1606691803177333,
+        "y": 0.9870083153125042,
+        "z": 0.0
+      },
+      "position": {
+        "x": 0.44875607521271876,
+        "y": 0.12145257920026799,
+        "z": -0.05742352572627629
+      }
+    },
+    "grasp_selection": {
+      "delta_from_raw_centroid_m": [
+        0.0,
+        0.0,
+        0.005159532546997081
+      ],
+      "grasp_pose_source": "raw_centroid_xy_with_adjusted_target_z",
+      "grasp_pose_xyz_m": [
+        -0.10395257920026779,
+        0.206454798579216,
+        1.447811460018158
+      ],
+      "gripper_axis_base_xy": [
+        0.9483708289920554,
+        -0.3171636339760938
+      ],
+      "gripper_axis_base_yaw_rad": -0.3227372082511568,
+      "gripper_axis_rule": "perpendicular_to_pca_major_axis",
+      "method": "median_fallback",
+      "pca_major_axis_base_xy": [
+        -0.3171636339760938,
+        -0.9483708289920554
+      ],
+      "pca_major_axis_base_yaw_rad": -1.8935335350460534,
+      "points_path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260529_160910_691814_strawberry/strawberry_0/foreground_points.npy",
+      "raw_centroid_xyz_m": [
+        -0.10395257920026779,
+        0.206454798579216,
+        1.4426519274711609
+      ],
+      "reason": "no_dense_axis_bin",
+      "rgbd_depth_adjustment": {
+        "adjusted_target_depth_m": 1.447811460018158,
+        "clearance_above_surface_m": -0.012,
+        "delta_depth_m": 0.005159532546997081,
+        "local_points": 166,
+        "local_radius_m": 0.035,
+        "measured_surface_depth_m": 1.435811460018158,
+        "method": "local_radius",
+        "previous_target_depth_m": 1.4426519274711609,
+        "surface_depth_percentile": 10.0
+      },
+      "target_xyz_m": [
+        -0.10395257920026779,
+        0.206454798579216,
+        1.447811460018158
+      ],
+      "xy_major_axis": [
+        0.948369636639692,
+        0.3171671992812287
+      ],
+      "xy_minor_axis": [
+        -0.3171671992812287,
+        0.948369636639692
+      ]
+    },
+    "ok": true
+  },
+  "stamp_sec": 1780038593.0694299,
+  "step": 1
+}

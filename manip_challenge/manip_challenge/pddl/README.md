@@ -121,6 +121,21 @@ If no key is configured, the rule-based parser still handles the standard move c
 Set `PDDL_PLANNER_CMD` in `.env`, using `{domain}` and `{problem}` placeholders.
 If it is empty or fails, `planner.py` uses the fallback planner.
 
+This repo can use Fast Downward through the submodule at `third_party/downward`.
+After cloning the parent repo, initialize and build it once:
+
+```bash
+cd /home/lhs/CS477_IIR_2026S
+git submodule update --init --recursive
+python3 third_party/downward/build.py
+```
+
+Then copy `.env.example` to `.env` in this folder and keep:
+
+```text
+PDDL_PLANNER_CMD=python3 run_fast_downward.py {domain} {problem}
+```
+
 ## Action handlers
 
 All symbolic-to-physical mappings live in `actions.py`:

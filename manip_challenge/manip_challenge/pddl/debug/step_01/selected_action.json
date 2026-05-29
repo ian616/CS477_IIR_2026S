@@ -1,0 +1,15 @@
+{
+  "action": {
+    "args": [
+      "strawberry_0",
+      "table",
+      "right_storage"
+    ],
+    "name": "move-target-to-goal",
+    "pddl": "(move-target-to-goal strawberry_0 table right_storage)",
+    "source": "external"
+  },
+  "event": "selected_action",
+  "stamp_sec": 1780038551.4032042,
+  "step": 1
+}

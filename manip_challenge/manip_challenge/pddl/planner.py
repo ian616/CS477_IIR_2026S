@@ -13,7 +13,9 @@ from .pddl_types import PlanAction, PredicateState
 def parse_plan_text(text: str, source: str = "external") -> list[PlanAction]:
     actions = []
     for line in str(text or "").splitlines():
-        stripped = line.strip().lower()
+        stripped = line.split(";", 1)[0].strip().lower()
+        if not stripped:
+            continue
         match = re.search(r"\(([a-z0-9_-]+)\s+([^)]*)\)", stripped)
         if not match:
             continue
