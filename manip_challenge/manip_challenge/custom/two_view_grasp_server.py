@@ -78,6 +78,10 @@ from manip_challenge.custom.grasping.gripper_control import JOINT_NAME as CUSTOM
 
 def executor_safe_gripper_goto(node, pos, force=1.0, timeout=3.0, **kwargs):
     """Send a gripper action without recursively spinning an executor-owned node."""
+    timeout = float(timeout)
+    result_timeout_margin = float(getattr(node, "gripper_result_timeout_margin", 8.0))
+    strict_result = bool(getattr(node, "strict_gripper_result", False))
+
     if not hasattr(node, "_two_view_gripper_client"):
         node._two_view_gripper_client = ActionClient(
             node,
@@ -102,7 +106,7 @@ def executor_safe_gripper_goto(node, pos, force=1.0, timeout=3.0, **kwargs):
     ]
 
     goal_future = client.send_goal_async(goal)
-    deadline = time.monotonic() + float(timeout) + 6.0
+    deadline = time.monotonic() + timeout + result_timeout_margin
     while rclpy.ok() and not goal_future.done():
         if time.monotonic() > deadline:
             raise TimeoutError("Timed out sending gripper goal.")
@@ -113,15 +117,43 @@ def executor_safe_gripper_goto(node, pos, force=1.0, timeout=3.0, **kwargs):
         raise RuntimeError("Gripper goal was rejected.")
 
     result_future = goal_handle.get_result_async()
-    deadline = time.monotonic() + float(timeout) + 6.0
+    deadline = time.monotonic() + timeout + result_timeout_margin
     while rclpy.ok() and not result_future.done():
         if time.monotonic() > deadline:
-            raise TimeoutError("Timed out waiting for gripper motion.")
+            message = (
+                "Timed out waiting for gripper action result. Continuing because "
+                "a grasp can stop before the requested close position when it contacts an object."
+            )
+            if strict_result:
+                raise TimeoutError("Timed out waiting for gripper motion.")
+            node.get_logger().warn(message)
+            try:
+                cancel_future = goal_handle.cancel_goal_async()
+                cancel_deadline = time.monotonic() + 0.75
+                while rclpy.ok() and not cancel_future.done() and time.monotonic() < cancel_deadline:
+                    time.sleep(0.01)
+                if cancel_future.done():
+                    node.get_logger().info("Cancelled timed-out gripper goal; controller should hold current position.")
+            except Exception as exc:
+                node.get_logger().warn(f"Could not cancel timed-out gripper goal: {exc}")
+            settle_time = float(getattr(node, "gripper_settle_time", 0.0))
+            if settle_time > 0.0:
+                time.sleep(settle_time)
+            return {
+                "ok": True,
+                "timed_out": True,
+                "position": float(pos),
+                "timeout": timeout,
+            }
         time.sleep(0.01)
 
     result = result_future.result()
     if result is None:
-        raise RuntimeError(f"Gripper action failed: {result_future.exception()!r}")
+        message = f"Gripper action returned no result: {result_future.exception()!r}"
+        if strict_result:
+            raise RuntimeError(message)
+        node.get_logger().warn(message)
+        return {"ok": True, "missing_result": True, "position": float(pos)}
     return result
 
 
@@ -130,9 +162,12 @@ def executor_safe_gripper_open(node, force=1.0, timeout=1.0, gripper_open_pos=0.
     return executor_safe_gripper_goto(node, gripper_open_pos, force=force, timeout=timeout, **kwargs)
 
 
-def executor_safe_gripper_close(node, force=1.0, timeout=3.0, gripper_close_pos=0.8, **kwargs):
+def executor_safe_gripper_close(node, force=1.0, timeout=3.0, gripper_close_pos=None, **kwargs):
     force = float(getattr(node, "gripper_force", force))
-    gripper_close_pos = float(getattr(node, "gripper_close_pos", gripper_close_pos))
+    if gripper_close_pos is None:
+        gripper_close_pos = float(getattr(node, "gripper_close_pos", 0.8))
+    else:
+        gripper_close_pos = float(gripper_close_pos)
     node.get_logger().info("Closing gripper.")
     return executor_safe_gripper_goto(node, gripper_close_pos, force=force, timeout=timeout, **kwargs)
 
@@ -142,6 +177,8 @@ move_gripper.gripper_open = executor_safe_gripper_open
 move_gripper.gripper_close = executor_safe_gripper_close
 
 from manip_challenge.custom.motion.motion import PLACE_CONFIGS, execute_pick_place_sequence  # noqa: E402
+from manip_challenge.custom.tamp.executor import execute_tamp_command  # noqa: E402
+from manip_challenge.custom.tamp.nlp import parse_task_goals  # noqa: E402
 
 
 # wrist_1=-1.0 keeps shoulder_lift + elbow + wrist_1 == -pi/2 for the vertical home posture.
@@ -452,9 +489,17 @@ def finite_xyz_points(points):
     return points[np.isfinite(points).all(axis=1) & (points[:, 2] > 0.0)]
 
 
+def raw_centroid_xyz(points):
+    points = finite_xyz_points(points)
+    if len(points) == 0:
+        return np.asarray([0.0, 0.0, 0.0], dtype=np.float64)
+    return np.mean(points[:, :3], axis=0)
+
+
 def pca_axes_xy(points):
+    points = finite_xyz_points(points)
     xy = points[:, :2].astype(np.float64)
-    center = np.median(xy, axis=0)
+    center = raw_centroid_xyz(points)[:2]
     centered = xy - center
     _, _, vt = np.linalg.svd(centered, full_matrices=False)
     major = vt[0]
@@ -496,9 +541,9 @@ def choose_grasp_target_from_points(points, label="", min_bin_points=20):
     """
     points = finite_xyz_points(points)
     if len(points) < max(8, min_bin_points):
-        centroid = np.median(points, axis=0) if len(points) else np.asarray([0.0, 0.0, 0.0])
+        centroid = raw_centroid_xyz(points)
         return {
-            "method": "median_fallback",
+            "method": "raw_centroid_fallback",
             "target_xyz_m": centroid.astype(float).tolist(),
             "raw_centroid_xyz_m": centroid.astype(float).tolist(),
             "reason": f"too_few_points:{len(points)}",
@@ -515,7 +560,7 @@ def choose_grasp_target_from_points(points, label="", min_bin_points=20):
     if high <= low:
         target = raw_centroid
         return {
-            "method": "median_fallback",
+            "method": "raw_centroid_fallback",
             "target_xyz_m": target.astype(float).tolist(),
             "raw_centroid_xyz_m": raw_centroid.astype(float).tolist(),
             "reason": "degenerate_major_axis",
@@ -568,7 +613,7 @@ def choose_grasp_target_from_points(points, label="", min_bin_points=20):
             method = "central_band_median"
         else:
             target = raw_centroid
-            method = "median_fallback"
+            method = "raw_centroid_fallback"
         return {
             "method": method,
             "target_xyz_m": target.astype(float).tolist(),
@@ -807,6 +852,8 @@ class TwoViewGraspServer(Node):
         self.gripper_force = args.gripper_force
         self.gripper_close_pos = args.gripper_close_pos
         self.gripper_settle_time = args.gripper_settle_time
+        self.gripper_result_timeout_margin = args.gripper_result_timeout_margin
+        self.strict_gripper_result = args.strict_gripper_result
         self.grasp_descend_duration = args.descend_duration
         self.callback_group = ReentrantCallbackGroup()
         self.perception_client = self.create_client(
@@ -1407,7 +1454,25 @@ def parse_args(argv=None):
     parser.add_argument("--gripper-force", type=float, default=0.5)
     parser.add_argument("--gripper-close-pos", type=float, default=0.5)
     parser.add_argument("--gripper-settle-time", type=float, default=0.4)
+    parser.add_argument(
+        "--gripper-result-timeout-margin",
+        type=float,
+        default=8.0,
+        help="Extra seconds to wait for a gripper action result after its trajectory duration.",
+    )
+    parser.add_argument(
+        "--strict-gripper-result",
+        action="store_true",
+        help="Treat gripper action result timeouts as fatal errors. By default they are warnings so contact grasps can continue.",
+    )
     parser.add_argument("--dry-run", action="store_true", help="Detect and transform, but do not move the arm.")
+    parser.add_argument("--disable-tamp", action="store_true", help="Disable natural-language TAMP planning and use the original one-object command path.")
+    parser.add_argument(
+        "--tamp-max-steps",
+        type=int,
+        default=int(os.environ.get("TAMP_MAX_STEPS", "8")),
+        help="Maximum pick/place actions the TAMP planner may execute for one natural-language command.",
+    )
     parser.add_argument("--no-home", action="store_true", help="Do not move the arm to the home joint pose at startup.")
     parser.add_argument("--launch-world", action="store_true", help="Start ur5_setup_random_picking.launch.py as a child process.")
     parser.add_argument("--launch-wait", type=float, default=12.0)

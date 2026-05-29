@@ -70,7 +70,7 @@ DROP_H_MIN, DROP_H_MAX = 0.02, 0.03
 YAW_MIN, YAW_MAX = -3.14159, 3.14159
 
 # How many objects to spawn
-NUM_SPAWNS = 8
+NUM_SPAWNS = 5
 
 # Time to wait after each spawn (seconds) to let physics settle
 SETTLE_TIME = 0.6

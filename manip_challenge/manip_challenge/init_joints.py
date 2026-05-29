@@ -55,7 +55,7 @@ def main(args=None):
     rclpy.init(args=args)
 
     init_joint_client = InitJoints()
-    init_joint_client.send_goal([0., -np.pi/2.0, 1., -np.pi/3., -np.pi/2., 0.])
+    init_joint_client.send_goal([0., -np.pi/2.0, 1., -1.0, -np.pi/2., 0.])
     
     rclpy.spin(init_joint_client)
 
