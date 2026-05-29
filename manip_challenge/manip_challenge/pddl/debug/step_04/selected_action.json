@@ -1,0 +1,15 @@
+{
+  "action": {
+    "args": [
+      "coke_can_1",
+      "table",
+      "bookshelf"
+    ],
+    "name": "move-target-to-goal",
+    "pddl": "(move-target-to-goal coke_can_1 table bookshelf)",
+    "source": "external"
+  },
+  "event": "selected_action",
+  "stamp_sec": 1780056893.098727,
+  "step": 4
+}

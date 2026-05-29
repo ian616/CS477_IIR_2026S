@@ -1,28 +1,29 @@
 {
   "action": {
     "args": [
-      "strawberry_0",
+      "meat_can_0",
       "table",
-      "right_storage"
+      "left_storage"
     ],
     "name": "move-target-to-goal",
-    "pddl": "(move-target-to-goal strawberry_0 table right_storage)",
-    "source": "external"
+    "pddl": "(move-target-to-goal meat_can_0 table left_storage)",
+    "source": "fallback"
   },
   "event": "action_result",
   "result": {
     "action": {
       "args": [
-        "strawberry_0",
+        "meat_can_0",
         "table",
-        "right_storage"
+        "left_storage"
       ],
       "name": "move-target-to-goal",
-      "pddl": "(move-target-to-goal strawberry_0 table right_storage)",
-      "source": "external"
+      "pddl": "(move-target-to-goal meat_can_0 table left_storage)",
+      "source": "fallback"
     },
-    "class_name": "strawberry",
-    "destination": "right storage",
+    "class_name": "meat_can",
+    "command_id": "step1-10e2ef00",
+    "destination": "left storage",
     "detected_pose_in_source": {
       "orientation": {
         "w": 1.0,
@@ -31,83 +32,90 @@
         "z": 0.0
       },
       "position": {
-        "x": -0.10395257920026779,
-        "y": 0.206454798579216,
-        "z": 1.447811460018158
+        "x": 0.372771292924881,
+        "y": 0.06428948044776917,
+        "z": 1.3937549467086792
       }
     },
     "dry_run": false,
     "grasp_pose_in_base": {
       "orientation": {
         "w": 0.0,
-        "x": 0.1606691803177333,
-        "y": 0.9870083153125042,
+        "x": -0.4857447330260485,
+        "y": 0.874100711781802,
         "z": 0.0
       },
       "position": {
-        "x": 0.44875607521271876,
-        "y": 0.12145257920026799,
-        "z": -0.05742352572627629
+        "x": 0.5911898802888769,
+        "y": -0.3552712929248808,
+        "z": -0.0040784652040462
       }
     },
     "grasp_selection": {
       "delta_from_raw_centroid_m": [
-        0.0,
-        0.0,
-        0.005159532546997081
+        0.0028249025344848633,
+        -0.002873837947845459,
+        0.006782400131225552
       ],
       "grasp_pose_source": "raw_centroid_xy_with_adjusted_target_z",
       "grasp_pose_xyz_m": [
-        -0.10395257920026779,
-        0.206454798579216,
-        1.447811460018158
+        0.372771292924881,
+        0.06428948044776917,
+        1.3937549467086792
       ],
       "gripper_axis_base_xy": [
-        0.9483708289920554,
-        -0.3171636339760938
+        0.5281041086749058,
+        0.8491796337646608
       ],
-      "gripper_axis_base_yaw_rad": -0.3227372082511568,
+      "gripper_axis_base_yaw_rad": 1.0144299305799827,
       "gripper_axis_rule": "perpendicular_to_pca_major_axis",
-      "method": "median_fallback",
+      "method": "local_thick_axis_band",
       "pca_major_axis_base_xy": [
-        -0.3171636339760938,
-        -0.9483708289920554
+        0.8491796337646608,
+        -0.5281041086749058
       ],
-      "pca_major_axis_base_yaw_rad": -1.8935335350460534,
-      "points_path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260529_160910_691814_strawberry/strawberry_0/foreground_points.npy",
+      "pca_major_axis_base_yaw_rad": -0.5563663962149139,
+      "points_path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260529_211303_500009_meat_can/meat_can_0/foreground_points.npy",
       "raw_centroid_xyz_m": [
-        -0.10395257920026779,
-        0.206454798579216,
-        1.4426519274711609
+        0.372771292924881,
+        0.06428948044776917,
+        1.3869725465774536
       ],
-      "reason": "no_dense_axis_bin",
       "rgbd_depth_adjustment": {
-        "adjusted_target_depth_m": 1.447811460018158,
+        "adjusted_target_depth_m": 1.3937549467086792,
         "clearance_above_surface_m": -0.012,
-        "delta_depth_m": 0.005159532546997081,
-        "local_points": 166,
+        "delta_depth_m": 0.006609785079956021,
+        "local_points": 378,
         "local_radius_m": 0.035,
-        "measured_surface_depth_m": 1.435811460018158,
+        "measured_surface_depth_m": 1.3817549467086792,
         "method": "local_radius",
-        "previous_target_depth_m": 1.4426519274711609,
+        "previous_target_depth_m": 1.3871451616287231,
         "surface_depth_percentile": 10.0
       },
+      "selected_band": {
+        "along_max_m": 0.004635079244910637,
+        "along_min_m": 0.0010990531621907114,
+        "point_count": 23,
+        "score": 0.05062715399989533,
+        "width_m": 0.04460455375278911,
+        "z_spread_m": 0.01996290683746338
+      },
       "target_xyz_m": [
-        -0.10395257920026779,
-        0.206454798579216,
-        1.447811460018158
+        0.37559619545936584,
+        0.061415642499923706,
+        1.3937549467086792
       ],
       "xy_major_axis": [
-        0.948369636639692,
-        0.3171671992812287
+        0.5280993490438127,
+        -0.849182593756785
       ],
       "xy_minor_axis": [
-        -0.3171671992812287,
-        0.948369636639692
+        0.849182593756785,
+        0.5280993490438127
       ]
     },
     "ok": true
   },
-  "stamp_sec": 1780038593.0694299,
+  "stamp_sec": 1780056832.793078,
   "step": 1
 }
