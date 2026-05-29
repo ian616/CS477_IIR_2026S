@@ -122,7 +122,7 @@ def pick_place_storage(node, arm, grasp_pose, destination, obj_name,
     place_pose = Pose()
     place_pose.position.x = x_slots[(count // 4) % 2]
     place_pose.position.y = y_slots[count % 4]
-    place_pose.position.z = config["base_z"]
+    place_pose.position.z = config["base_z"] + grasp_pose.position.z + 0.15
     place_pose.orientation = lift_pose.orientation
 
     place_pan_angle = math.atan2(place_pose.position.y, place_pose.position.x)
