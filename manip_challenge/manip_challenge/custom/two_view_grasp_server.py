@@ -45,6 +45,7 @@ import numpy as np
 import rclpy
 import tf2_geometry_msgs  # noqa: F401  Needed for PoseStamped TF transforms.
 from geometry_msgs.msg import Pose, PoseStamped
+from std_msgs.msg import String
 from rclpy.action import ActionClient
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
@@ -180,7 +181,11 @@ from manip_challenge.custom.tamp.executor import execute_tamp_command  # noqa: E
 from manip_challenge.custom.tamp.nlp import parse_task_goals  # noqa: E402
 
 
-HOME_JOINTS = [0.0, -np.pi / 2.0, 1.0, -np.pi / 3.0, -np.pi / 2.0, 0.0]
+# wrist_1=-1.0 keeps shoulder_lift + elbow + wrist_1 == -pi/2 for the vertical home posture.
+HOME_JOINTS = [0.0, -np.pi / 2.0, 1.0, -1.0, -np.pi / 2.0, 0.0]
+# Keep the commanded grasp approach exactly vertical.
+VERTICAL_DOWN_GRASP_QUATERNION = np.asarray([0.0, 1.0, 0.0, 0.0], dtype=np.float64)
+GRASP_AXIS_ENDPOINT_OFFSET_M = 0.05
 
 DESTINATION_ALIASES = {
     "left": "left storage",
@@ -199,6 +204,12 @@ class CommandParseError(ValueError):
     pass
 
 
+def home_joints_for_pan(pan):
+    joints = list(HOME_JOINTS)
+    joints[0] = float(pan)
+    return joints
+
+
 def normalize_object_name(name):
     text = str(name or "").strip().lower()
     text = re.sub(r"^(a|an|the)\s+", "", text)
@@ -212,7 +223,7 @@ def normalize_destination(name):
 
 
 def parse_command(text):
-    """Return (action, object_name, destination) from a short client command."""
+    """Return (action, object_name, destination) from a single short command."""
     raw = str(text or "").strip()
     if not raw:
         raise CommandParseError("Empty command. Try: banana left")
@@ -241,6 +252,63 @@ def parse_command(text):
     return "approach", normalize_object_name(lowered), None
 
 
+def parse_commands(text):
+    """Parse one or more sentences into a list of (action, object_name, destination).
+
+    Handles:
+      - Simple commands: "banana left", "home"
+      - Natural language: "Move a banana to left storage."
+      - Multiple objects: "Move a banana, a coke can, and a hammer to left storage."
+      - Multiple sentences: "Move a banana to left. Move a coke can to right."
+    """
+    raw = str(text or "").strip()
+    if not raw:
+        raise CommandParseError("Empty command.")
+
+    lowered = raw.lower().strip()
+    if lowered in {"home", "idle", "reset"}:
+        return [(lowered, None, None)]
+
+    results = []
+
+    # 문장 단위로 분리
+    sentences = re.split(r"[.!?\n]+", raw)
+    for sentence in sentences:
+        sentence = sentence.strip()
+        if not sentence:
+            continue
+
+        lowered_s = sentence.lower()
+
+        # "Move X, Y, and Z to destination" — 여러 물체 동시 처리 (parsing.py 로직)
+        multi_match = re.search(
+            r"(?:move|pick|grasp)\s+(.*?)\s+(?:to|into|onto)\s+(?:the\s+)?([\w\s]+?)$",
+            lowered_s,
+            re.IGNORECASE,
+        )
+        if multi_match:
+            objects_str = multi_match.group(1)
+            destination = normalize_destination(multi_match.group(2).strip())
+            objects_str = re.sub(r"\band\b", ",", objects_str, flags=re.IGNORECASE)
+            for raw_obj in objects_str.split(","):
+                obj = re.sub(r"^\s*(a|an|the)\s+", "", raw_obj.strip(), flags=re.IGNORECASE).strip()
+                obj = normalize_object_name(obj)
+                if obj:
+                    results.append(("approach", obj, destination))
+            continue
+
+        # 단순 단일 명령 fallback
+        try:
+            results.append(parse_command(sentence))
+        except CommandParseError:
+            pass
+
+    if not results:
+        raise CommandParseError(f"Could not parse: '{text}'")
+
+    return results
+
+
 def pose_from_xyz(xyz):
     pose = Pose()
     pose.position.x = float(xyz[0])
@@ -264,6 +332,136 @@ def pose_to_dict(pose):
             "w": float(pose.orientation.w),
         },
     }
+
+
+def grasp_pose_xyz_from_selection(selection):
+    target = np.asarray(selection["target_xyz_m"], dtype=np.float64)
+    if target.shape[0] < 3:
+        raise ValueError("target_xyz_m must contain at least 3 values")
+
+    raw = selection.get("raw_centroid_xyz_m")
+    if raw is not None:
+        raw = np.asarray(raw, dtype=np.float64)
+        if raw.shape[0] >= 2 and np.isfinite(raw[:2]).all():
+            return (
+                np.asarray([raw[0], raw[1], target[2]], dtype=np.float64),
+                "raw_centroid_xy_with_adjusted_target_z",
+            )
+
+    return target[:3].copy(), "target_xyz_m"
+
+
+def store_grasp_pose_reference(selection):
+    grasp_xyz, source = grasp_pose_xyz_from_selection(selection)
+    selection["grasp_pose_xyz_m"] = [float(v) for v in grasp_xyz]
+    selection["grasp_pose_source"] = source
+    return grasp_xyz, source
+
+
+def normalize_vector(vector, min_norm=1e-9):
+    vector = np.asarray(vector, dtype=np.float64)
+    norm = float(np.linalg.norm(vector))
+    if norm < min_norm or not np.isfinite(norm):
+        return None
+    return vector / norm
+
+
+def quaternion_to_matrix(quaternion):
+    x = float(quaternion[0])
+    y = float(quaternion[1])
+    z = float(quaternion[2])
+    w = float(quaternion[3])
+    norm = math.sqrt(x * x + y * y + z * z + w * w)
+    if norm <= 0.0:
+        return np.eye(3, dtype=np.float64)
+    x /= norm
+    y /= norm
+    z /= norm
+    w /= norm
+
+    return np.asarray(
+        [
+            [1.0 - 2.0 * (y * y + z * z), 2.0 * (x * y - z * w), 2.0 * (x * z + y * w)],
+            [2.0 * (x * y + z * w), 1.0 - 2.0 * (x * x + z * z), 2.0 * (y * z - x * w)],
+            [2.0 * (x * z - y * w), 2.0 * (y * z + x * w), 1.0 - 2.0 * (x * x + y * y)],
+        ],
+        dtype=np.float64,
+    )
+
+
+def orientation_to_matrix(orientation):
+    return quaternion_to_matrix([orientation.x, orientation.y, orientation.z, orientation.w])
+
+
+def matrix_to_quaternion(matrix):
+    matrix = np.asarray(matrix, dtype=np.float64)
+    trace = float(np.trace(matrix))
+
+    if trace > 0.0:
+        scale = math.sqrt(trace + 1.0) * 2.0
+        w = 0.25 * scale
+        x = (matrix[2, 1] - matrix[1, 2]) / scale
+        y = (matrix[0, 2] - matrix[2, 0]) / scale
+        z = (matrix[1, 0] - matrix[0, 1]) / scale
+    elif matrix[0, 0] > matrix[1, 1] and matrix[0, 0] > matrix[2, 2]:
+        scale = math.sqrt(1.0 + matrix[0, 0] - matrix[1, 1] - matrix[2, 2]) * 2.0
+        w = (matrix[2, 1] - matrix[1, 2]) / scale
+        x = 0.25 * scale
+        y = (matrix[0, 1] + matrix[1, 0]) / scale
+        z = (matrix[0, 2] + matrix[2, 0]) / scale
+    elif matrix[1, 1] > matrix[2, 2]:
+        scale = math.sqrt(1.0 + matrix[1, 1] - matrix[0, 0] - matrix[2, 2]) * 2.0
+        w = (matrix[0, 2] - matrix[2, 0]) / scale
+        x = (matrix[0, 1] + matrix[1, 0]) / scale
+        y = 0.25 * scale
+        z = (matrix[1, 2] + matrix[2, 1]) / scale
+    else:
+        scale = math.sqrt(1.0 + matrix[2, 2] - matrix[0, 0] - matrix[1, 1]) * 2.0
+        w = (matrix[1, 0] - matrix[0, 1]) / scale
+        x = (matrix[0, 2] + matrix[2, 0]) / scale
+        y = (matrix[1, 2] + matrix[2, 1]) / scale
+        z = 0.25 * scale
+
+    quaternion = normalize_vector([x, y, z, w])
+    if quaternion is None:
+        return np.asarray([0.0, 0.0, 0.0, 1.0], dtype=np.float64)
+    return quaternion
+
+
+def set_pose_orientation_from_quaternion(pose, quaternion):
+    pose.orientation.x = float(quaternion[0])
+    pose.orientation.y = float(quaternion[1])
+    pose.orientation.z = float(quaternion[2])
+    pose.orientation.w = float(quaternion[3])
+
+
+def build_grasp_orientation_perpendicular_to_axis(reference_quaternion, gripper_axis_base_xy):
+    reference_matrix = quaternion_to_matrix(reference_quaternion)
+    tool_z_axis = normalize_vector(reference_matrix[:, 2])
+    # In the ArmClient tool frame, local X is the gripper closing/opening axis.
+    # Keep the reference approach axis, and rotate only the in-plane gripper axis.
+    desired_tool_x = normalize_vector([gripper_axis_base_xy[0], gripper_axis_base_xy[1], 0.0])
+    if tool_z_axis is None or desired_tool_x is None:
+        return None, None
+
+    desired_tool_x = desired_tool_x - np.dot(desired_tool_x, tool_z_axis) * tool_z_axis
+    desired_tool_x = normalize_vector(desired_tool_x)
+    if desired_tool_x is None:
+        return None, None
+
+    reference_tool_x = reference_matrix[:, 0]
+    if float(np.dot(desired_tool_x, reference_tool_x)) < 0.0:
+        desired_tool_x = -desired_tool_x
+
+    desired_tool_y = normalize_vector(np.cross(tool_z_axis, desired_tool_x))
+    if desired_tool_y is None:
+        return None, None
+    desired_tool_x = normalize_vector(np.cross(desired_tool_y, tool_z_axis))
+    if desired_tool_x is None:
+        return None, None
+
+    orientation_matrix = np.column_stack((desired_tool_x, desired_tool_y, tool_z_axis))
+    return matrix_to_quaternion(orientation_matrix), desired_tool_x
 
 
 def calc_rot_time(start_angle, target_angle, sec_per_rad=1.2, min_time=0.8):
@@ -312,6 +510,28 @@ def pca_axes_xy(points):
     return center, major, minor
 
 
+def pca_bbox_xy(points, center, major, minor, percentile_low=2.0, percentile_high=98.0):
+    centered = points[:, :2].astype(np.float64) - center
+    along_major = centered @ major
+    along_minor = centered @ minor
+    major_min, major_max = np.percentile(along_major, [percentile_low, percentile_high])
+    minor_min, minor_max = np.percentile(along_minor, [percentile_low, percentile_high])
+    length_m = float(max(0.0, major_max - major_min))
+    width_m = float(max(0.0, minor_max - minor_min))
+    return {
+        "center_xy_m": center.astype(float).tolist(),
+        "length_m": length_m,
+        "width_m": width_m,
+        "area_m2": length_m * width_m,
+        "major_min_m": float(major_min),
+        "major_max_m": float(major_max),
+        "minor_min_m": float(minor_min),
+        "minor_max_m": float(minor_max),
+        "percentile_low": float(percentile_low),
+        "percentile_high": float(percentile_high),
+    }
+
+
 def choose_grasp_target_from_points(points, label="", min_bin_points=20):
     """Choose a grasp point from visible object points instead of raw centroid.
 
@@ -333,7 +553,8 @@ def choose_grasp_target_from_points(points, label="", min_bin_points=20):
     centered = points[:, :2] - xy_center
     along = centered @ major
     across = centered @ minor
-    raw_centroid = raw_centroid_xyz(points)
+    raw_centroid = np.median(points[:, :3], axis=0)
+    pca_bbox = pca_bbox_xy(points, xy_center, major, minor)
 
     low, high = np.percentile(along, [12.0, 88.0])
     if high <= low:
@@ -345,6 +566,7 @@ def choose_grasp_target_from_points(points, label="", min_bin_points=20):
             "reason": "degenerate_major_axis",
             "xy_major_axis": major.astype(float).tolist(),
             "xy_minor_axis": minor.astype(float).tolist(),
+            "pca_bbox": pca_bbox,
         }
 
     bin_count = 18
@@ -398,6 +620,7 @@ def choose_grasp_target_from_points(points, label="", min_bin_points=20):
             "raw_centroid_xyz_m": raw_centroid.astype(float).tolist(),
             "xy_major_axis": major.astype(float).tolist(),
             "xy_minor_axis": minor.astype(float).tolist(),
+            "pca_bbox": pca_bbox,
             "reason": "no_dense_axis_bin",
         }
 
@@ -409,6 +632,7 @@ def choose_grasp_target_from_points(points, label="", min_bin_points=20):
         "raw_centroid_xyz_m": raw_centroid.astype(float).tolist(),
         "xy_major_axis": major.astype(float).tolist(),
         "xy_minor_axis": minor.astype(float).tolist(),
+        "pca_bbox": pca_bbox,
         "selected_band": {
             "along_min_m": best["along_min_m"],
             "along_max_m": best["along_max_m"],
@@ -514,8 +738,10 @@ def save_grasp_selection_visualization(points, selection, output_dir, label):
 
     raw_centroid = np.asarray(selection.get("raw_centroid_xyz_m", selection["target_xyz_m"]), dtype=np.float64)
     target = np.asarray(selection["target_xyz_m"], dtype=np.float64)
+    grasp_xyz, _ = store_grasp_pose_reference(selection)
     raw_px = to_px(raw_centroid[:2])
     target_px = to_px(target[:2])
+    grasp_px = to_px(grasp_xyz[:2])
 
     major = np.asarray(selection.get("xy_major_axis", [1.0, 0.0]), dtype=np.float64)
     minor = np.asarray(selection.get("xy_minor_axis", [0.0, 1.0]), dtype=np.float64)
@@ -525,8 +751,9 @@ def save_grasp_selection_visualization(points, selection, output_dir, label):
         minor = minor / np.linalg.norm(minor)
 
     axis_len = float(np.max(span)) * 0.42
-    cv2.line(canvas, to_px(target[:2] - major * axis_len), to_px(target[:2] + major * axis_len), (0, 180, 255), 3, cv2.LINE_AA)
-    cv2.line(canvas, to_px(target[:2] - minor * axis_len * 0.35), to_px(target[:2] + minor * axis_len * 0.35), (255, 180, 0), 3, cv2.LINE_AA)
+    axis_origin_xy = grasp_xyz[:2]
+    cv2.line(canvas, to_px(axis_origin_xy - major * axis_len), to_px(axis_origin_xy + major * axis_len), (0, 180, 255), 3, cv2.LINE_AA)
+    cv2.line(canvas, to_px(axis_origin_xy - minor * axis_len * 0.35), to_px(axis_origin_xy + minor * axis_len * 0.35), (255, 180, 0), 3, cv2.LINE_AA)
 
     band = selection.get("selected_band") or {}
     if "along_min_m" in band and "along_max_m" in band:
@@ -539,8 +766,11 @@ def save_grasp_selection_visualization(points, selection, output_dir, label):
     cv2.drawMarker(canvas, raw_px, (30, 30, 30), cv2.MARKER_CROSS, 30, 3, cv2.LINE_AA)
     cv2.circle(canvas, target_px, 13, (40, 220, 40), -1, cv2.LINE_AA)
     cv2.circle(canvas, target_px, 13, (10, 80, 10), 3, cv2.LINE_AA)
+    cv2.circle(canvas, grasp_px, 8, (40, 40, 240), -1, cv2.LINE_AA)
+    cv2.circle(canvas, grasp_px, 8, (255, 255, 255), 2, cv2.LINE_AA)
     cv2.putText(canvas, "raw centroid", (raw_px[0] + 14, raw_px[1] - 12), cv2.FONT_HERSHEY_SIMPLEX, 0.58, (30, 30, 30), 2, cv2.LINE_AA)
     cv2.putText(canvas, "selected grasp", (target_px[0] + 16, target_px[1] + 8), cv2.FONT_HERSHEY_SIMPLEX, 0.58, (10, 80, 10), 2, cv2.LINE_AA)
+    cv2.putText(canvas, "grasp pose", (grasp_px[0] + 14, grasp_px[1] + 28), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (40, 40, 240), 2, cv2.LINE_AA)
 
     cv2.rectangle(canvas, (0, 0), (width, 46), (25, 25, 25), -1)
     title = f"{label} top-down grasp candidate: {selection.get('method', 'unknown')}"
@@ -631,44 +861,227 @@ class TwoViewGraspServer(Node):
             args.perception_service,
             callback_group=self.callback_group,
         )
-        self.command_service = self.create_service(
-            StringString,
-            args.service_name,
-            self.handle_command,
+        self.task_queue = []
+        self.task_queue_lock = threading.Lock()
+        self.command_subscription = self.create_subscription(
+            String,
+            args.command_topic,
+            self._command_callback,
+            10,
             callback_group=self.callback_group,
         )
+        self.result_publisher = self.create_publisher(String, args.result_topic, 10)
+        self._worker_thread = threading.Thread(target=self._worker_loop, daemon=True)
+        self._worker_thread.start()
 
         self.get_logger().info(f"Waiting for perception service '{args.perception_service}'...")
         while rclpy.ok() and not self.perception_client.wait_for_service(timeout_sec=1.0):
             self.get_logger().info(f"Still waiting for '{args.perception_service}'...")
 
         self.get_logger().info(
-            f"Ready. Send commands to '{args.service_name}', e.g. 'banana left'. "
+            f"Ready. Listening on topic '{args.command_topic}', e.g. 'banana left'. "
             "Each command detects the object and executes pick-and-place in this single server."
         )
 
-    def handle_command(self, request, response):
+    def _publish_result(self, result):
+        msg = String()
+        msg.data = json.dumps(result, sort_keys=True)
+        self.result_publisher.publish(msg)
+
+    def _command_callback(self, msg):
         try:
-            with self.command_lock:
-                result = self.execute_command(request.data)
-        except Exception as exc:
-            self.get_logger().error(f"Command failed: {exc}\n{traceback.format_exc()}")
-            result = {"ok": False, "error": str(exc), "command": request.data}
-        response.data = json.dumps(result, sort_keys=True)
-        return response
+            parsed_list = parse_commands(msg.data)
+        except CommandParseError as exc:
+            self.get_logger().error(f"Parse error: {exc}")
+            return
+        with self.task_queue_lock:
+            self.task_queue.extend(parsed_list)
+        self.get_logger().info(f"Queued {len(parsed_list)} command(s) from: '{msg.data}'")
 
-    def execute_command(self, command_text):
-        lowered = str(command_text or "").strip().lower()
-        if lowered in {"home", "idle", "reset"}:
-            self.arm.move_joint(HOME_JOINTS)
-            return {"ok": True, "action": lowered, "message": "Robot moved to home joints."}
+    def _worker_loop(self):
+        # Pipeline state (mirrors main.py pattern)
+        pending_future = None   # async detection future for the next queued object
+        pending_obj = None      # object name the future is for
+        next_pick_done = False  # True when the next item's pick was already done inline
+        next_grasp_pose = None  # grasp pose used in that inline pick
+        next_perception_info = None
 
-        tamp_goals = parse_task_goals(command_text)
-        natural_command = re.search(r"\b(move|put|place|pick)\b", lowered) is not None
-        if not self.args.disable_tamp and tamp_goals and (natural_command or len(tamp_goals) > 1):
-            return execute_tamp_command(self, command_text)
+        while rclpy.ok():
+            item = None
+            with self.task_queue_lock:
+                if self.task_queue:
+                    item = self.task_queue.pop(0)
+            if item is None:
+                time.sleep(0.01)
+                continue
 
-        action, obj_name, destination = parse_command(command_text)
+            action, obj_name, destination = item
+            result = None
+            try:
+                with self.command_lock:
+                    # --- home / idle ---
+                    if action in {"home", "idle", "reset"}:
+                        self.arm.move_joint(HOME_JOINTS)
+                        result = {"ok": True, "action": action, "message": "Robot moved to home joints."}
+                        pending_future = None
+                        pending_obj = None
+                        next_pick_done = False
+                        next_grasp_pose = None
+                        next_perception_info = None
+                        self._publish_result(result)
+                        continue
+
+                    # --- validation ---
+                    if not destination and not self.args.approach_only:
+                        raise CommandParseError(
+                            "Destination is required. Try: 'banana left' or 'move banana to bookshelf'."
+                        )
+                    if destination and destination not in PLACE_CONFIGS:
+                        raise CommandParseError(
+                            f"Unknown destination '{destination}'. Choose one of: {sorted(PLACE_CONFIGS)}"
+                        )
+
+                    # --- get grasp pose (use pre-fetched result if available) ---
+                    grasp_selection = None
+                    perception_info = None
+                    if next_pick_done and pending_obj == obj_name:
+                        # Pick phase already executed inline during previous place
+                        self.get_logger().info(f"[Pipeline] Pick already done for '{obj_name}', skipping to place.")
+                        grasp_pose = next_grasp_pose
+                        perception_info = next_perception_info
+                        if isinstance(perception_info, dict):
+                            grasp_selection = perception_info.get("grasp_selection")
+                        pick_already_done = True
+                        next_pick_done = False
+                        next_grasp_pose = None
+                        next_perception_info = None
+                        pending_obj = None
+                    else:
+                        if not self.args.dry_run and not self.args.no_command_home:
+                            self.get_logger().info("Returning to home before new command.")
+                            self.arm.move_joint(HOME_JOINTS)
+
+                        # Use pre-fetched future if it's for the right object
+                        if pending_future is not None and pending_obj == obj_name:
+                            self.get_logger().info(f"[Pipeline] Using pre-fetched detection for '{obj_name}'.")
+                            detection = self._collect_detection(pending_future, obj_name)
+                            pending_future = None
+                            pending_obj = None
+                        else:
+                            detection = self.detect_object(obj_name)
+
+                        grasp_pose, grasp_selection = self._compute_grasp_pose(detection, obj_name)
+                        perception_info = {
+                            "detection_result": detection,
+                            "grasp_selection": grasp_selection,
+                        }
+                        pick_already_done = False
+
+                    # --- build pipeline callbacks (mirrors main.py make_callbacks) ---
+                    def on_before_idle():
+                        nonlocal pending_future, pending_obj
+                        with self.task_queue_lock:
+                            if not self.task_queue:
+                                return
+                            _, next_obj, _ = self.task_queue[0]
+                        self.get_logger().info(f"[Pipeline] Starting detection for next: '{next_obj}'")
+                        pending_future = self._detect_async(next_obj)
+                        pending_obj = next_obj
+
+                    def get_next_pick_data():
+                        nonlocal pending_future, pending_obj, next_pick_done, next_grasp_pose, next_perception_info
+                        if pending_future is None:
+                            return None
+                        with self.task_queue_lock:
+                            if not self.task_queue:
+                                pending_future = None
+                                pending_obj = None
+                                return None
+                            _, next_obj, _ = self.task_queue[0]
+
+                        if next_obj != pending_obj:
+                            self.get_logger().warn(
+                                f"[Pipeline] Queue head changed: expected '{pending_obj}', got '{next_obj}'"
+                            )
+                            pending_future = None
+                            pending_obj = None
+                            return None
+
+                        try:
+                            det = self._collect_detection(pending_future, next_obj)
+                            pending_future = None
+                        except Exception as exc:
+                            self.get_logger().warn(f"[Pipeline] Detection failed for '{next_obj}': {exc}")
+                            pending_future = None
+                            pending_obj = None
+                            return None
+
+                        try:
+                            ng_pose, ng_selection = self._compute_grasp_pose(det, next_obj)
+                        except Exception as exc:
+                            self.get_logger().warn(f"[Pipeline] Grasp compute failed for '{next_obj}': {exc}")
+                            pending_obj = None
+                            return None
+
+                        approach = copy.deepcopy(ng_pose)
+                        approach.position.z += self.args.approach_height
+                        pan = math.atan2(ng_pose.position.y, ng_pose.position.x)
+
+                        next_pick_done = True
+                        next_grasp_pose = ng_pose
+                        next_perception_info = {
+                            "detection_result": det,
+                            "grasp_selection": ng_selection,
+                        }
+                        self.get_logger().info(f"[Pipeline] Next pick ready for '{next_obj}', pan={pan:.3f}")
+                        return {
+                            "obj_name": next_obj,
+                            "pick_joint": home_joints_for_pan(pan),
+                            "approach_pose": approach,
+                            "grasp_pose": ng_pose,
+                            "perception_info": next_perception_info,
+                        }
+
+                    # --- execute ---
+                    if self.args.dry_run:
+                        self.get_logger().info("Dry run: skipping motion.")
+                    elif self.args.approach_only:
+                        approach_pose = copy.deepcopy(grasp_pose)
+                        approach_pose.position.z += self.args.approach_height
+                        move_gripper.gripper_open(self)
+                        self.move_to_grasp_approach(grasp_pose, approach_pose)
+                    else:
+                        execute_pick_place_sequence(
+                            self, self.arm, grasp_pose, destination, obj_name,
+                            on_before_idle=on_before_idle,
+                            get_next_pick_data=get_next_pick_data,
+                            pick_already_done=pick_already_done,
+                            perception_info=perception_info,
+                        )
+
+                    result = {
+                        "ok": True,
+                        "action": "grasp_ready" if self.args.approach_only else "pick_place",
+                        "object": obj_name,
+                        "destination": destination,
+                        "grasp_selection": grasp_selection,
+                        "message": "Pick-and-place sequence completed.",
+                    }
+
+            except Exception as exc:
+                self.get_logger().error(f"Command failed: {exc}\n{traceback.format_exc()}")
+                result = {"ok": False, "error": str(exc), "object": obj_name, "destination": destination}
+                # Reset pipeline state on error
+                pending_future = None
+                pending_obj = None
+                next_pick_done = False
+                next_grasp_pose = None
+                next_perception_info = None
+
+            if result is not None:
+                self._publish_result(result)
+
+    def execute_command(self, action, obj_name, destination):
         if action in {"home", "idle", "reset"}:
             self.arm.move_joint(HOME_JOINTS)
             return {"ok": True, "action": action, "message": "Robot moved to home joints."}
@@ -687,14 +1100,14 @@ class TwoViewGraspServer(Node):
             self.arm.move_joint(HOME_JOINTS)
 
         detection = self.detect_object(obj_name)
-        if not detection.get("ok"):
-            raise RuntimeError(detection.get("error", "Perception failed."))
-
+        grasp_pose, grasp_selection = self._compute_grasp_pose(detection, obj_name)
+        perception_info = {
+            "detection_result": detection,
+            "grasp_selection": grasp_selection,
+        }
         source_frame = detection.get("frame_id") or self.args.camera_frame
-        grasp_selection = self.select_grasp_target(detection, obj_name)
+
         detected_pose = pose_from_xyz(grasp_selection["target_xyz_m"])
-        base_pose = self.transform_pose(detected_pose, source_frame, "base_link")
-        grasp_pose = self.make_grasp_pose(base_pose)
         approach_pose = copy.deepcopy(grasp_pose)
         approach_pose.position.z += self.args.approach_height
 
@@ -707,7 +1120,14 @@ class TwoViewGraspServer(Node):
             move_gripper.gripper_open(self)
             self.move_to_grasp_approach(grasp_pose, approach_pose)
         else:
-            execute_pick_place_sequence(self, self.arm, grasp_pose, destination, obj_name)
+            execute_pick_place_sequence(
+                self,
+                self.arm,
+                grasp_pose,
+                destination,
+                obj_name,
+                perception_info=perception_info,
+            )
 
         return {
             "ok": True,
@@ -726,20 +1146,66 @@ class TwoViewGraspServer(Node):
             "message": message,
         }
 
-    def detect_object(self, obj_name):
+    def _detect_async(self, obj_name):
+        """Start detection asynchronously and return the future."""
         req = StringString.Request()
         req.data = obj_name
-        future = self.perception_client.call_async(req)
+        return self.perception_client.call_async(req)
+
+    def _collect_detection(self, future, obj_name):
+        """Wait for a detection future and return the result dict."""
         deadline = time.monotonic() + self.args.perception_timeout
         while rclpy.ok() and not future.done():
             if time.monotonic() > deadline:
                 raise TimeoutError(f"Timed out waiting for perception result for '{obj_name}'.")
             time.sleep(0.02)
-
         result = future.result()
         if result is None:
             raise RuntimeError(f"Perception service returned no result for '{obj_name}'.")
         return json.loads(result.data)
+
+    def detect_object(self, obj_name):
+        return self._collect_detection(self._detect_async(obj_name), obj_name)
+
+    def _compute_grasp_pose(self, detection, obj_name):
+        """Detection dict → (grasp_pose, grasp_selection). Raises on failure."""
+        if not detection.get("ok"):
+            raise RuntimeError(detection.get("error", "Perception failed."))
+        source_frame = detection.get("frame_id") or self.args.camera_frame
+        grasp_selection = self.select_grasp_target(detection, obj_name)
+
+        # 기존: 잡기 좋은 grasping point 를 계산하여 grasp_pose 로 설정
+        # detected_pose = pose_from_xyz(grasp_selection["target_xyz_m"])
+
+        # 변경: raw centroid XY + adjusted target Z
+        grasp_xyz, _ = store_grasp_pose_reference(grasp_selection)
+        detected_pose = pose_from_xyz(grasp_xyz)
+
+        base_pose = self.transform_pose(detected_pose, source_frame, "base_link")
+        pca_major_axis_base_xy = self.transform_selection_axis_to_base_xy(
+            grasp_selection,
+            source_frame,
+            base_pose,
+            grasp_xyz,
+        )
+        gripper_axis_base_xy = None
+        if pca_major_axis_base_xy is not None:
+            gripper_axis_base_xy = np.asarray(
+                [-pca_major_axis_base_xy[1], pca_major_axis_base_xy[0]],
+                dtype=np.float64,
+            )
+            grasp_selection["pca_major_axis_base_xy"] = pca_major_axis_base_xy.astype(float).tolist()
+            grasp_selection["pca_major_axis_base_yaw_rad"] = float(
+                math.atan2(pca_major_axis_base_xy[1], pca_major_axis_base_xy[0])
+            )
+            grasp_selection["gripper_axis_base_xy"] = gripper_axis_base_xy.astype(float).tolist()
+            grasp_selection["gripper_axis_base_yaw_rad"] = float(
+                math.atan2(gripper_axis_base_xy[1], gripper_axis_base_xy[0])
+            )
+            grasp_selection["gripper_axis_rule"] = "perpendicular_to_pca_major_axis"
+
+        grasp_pose = self.make_grasp_pose(base_pose, gripper_axis_base_xy)
+        return grasp_pose, grasp_selection
 
     def select_grasp_target(self, detection, obj_name):
         points, points_path = load_grasp_points_from_detection(detection)
@@ -763,6 +1229,7 @@ class TwoViewGraspServer(Node):
             local_radius_m=self.args.grasp_depth_local_radius,
             percentile=self.args.grasp_depth_percentile,
         )
+        store_grasp_pose_reference(selection)
 
         output_dir = detection.get("save_dir")
         if not output_dir and points_path:
@@ -815,18 +1282,70 @@ class TwoViewGraspServer(Node):
             raise RuntimeError(f"TF transform failed: {exc}") from exc
         return transformed.pose
 
-    def make_grasp_pose(self, base_pose):
-        home_pose = self.arm.fk_request(HOME_JOINTS)
+    def transform_selection_axis_to_base_xy(self, grasp_selection, source_frame, base_pose, axis_origin_xyz_m):
+        axis = grasp_selection.get("xy_major_axis")
+        if axis is None:
+            return None
+
+        try:
+            axis_source = np.asarray([float(axis[0]), float(axis[1]), 0.0], dtype=np.float64)
+            origin = np.asarray(axis_origin_xyz_m, dtype=np.float64)
+        except (TypeError, ValueError, IndexError):
+            return None
+        if origin.shape[0] < 3:
+            return None
+
+        axis_source = normalize_vector(axis_source)
+        if axis_source is None:
+            return None
+
+        endpoint = origin[:3].copy()
+        endpoint[:3] += axis_source * GRASP_AXIS_ENDPOINT_OFFSET_M
+        endpoint_base = self.transform_pose(pose_from_xyz(endpoint), source_frame, "base_link")
+        axis_base = np.asarray(
+            [
+                endpoint_base.position.x - base_pose.position.x,
+                endpoint_base.position.y - base_pose.position.y,
+                0.0,
+            ],
+            dtype=np.float64,
+        )
+        axis_base = normalize_vector(axis_base)
+        if axis_base is None:
+            return None
+        return axis_base[:2]
+
+    def make_grasp_pose(self, base_pose, gripper_axis_base_xy=None):
         grasp_pose = copy.deepcopy(base_pose)
-        grasp_pose.orientation = home_pose.orientation
-        grasp_pose.position.y += self.args.grasp_y_offset
-        grasp_pose.position.z += self.args.final_z_offset
+        orientation_quat = VERTICAL_DOWN_GRASP_QUATERNION.copy()
+        applied_gripper_axis = None
+        if gripper_axis_base_xy is not None:
+            pca_aligned_quat, applied_gripper_axis = build_grasp_orientation_perpendicular_to_axis(
+                VERTICAL_DOWN_GRASP_QUATERNION,
+                gripper_axis_base_xy,
+            )
+            if pca_aligned_quat is not None:
+                orientation_quat = pca_aligned_quat
+
+        set_pose_orientation_from_quaternion(grasp_pose, orientation_quat)
+        if applied_gripper_axis is not None:
+            axis_yaw = math.atan2(applied_gripper_axis[1], applied_gripper_axis[0])
+            self.get_logger().info(
+                "Using PCA-aligned grasp orientation: "
+                f"gripper_axis_yaw={math.degrees(axis_yaw):.1f} deg"
+            )
+        # grasp_pose.position.y += self.args.grasp_y_offset
+        # grasp_pose.position.z += self.args.final_z_offset
+
+        # 왜인지는 모르겠는데 필요함 -> 더 정확함
+        grasp_pose.position.y += -0.015  # +: 로봇 기준 왼쪽, -: 오른쪽
+
         return grasp_pose
 
     def move_to_grasp_approach(self, grasp_pose, approach_pose):
         current_pan = float(self.arm.js_joint_position[0])
         target_pan = math.atan2(grasp_pose.position.y, grasp_pose.position.x)
-        pick_joint = [target_pan, -np.pi / 2.0, 1.0, -np.pi / 3.0, -np.pi / 2.0, 0.0]
+        pick_joint = home_joints_for_pan(target_pan)
         rot_time = calc_rot_time(current_pan, target_pan)
         self.get_logger().info(
             "Moving to grasp approach: "
@@ -893,7 +1412,8 @@ def spawn_objects(node, object_names):
 
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description="Two-view pick-and-place command server.")
-    parser.add_argument("--service-name", default="two_view_grasp_command")
+    parser.add_argument("--command-topic", default="/task_commands")
+    parser.add_argument("--result-topic", default="/task_results")
     parser.add_argument("--perception-service", default="detect_object_top_rgbd_seg_crop")
     parser.add_argument("--camera-frame", default="camera_color_optical_frame")
     parser.add_argument("--perception-timeout", type=float, default=15.0)

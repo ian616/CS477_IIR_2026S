@@ -22,9 +22,9 @@ from manip_challenge.custom.perception.icp.rgbd_seg_crop_server import RgbdSegCr
 
 DEFAULTS = {
     "model_path": str(PERCEPTION_DIR / "model" / "yolov11_seg.pt"),
-    "image_topic": "/camera/camera/color/image_raw",
-    "depth_topic": "/camera/camera/depth/color/image_raw",
-    "points_topic": "/camera/camera/depth/color/points",
+    "image_topic": "/camera/color/image_raw",
+    "depth_topic": "/camera/depth/color/image_raw",
+    "points_topic": "/camera/depth/color/points",
     "camera_frame": "camera_color_optical_frame",
     "service_name": "detect_object_top_rgbd_seg_crop",
     "display": "false",
