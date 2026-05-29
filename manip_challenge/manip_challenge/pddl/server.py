@@ -64,7 +64,7 @@ from manip_challenge.pddl.ros_helpers import (
     save_grasp_selection_visualization,
     stop_child_processes,
 )
-from manip_challenge.pddl.pddl_types import ObjectState, PlanAction, PredicateState
+from manip_challenge.pddl.pddl_types import Goal, ObjectState, PlanAction, PredicateState
 from manip_challenge.pddl.utils import PDDL_DIR, load_dotenv
 
 
@@ -360,6 +360,10 @@ class PddlTampServer(Node):
         )
         self.executor_results: dict[str, dict] = {}
         self.executor_condition = threading.Condition()
+        self.prefetch_lock = threading.Lock()
+        self.prefetch_condition = threading.Condition(self.prefetch_lock)
+        self.prefetch_states: dict[tuple, PredicateState] = {}
+        self.prefetch_pending: set[tuple] = set()
 
         self.get_logger().info(f"Waiting for perception service '{args.perception_service}'...")
         while rclpy.ok() and not self.perception_client.wait_for_service(timeout_sec=1.0):
@@ -386,6 +390,7 @@ class PddlTampServer(Node):
     def dispatch_action_to_executor(self, action: PlanAction, state: PredicateState, step_idx: int) -> dict:
         command_id = f"step{step_idx}-{uuid.uuid4().hex[:8]}"
         selected_object = state.objects.get(action.args[0]) if action.args else None
+        next_completed, next_occupied = self.anticipated_progress_after_action(action, state)
         payload = {
             "event": "execute_action",
             "command_id": command_id,
@@ -393,6 +398,12 @@ class PddlTampServer(Node):
             "stamp_sec": time.time(),
             "action": action.to_dict(),
             "selected_object": object_command_payload(selected_object),
+            "prefetch": {
+                "goals": [goal.__dict__ for goal in state.goals],
+                "completed": sorted(next_completed),
+                "occupied_buffers": sorted(next_occupied),
+                "scan_all_targets": not self.args.scan_goals_only,
+            },
         }
         msg = String()
         msg.data = json.dumps(payload, sort_keys=True)
@@ -422,6 +433,106 @@ class PddlTampServer(Node):
             }
         result.setdefault("command_id", command_id)
         return result
+
+    @staticmethod
+    def prefetch_key(goals: list[Goal], completed: set[str], occupied_buffers: set[str], scan_all_targets: bool) -> tuple:
+        goal_key = tuple((goal.object_name, goal.location) for goal in goals)
+        return (goal_key, tuple(sorted(completed)), tuple(sorted(occupied_buffers)), bool(scan_all_targets))
+
+    @staticmethod
+    def goals_from_payload(payload: list[dict]) -> list[Goal]:
+        return [
+            Goal(
+                object_name=str(item["object_name"]),
+                location=str(item["location"]),
+                bound_object_name=item.get("bound_object_name"),
+            )
+            for item in payload
+        ]
+
+    def anticipated_progress_after_action(self, action: PlanAction, state: PredicateState) -> tuple[set[str], set[str]]:
+        completed = set(state.completed)
+        occupied_buffers = set(state.occupied_buffers)
+        if action.name == "move-target-to-goal" and action.args:
+            moved = state.objects.get(action.args[0])
+            completed.add(moved.class_name if moved is not None and moved.class_name else action.args[0])
+        elif action.name == "move-obstacle-to-buffer" and len(action.args) >= 3:
+            occupied_buffers.add(action.args[2])
+        return completed, occupied_buffers
+
+    def start_scene_prefetch(self, prefetch_payload: dict | None, command_id: str) -> None:
+        if not prefetch_payload:
+            return
+        try:
+            goals = self.goals_from_payload(prefetch_payload.get("goals") or [])
+            completed = set(prefetch_payload.get("completed") or [])
+            occupied_buffers = set(prefetch_payload.get("occupied_buffers") or [])
+            scan_all_targets = bool(prefetch_payload.get("scan_all_targets", True))
+        except Exception as exc:
+            self.get_logger().warn(f"[Prefetch] Ignoring malformed prefetch payload: {exc}")
+            return
+        key = self.prefetch_key(goals, completed, occupied_buffers, scan_all_targets)
+        with self.prefetch_condition:
+            if key in self.prefetch_states or key in self.prefetch_pending:
+                return
+            self.prefetch_pending.add(key)
+        self.get_logger().info(
+            f"[Prefetch] Starting observe-ready scene scan for command_id={command_id}; "
+            f"completed={', '.join(sorted(completed)) or '<none>'}"
+        )
+        worker = threading.Thread(
+            target=self._prefetch_scene_worker,
+            args=(key, goals, completed, occupied_buffers, scan_all_targets, command_id),
+            daemon=True,
+        )
+        worker.start()
+
+    def _prefetch_scene_worker(
+        self,
+        key: tuple,
+        goals: list[Goal],
+        completed: set[str],
+        occupied_buffers: set[str],
+        scan_all_targets: bool,
+        command_id: str,
+    ) -> None:
+        try:
+            state = build_predicate_state(
+                goals,
+                self.detect_object,
+                completed=completed,
+                occupied_buffers=occupied_buffers,
+                scan_all_targets=scan_all_targets,
+            )
+        except Exception as exc:
+            self.get_logger().warn(f"[Prefetch] Scene scan failed for command_id={command_id}: {exc}")
+            state = None
+        with self.prefetch_condition:
+            self.prefetch_pending.discard(key)
+            if state is not None:
+                self.prefetch_states[key] = state
+            self.prefetch_condition.notify_all()
+        if state is not None:
+            self.get_logger().info(
+                f"[Prefetch] Scene scan ready for command_id={command_id}: objects={len(state.objects)}"
+            )
+
+    def consume_prefetched_state(
+        self,
+        goals: list[Goal],
+        completed: set[str],
+        occupied_buffers: set[str],
+        scan_all_targets: bool,
+    ) -> PredicateState | None:
+        key = self.prefetch_key(goals, completed, occupied_buffers, scan_all_targets)
+        deadline = time.monotonic() + float(self.args.prefetch_wait_timeout)
+        with self.prefetch_condition:
+            while key in self.prefetch_pending:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0.0:
+                    break
+                self.prefetch_condition.wait(timeout=min(0.1, remaining))
+            return self.prefetch_states.pop(key, None)
 
     def publish_json(self, publisher, payload: dict) -> None:
         msg = String()
@@ -527,13 +638,18 @@ class PddlTampServer(Node):
 
         for step_idx in range(1, self.args.max_steps + 1):
             self.get_logger().info(f"[PDDL] ===== planning step {step_idx}/{self.args.max_steps} =====")
-            state = build_predicate_state(
-                goals,
-                self.detect_object,
-                completed=completed,
-                occupied_buffers=occupied_buffers,
-                scan_all_targets=not self.args.scan_goals_only,
-            )
+            scan_all_targets = not self.args.scan_goals_only
+            state = self.consume_prefetched_state(goals, completed, occupied_buffers, scan_all_targets)
+            if state is not None:
+                self.get_logger().info("[Prefetch] Using cached observe-ready scene scan.")
+            else:
+                state = build_predicate_state(
+                    goals,
+                    self.detect_object,
+                    completed=completed,
+                    occupied_buffers=occupied_buffers,
+                    scan_all_targets=scan_all_targets,
+                )
             scene_summary = {
                 "completed": sorted(completed),
                 "occupied_buffers": sorted(occupied_buffers),
@@ -1289,7 +1405,12 @@ class ManipulatorExecutor(Node):
                     raise ValueError("Action has no arguments.")
                 obj = object_state_from_command(payload.get("selected_object"), action.args[0])
                 state = PredicateState(goals=[], objects={obj.name: obj})
-                context = ActionContext(self.coordinator)
+                prefetch_payload = payload.get("prefetch")
+
+                def on_observe_ready(_prefetch_payload=prefetch_payload, _command_id=command_id):
+                    self.coordinator.start_scene_prefetch(_prefetch_payload, _command_id)
+
+                context = ActionContext(self.coordinator, on_observe_ready=on_observe_ready)
                 self.get_logger().info(
                     f"[Executor] Executing committed action {action.pddl()} command_id={command_id}"
                 )
@@ -1315,6 +1436,13 @@ class ManipulatorExecutor(Node):
         )
 
 
+def parse_joint_list(text: str) -> list[float]:
+    values = [float(part.strip()) for part in str(text).split(",") if part.strip()]
+    if len(values) != 6:
+        raise ValueError(f"--observe-joints must contain exactly 6 comma-separated values, got {len(values)}")
+    return values
+
+
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description="PDDL-based TAMP command server.")
     parser.add_argument("--service-name", default="pddl_tamp_command")
@@ -1325,8 +1453,14 @@ def parse_args(argv=None):
     parser.add_argument("--perception-timeout", type=float, default=15.0)
     parser.add_argument("--tf-timeout", type=float, default=5.0)
     parser.add_argument("--action-timeout", type=float, default=300.0)
+    parser.add_argument("--prefetch-wait-timeout", type=float, default=5.0)
     parser.add_argument("--executor-command-topic", default="/pddl_action_commands")
     parser.add_argument("--executor-result-topic", default="/pddl_action_results")
+    parser.add_argument(
+        "--observe-joints",
+        default="0.0,-1.57079632679,1.0,-1.0471975512,-1.57079632679,0.0",
+        help="Comma-separated six-joint pose used for top-view observation after each place.",
+    )
     parser.add_argument("--max-steps", type=int, default=int(os.environ.get("PDDL_TAMP_MAX_STEPS", "8")))
     parser.add_argument("--one-step", action="store_true", help="Execute only the first selected physical action.")
     parser.add_argument("--scan-goals-only", action="store_true", help="Only scan requested targets instead of all five fixed targets.")
@@ -1348,7 +1482,9 @@ def parse_args(argv=None):
     parser.add_argument("--gripper-settle-time", type=float, default=0.4)
     parser.add_argument("--gripper-result-timeout-margin", type=float, default=8.0)
     parser.add_argument("--strict-gripper-result", action="store_true")
-    return parser.parse_args(rclpy.utilities.remove_ros_args(args=argv or sys.argv)[1:])
+    parsed = parser.parse_args(rclpy.utilities.remove_ros_args(args=argv or sys.argv)[1:])
+    parsed.observe_joints = parse_joint_list(parsed.observe_joints)
+    return parsed
 
 
 def main(argv=None):

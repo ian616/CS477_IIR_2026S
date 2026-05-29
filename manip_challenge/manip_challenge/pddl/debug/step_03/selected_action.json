@@ -1,15 +1,15 @@
 {
   "action": {
     "args": [
-      "meat_can_0",
+      "hammer_0",
       "table",
-      "left_storage"
+      "right_storage"
     ],
     "name": "move-target-to-goal",
-    "pddl": "(move-target-to-goal meat_can_0 table left_storage)",
-    "source": "fallback"
+    "pddl": "(move-target-to-goal hammer_0 table right_storage)",
+    "source": "external"
   },
   "event": "selected_action",
-  "stamp_sec": 1780054364.1367488,
+  "stamp_sec": 1780056868.7934058,
   "step": 3
 }

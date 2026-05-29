@@ -13,31 +13,22 @@
     },
     {
       "args": [
-        "strawberry_0",
-        "hammer_0"
-      ],
-      "name": "clear-blocking-relation",
-      "pddl": "(clear-blocking-relation strawberry_0 hammer_0)",
-      "source": "external"
-    },
-    {
-      "args": [
-        "meat_can_1",
-        "table",
-        "left_storage"
-      ],
-      "name": "move-target-to-goal",
-      "pddl": "(move-target-to-goal meat_can_1 table left_storage)",
-      "source": "external"
-    },
-    {
-      "args": [
         "hammer_0",
         "table",
         "right_storage"
       ],
       "name": "move-target-to-goal",
       "pddl": "(move-target-to-goal hammer_0 table right_storage)",
+      "source": "external"
+    },
+    {
+      "args": [
+        "coke_can_0",
+        "table",
+        "bookshelf"
+      ],
+      "name": "move-target-to-goal",
+      "pddl": "(move-target-to-goal coke_can_0 table bookshelf)",
       "source": "external"
     },
     {
@@ -52,7 +43,7 @@
     }
   ],
   "problem": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/problem.pddl",
-  "raw_output": "(move-target-to-goal strawberry_0 table right_storage)\n(clear-blocking-relation strawberry_0 hammer_0)\n(move-target-to-goal meat_can_1 table left_storage)\n(move-target-to-goal hammer_0 table right_storage)\n(move-target-to-goal banana_0 table left_storage)\n; cost = 5 (unit cost)\n\n",
-  "stamp_sec": 1780054295.0362978,
+  "raw_output": "(move-target-to-goal strawberry_0 table right_storage)\n(move-target-to-goal hammer_0 table right_storage)\n(move-target-to-goal coke_can_0 table bookshelf)\n(move-target-to-goal banana_0 table left_storage)\n; cost = 4 (unit cost)\n\n",
+  "stamp_sec": 1780056836.8519807,
   "step": 2
 }

@@ -22,7 +22,7 @@
       "source": "external"
     },
     "class_name": "strawberry",
-    "command_id": "step2-162f92ba",
+    "command_id": "step2-6bbacd43",
     "destination": "right storage",
     "detected_pose_in_source": {
       "orientation": {
@@ -32,83 +32,83 @@
         "z": 0.0
       },
       "position": {
-        "x": 0.29663652181625366,
-        "y": 0.11716457828879356,
-        "z": 1.4471940870285034
+        "x": -0.3187222480773926,
+        "y": -0.07005240023136139,
+        "z": 1.4493521685600281
       }
     },
     "dry_run": false,
     "grasp_pose_in_base": {
       "orientation": {
         "w": 0.0,
-        "x": -0.1599305503645697,
-        "y": 0.9871282687979743,
+        "x": 0.09573293335011436,
+        "y": 0.9954070551649624,
         "z": 0.0
       },
       "position": {
-        "x": 0.5380482661739401,
-        "y": -0.2791365218162535,
-        "z": -0.05725258051477722
+        "x": 0.7252521151351788,
+        "y": 0.33622224807739276,
+        "z": -0.06034665488532842
       }
     },
     "grasp_selection": {
       "delta_from_raw_centroid_m": [
         0.0,
         0.0,
-        0.005895423412322964
+        0.008238398551940973
       ],
       "grasp_pose_source": "raw_centroid_xy_with_adjusted_target_z",
       "grasp_pose_xyz_m": [
-        0.29663652181625366,
-        0.11716457828879356,
-        1.4471940870285034
+        -0.3187222480773926,
+        -0.07005240023136139,
+        1.4493521685600281
       ],
       "gripper_axis_base_xy": [
-        0.9488444381201717,
-        0.31574393461856987
+        0.9816704109443651,
+        -0.1905864745366819
       ],
-      "gripper_axis_base_yaw_rad": 0.3212405946436859,
+      "gripper_axis_base_yaw_rad": -0.19175953701692372,
       "gripper_axis_rule": "perpendicular_to_pca_major_axis",
       "method": "median_fallback",
       "pca_major_axis_base_xy": [
-        0.31574393461856987,
-        -0.9488444381201717
+        -0.1905864745366819,
+        -0.9816704109443651
       ],
-      "pca_major_axis_base_yaw_rad": -1.2495557321512107,
-      "points_path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260529_203134_156323_strawberry/strawberry_0/foreground_points.npy",
+      "pca_major_axis_base_yaw_rad": -1.7625558638118204,
+      "points_path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260529_211356_013042_strawberry/strawberry_0/foreground_points.npy",
       "raw_centroid_xyz_m": [
-        0.29663652181625366,
-        0.11716457828879356,
-        1.4412986636161804
+        -0.3187222480773926,
+        -0.07005240023136139,
+        1.4411137700080872
       ],
       "reason": "no_dense_axis_bin",
       "rgbd_depth_adjustment": {
-        "adjusted_target_depth_m": 1.4471940870285034,
+        "adjusted_target_depth_m": 1.4493521685600281,
         "clearance_above_surface_m": -0.012,
-        "delta_depth_m": 0.005895423412322964,
-        "local_points": 158,
+        "delta_depth_m": 0.008238398551940973,
+        "local_points": 142,
         "local_radius_m": 0.035,
-        "measured_surface_depth_m": 1.4351940870285034,
+        "measured_surface_depth_m": 1.4373521685600281,
         "method": "local_radius",
-        "previous_target_depth_m": 1.4412986636161804,
+        "previous_target_depth_m": 1.4411137700080872,
         "surface_depth_percentile": 10.0
       },
       "target_xyz_m": [
-        0.29663652181625366,
-        0.11716457828879356,
-        1.4471940870285034
+        -0.3187222480773926,
+        -0.07005240023136139,
+        1.4493521685600281
       ],
       "xy_major_axis": [
-        0.9488432558282666,
-        -0.3157474875105335
+        0.9816699652778172,
+        0.19058877005597388
       ],
       "xy_minor_axis": [
-        0.3157474875105335,
-        0.9488432558282666
+        -0.19058877005597388,
+        0.9816699652778172
       ]
     },
     "ok": true
   },
-  "stamp_sec": 1780054360.523176,
+  "stamp_sec": 1780056865.472862,
   "step": 2
 }

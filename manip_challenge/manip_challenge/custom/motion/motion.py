@@ -14,6 +14,9 @@ from manip_challenge import move_gripper
 from ..grasping.grasping_item import grasping_item
 
 
+DEFAULT_OBSERVE_JOINTS = [0., -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., 0.]
+
+
 PLACE_CONFIGS = {
     "left storage": {
         "range_x": [-0.124, 0.117],
@@ -47,6 +50,23 @@ def _calc_rot_time(start_angle, target_angle, sec_per_rad=1.2, min_time=0.8):
     return max(min_time, delta * sec_per_rad)
 
 
+def _observe_joints(node):
+    args = getattr(node, "args", None)
+    joints = getattr(args, "observe_joints", None)
+    return list(joints) if joints is not None else list(DEFAULT_OBSERVE_JOINTS)
+
+
+def _move_to_observe_and_notify(node, arm, retreat_pose, place_pan_angle, on_observe_ready, retreat_duration):
+    observe_joint = _observe_joints(node)
+    rot_time_observe = _calc_rot_time(place_pan_angle, observe_joint[0])
+    arm.execute_trajectory([retreat_pose, observe_joint], durations=[retreat_duration, rot_time_observe])
+    if on_observe_ready is not None:
+        try:
+            on_observe_ready()
+        except Exception as exc:
+            node.get_logger().warn(f"observe-ready callback failed: {exc}")
+
+
 def transform_pose(node, tf_buffer, pose, source_frame, target_frame):
     """Transform a Pose from source_frame to target_frame. Returns None on failure."""
     try:
@@ -75,7 +95,8 @@ def wait_for_tf(node, tf_buffer, source_frame, target_frame):
 
 def pick_place_storage(node, arm, grasp_pose, destination, obj_name,
                        on_before_idle=None, get_next_pick_data=None,
-                       pick_already_done=False, perception_info=None):
+                       pick_already_done=False, perception_info=None,
+                       on_observe_ready=None):
     pick_pan_angle = math.atan2(grasp_pose.position.y, grasp_pose.position.x)
 
     if not pick_already_done:
@@ -175,9 +196,7 @@ def pick_place_storage(node, arm, grasp_pose, destination, obj_name,
         )
 
     else:
-        idle_joint = [0., -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., 0.]
-        rot_time_idle = _calc_rot_time(place_pan_angle, 0.0)
-        arm.execute_trajectory([retreat_pose, idle_joint], durations=[1.0, rot_time_idle])
+        _move_to_observe_and_notify(node, arm, retreat_pose, place_pan_angle, on_observe_ready, retreat_duration=1.0)
 
     setattr(node, count_attr, count + 1)
     node.get_logger().info("PICK-and-PLACE sequence completed successfully!")
@@ -185,7 +204,8 @@ def pick_place_storage(node, arm, grasp_pose, destination, obj_name,
 
 def pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name,
                          on_before_idle=None, get_next_pick_data=None,
-                         pick_already_done=False, perception_info=None):
+                         pick_already_done=False, perception_info=None,
+                         on_observe_ready=None):
     pick_pan_angle = math.atan2(grasp_pose.position.y, grasp_pose.position.x)
 
     if not pick_already_done:
@@ -283,8 +303,7 @@ def pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name,
         )
         
     else:
-        idle_joint = [0., -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., 0.]
-        arm.execute_trajectory([retreat_pose, idle_joint], durations=[1.3, 1.5])
+        _move_to_observe_and_notify(node, arm, retreat_pose, place_pan_angle, on_observe_ready, retreat_duration=1.3)
 
     node.bookshelf_count += 1
     node.get_logger().info("PICK-and-PLACE sequence completed successfully!")
@@ -292,12 +311,15 @@ def pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name,
 
 def execute_pick_place_sequence(node, arm, grasp_pose, destination, obj_name,
                                 on_before_idle=None, get_next_pick_data=None,
-                                pick_already_done=False, perception_info=None):
+                                pick_already_done=False, perception_info=None,
+                                on_observe_ready=None):
     if destination == "bookshelf":
         pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name,
                              on_before_idle, get_next_pick_data, pick_already_done,
-                             perception_info=perception_info)
+                             perception_info=perception_info,
+                             on_observe_ready=on_observe_ready)
     else:
         pick_place_storage(node, arm, grasp_pose, destination, obj_name,
                            on_before_idle, get_next_pick_data, pick_already_done,
-                           perception_info=perception_info)
+                           perception_info=perception_info,
+                           on_observe_ready=on_observe_ready)

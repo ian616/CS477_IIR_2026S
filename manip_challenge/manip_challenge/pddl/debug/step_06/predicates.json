@@ -10,34 +10,34 @@
   "event": "planning_step_start",
   "goals": [
     {
-      "bound_object_name": null,
+      "bound_object_name": "banana_0",
       "location": "left_storage",
       "object_name": "banana",
-      "target_name": "banana"
+      "target_name": "banana_0"
     },
     {
-      "bound_object_name": null,
+      "bound_object_name": "meat_can_0",
       "location": "left_storage",
       "object_name": "meat_can",
-      "target_name": "meat_can"
+      "target_name": "meat_can_0"
     },
     {
-      "bound_object_name": null,
+      "bound_object_name": "strawberry_0",
       "location": "right_storage",
       "object_name": "strawberry",
-      "target_name": "strawberry"
+      "target_name": "strawberry_0"
     },
     {
-      "bound_object_name": null,
+      "bound_object_name": "hammer_0",
       "location": "right_storage",
       "object_name": "hammer",
-      "target_name": "hammer"
+      "target_name": "hammer_0"
     },
     {
-      "bound_object_name": null,
+      "bound_object_name": "coke_can_1",
       "location": "bookshelf",
       "object_name": "coke_can",
-      "target_name": "coke_can"
+      "target_name": "coke_can_1"
     }
   ],
   "images": [],
@@ -54,6 +54,6 @@
     "storage left_storage",
     "storage right_storage"
   ],
-  "stamp_sec": 1780054484.5125537,
+  "stamp_sec": 1780056936.89317,
   "step": 6
 }

@@ -22,7 +22,7 @@
       "source": "external"
     },
     "class_name": "banana",
-    "command_id": "step5-2affb8d8",
+    "command_id": "step5-946ab26a",
     "destination": "left storage",
     "detected_pose_in_source": {
       "orientation": {
@@ -32,83 +32,90 @@
         "z": 0.0
       },
       "position": {
-        "x": -0.11463821679353714,
-        "y": 0.1487729698419571,
-        "z": 0.7602950091362
+        "x": -0.17680397629737854,
+        "y": 0.28019362688064575,
+        "z": 1.4581835026741028
       }
     },
     "dry_run": false,
     "grasp_pose_in_base": {
       "orientation": {
         "w": 0.0,
-        "x": -0.0928904115528069,
-        "y": 0.9956763386972446,
+        "x": 0.021140350396382294,
+        "y": 0.9997765178204169,
         "z": 0.0
       },
       "position": {
-        "x": 0.5098745262799766,
-        "y": 0.1321382167935372,
-        "z": 0.6297959432492013
+        "x": 0.374966311916532,
+        "y": 0.19430397629737872,
+        "z": -0.06742677024079313
       }
     },
     "grasp_selection": {
       "delta_from_raw_centroid_m": [
-        0.0,
-        0.0,
-        0.00843099308013917
+        0.0031405240297317505,
+        -0.00639989972114563,
+        0.005055641651153575
       ],
       "grasp_pose_source": "raw_centroid_xy_with_adjusted_target_z",
       "grasp_pose_xyz_m": [
-        -0.11463821679353714,
-        0.1487729698419571,
-        0.7602950091362
+        -0.17680397629737854,
+        0.28019362688064575,
+        1.4581835026741028
       ],
       "gripper_axis_base_xy": [
-        0.9827427428831003,
-        0.184977569749958
+        0.9991061711702364,
+        -0.04227125180959712
       ],
-      "gripper_axis_base_yaw_rad": 0.1860490381499382,
+      "gripper_axis_base_yaw_rad": -0.04228385073540463,
       "gripper_axis_rule": "perpendicular_to_pca_major_axis",
-      "method": "median_fallback",
+      "method": "local_thick_axis_band",
       "pca_major_axis_base_xy": [
-        0.184977569749958,
-        -0.9827427428831003
+        -0.04227125180959712,
+        -0.9991061711702364
       ],
-      "pca_major_axis_base_yaw_rad": -1.3847472886449583,
-      "points_path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260529_203358_190959_banana/banana_0/foreground_points.npy",
+      "pca_major_axis_base_yaw_rad": -1.6130801775303012,
+      "points_path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260529_211516_204204_banana/banana_0/foreground_points.npy",
       "raw_centroid_xyz_m": [
-        -0.11463821679353714,
-        0.1487729698419571,
-        0.7518640160560608
+        -0.17680397629737854,
+        0.28019362688064575,
+        1.4531278610229492
       ],
-      "reason": "no_dense_axis_bin",
       "rgbd_depth_adjustment": {
-        "adjusted_target_depth_m": 0.7602950091362,
+        "adjusted_target_depth_m": 1.4581835026741028,
         "clearance_above_surface_m": -0.012,
-        "delta_depth_m": 0.00843099308013917,
-        "local_points": 279,
+        "delta_depth_m": 0.00577053976058961,
+        "local_points": 250,
         "local_radius_m": 0.035,
-        "measured_surface_depth_m": 0.7482950091362,
+        "measured_surface_depth_m": 1.4461835026741028,
         "method": "local_radius",
-        "previous_target_depth_m": 0.7518640160560608,
+        "previous_target_depth_m": 1.4524129629135132,
         "surface_depth_percentile": 10.0
       },
+      "selected_band": {
+        "along_max_m": 0.0072829974680667375,
+        "along_min_m": 1.4088175145615667e-05,
+        "point_count": 37,
+        "score": 0.09691391953341309,
+        "width_m": 0.06982829322297912,
+        "z_spread_m": 0.03478519916534428
+      },
       "target_xyz_m": [
-        -0.11463821679353714,
-        0.1487729698419571,
-        0.7602950091362
+        -0.1736634522676468,
+        0.2737937271595001,
+        1.4581835026741028
       ],
       "xy_major_axis": [
-        0.9827423226036227,
-        -0.1849798025829776
+        0.9991061488570124,
+        0.04227177919261622
       ],
       "xy_minor_axis": [
-        0.1849798025829776,
-        0.9827423226036227
+        -0.04227177919261622,
+        0.9991061488570124
       ]
     },
     "ok": true
   },
-  "stamp_sec": 1780054484.5066247,
+  "stamp_sec": 1780056936.875065,
   "step": 5
 }
