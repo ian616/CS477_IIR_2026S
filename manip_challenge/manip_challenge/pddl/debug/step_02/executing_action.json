@@ -1,15 +1,15 @@
 {
   "action": {
     "args": [
-      "meat_can_0",
+      "coke_can_0",
       "table",
-      "left_storage"
+      "bookshelf"
     ],
     "name": "move-target-to-goal",
-    "pddl": "(move-target-to-goal meat_can_0 table left_storage)",
-    "source": "external"
+    "pddl": "(move-target-to-goal coke_can_0 table bookshelf)",
+    "source": "fallback"
   },
   "event": "executing_action",
-  "stamp_sec": 1780154960.003096,
+  "stamp_sec": 1780156257.7375476,
   "step": 2
 }
