@@ -52,7 +52,7 @@ from assignment_2.move_joint import ArmClient
 from manip_challenge.pddl.actions import ActionContext, execute_action
 from manip_challenge.pddl.nlp import parse_goals
 from manip_challenge.pddl.planner import plan
-from manip_challenge.pddl.predicate_builder import build_predicate_state
+from manip_challenge.pddl.predicate_builder import _build_predicates, build_predicate_state
 from manip_challenge.pddl.problem_generator import ensure_domain, write_problem
 from manip_challenge.pddl.ros_helpers import (
     HOME_JOINTS,
@@ -403,6 +403,8 @@ class PddlTampServer(Node):
         command_id = f"step{step_idx}-{uuid.uuid4().hex[:8]}"
         selected_object = state.objects.get(action.args[0]) if action.args else None
         next_completed, next_occupied = self.anticipated_progress_after_action(action, state)
+        if self.should_reuse_previous_topview(action):
+            self.seed_previous_topview_prefetch(action, state, next_completed, next_occupied, command_id)
         payload = {
             "event": "execute_action",
             "command_id": command_id,
@@ -447,6 +449,48 @@ class PddlTampServer(Node):
         return result
 
     @staticmethod
+    def should_reuse_previous_topview(action: PlanAction) -> bool:
+        return (
+            action.name == "move-target-to-goal"
+            and len(action.args) >= 3
+            and action.args[2] == "bookshelf"
+        )
+
+    def seed_previous_topview_prefetch(
+        self,
+        action: PlanAction,
+        state: PredicateState,
+        completed: set[str],
+        occupied_buffers: set[str],
+        command_id: str,
+    ) -> None:
+        scan_all_targets = not self.args.scan_goals_only
+        cached = copy.deepcopy(state)
+        cached.completed = set(completed)
+        cached.occupied_buffers = set(occupied_buffers)
+        completed_classes = set(completed)
+        cached.objects = {
+            name: obj
+            for name, obj in cached.objects.items()
+            if not (obj.is_target and obj.class_name in completed_classes)
+        }
+        cached.predicates = _build_predicates(cached)
+        cached.notes = [
+            *cached.notes,
+            f"reused previous top-view state after {action.pddl()} for bookshelf placement",
+        ]
+        key = self.prefetch_key(cached.goals, cached.completed, cached.occupied_buffers, scan_all_targets)
+        with self.prefetch_condition:
+            if key in self.prefetch_states or key in self.prefetch_pending:
+                return
+            self.prefetch_states[key] = cached
+            self.prefetch_condition.notify_all()
+        self.get_logger().info(
+            f"[Prefetch] Reusing previous top-view state for bookshelf action command_id={command_id}; "
+            f"completed={', '.join(sorted(completed)) or '<none>'}; objects={len(cached.objects)}"
+        )
+
+    @staticmethod
     def prefetch_key(goals: list[Goal], completed: set[str], occupied_buffers: set[str], scan_all_targets: bool) -> tuple:
         goal_key = tuple((goal.object_name, goal.location) for goal in goals)
         return (goal_key, tuple(sorted(completed)), tuple(sorted(occupied_buffers)), bool(scan_all_targets))
@@ -472,7 +516,7 @@ class PddlTampServer(Node):
             occupied_buffers.add(action.args[2])
         return completed, occupied_buffers
 
-    def start_scene_prefetch(self, prefetch_payload: dict | None, command_id: str) -> None:
+    def start_scene_prefetch(self, prefetch_payload: dict | None, command_id: str, trigger: str = "observe-ready") -> None:
         if not prefetch_payload:
             return
         try:
@@ -489,7 +533,7 @@ class PddlTampServer(Node):
                 return
             self.prefetch_pending.add(key)
         self.get_logger().info(
-            f"[Prefetch] Starting observe-ready scene scan for command_id={command_id}; "
+            f"[Prefetch] Starting {trigger} scene scan for command_id={command_id}; "
             f"completed={', '.join(sorted(completed)) or '<none>'}"
         )
         worker = threading.Thread(
@@ -653,7 +697,7 @@ class PddlTampServer(Node):
             scan_all_targets = not self.args.scan_goals_only
             state = self.consume_prefetched_state(goals, completed, occupied_buffers, scan_all_targets)
             if state is not None:
-                self.get_logger().info("[Prefetch] Using cached observe-ready scene scan.")
+                self.get_logger().info("[Prefetch] Using cached scene state.")
             else:
                 state = build_predicate_state(
                     goals,
@@ -1580,11 +1624,32 @@ class ManipulatorExecutor(Node):
                 obj = object_state_from_command(payload.get("selected_object"), action.args[0])
                 state = PredicateState(goals=[], objects={obj.name: obj})
                 prefetch_payload = payload.get("prefetch")
+                use_storage_place_prefetch = (
+                    action.name == "move-target-to-goal"
+                    and len(action.args) >= 3
+                    and action.args[2] in {"left_storage", "right_storage"}
+                )
+
+                def on_storage_place(_prefetch_payload=prefetch_payload, _command_id=command_id):
+                    self.coordinator.start_scene_prefetch(
+                        _prefetch_payload,
+                        _command_id,
+                        trigger="storage-place",
+                    )
 
                 def on_observe_ready(_prefetch_payload=prefetch_payload, _command_id=command_id):
-                    self.coordinator.start_scene_prefetch(_prefetch_payload, _command_id)
+                    self.coordinator.start_scene_prefetch(
+                        _prefetch_payload,
+                        _command_id,
+                        trigger="observe-ready",
+                    )
 
-                context = ActionContext(self.coordinator, on_observe_ready=on_observe_ready)
+                context = ActionContext(
+                    self.coordinator,
+                    on_before_idle=on_storage_place if use_storage_place_prefetch else None,
+                    on_observe_ready=None if use_storage_place_prefetch else on_observe_ready,
+                    skip_observe_after_place=use_storage_place_prefetch,
+                )
                 self.get_logger().info(
                     f"[Executor] Executing committed action {action.pddl()} command_id={command_id}"
                 )

@@ -1,29 +1,29 @@
 {
   "action": {
     "args": [
-      "strawberry_0",
+      "meat_can_0",
       "table",
-      "right_storage"
+      "left_storage"
     ],
     "name": "move-target-to-goal",
-    "pddl": "(move-target-to-goal strawberry_0 table right_storage)",
+    "pddl": "(move-target-to-goal meat_can_0 table left_storage)",
     "source": "external"
   },
   "event": "action_result",
   "result": {
     "action": {
       "args": [
-        "strawberry_0",
+        "meat_can_0",
         "table",
-        "right_storage"
+        "left_storage"
       ],
       "name": "move-target-to-goal",
-      "pddl": "(move-target-to-goal strawberry_0 table right_storage)",
+      "pddl": "(move-target-to-goal meat_can_0 table left_storage)",
       "source": "external"
     },
-    "class_name": "strawberry",
-    "command_id": "step2-6bbacd43",
-    "destination": "right storage",
+    "class_name": "meat_can",
+    "command_id": "step2-18a728b5",
+    "destination": "left storage",
     "detected_pose_in_source": {
       "orientation": {
         "w": 1.0,
@@ -32,83 +32,79 @@
         "z": 0.0
       },
       "position": {
-        "x": -0.3187222480773926,
-        "y": -0.07005240023136139,
-        "z": 1.4493521685600281
+        "x": 0.36895230412483215,
+        "y": 0.0820636935532093,
+        "z": 1.428389072418213
       }
     },
     "dry_run": false,
     "grasp_pose_in_base": {
       "orientation": {
-        "w": 0.0,
-        "x": 0.09573293335011436,
-        "y": 0.9954070551649624,
-        "z": 0.0
+        "w": 0.033317839542271306,
+        "x": 0.9992957931288704,
+        "y": 0.017248439917198606,
+        "z": 0.000575085732840285
       },
       "position": {
-        "x": 0.7252521151351788,
-        "y": 0.33622224807739276,
-        "z": -0.06034665488532842
+        "x": 0.5732703154188745,
+        "y": -0.33725113110624855,
+        "z": -0.05059664333798876
       }
     },
     "grasp_selection": {
       "delta_from_raw_centroid_m": [
-        0.0,
-        0.0,
-        0.008238398551940973
+        0.0037463009357452393,
+        0.009095214307308197,
+        -0.0003215670585632324
       ],
-      "grasp_pose_source": "raw_centroid_xy_with_adjusted_target_z",
+      "grasp_pose_source": "raw_centroid_xyz",
       "grasp_pose_xyz_m": [
-        -0.3187222480773926,
-        -0.07005240023136139,
-        1.4493521685600281
+        0.36895230412483215,
+        0.0820636935532093,
+        1.428389072418213
       ],
-      "gripper_axis_base_xy": [
-        0.9816704109443651,
-        -0.1905864745366819
-      ],
-      "gripper_axis_base_yaw_rad": -0.19175953701692372,
-      "gripper_axis_rule": "perpendicular_to_pca_major_axis",
-      "method": "median_fallback",
-      "pca_major_axis_base_xy": [
-        -0.1905864745366819,
-        -0.9816704109443651
-      ],
-      "pca_major_axis_base_yaw_rad": -1.7625558638118204,
-      "points_path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260529_211356_013042_strawberry/strawberry_0/foreground_points.npy",
+      "gripper_axis_rule": "3d_perpendicular_to_pca_major_axis",
+      "method": "local_thick_axis_band",
+      "points_path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260531_002916_100669_meat_can/meat_can_0/foreground_points.npy",
       "raw_centroid_xyz_m": [
-        -0.3187222480773926,
-        -0.07005240023136139,
-        1.4411137700080872
+        0.36895230412483215,
+        0.0820636935532093,
+        1.428389072418213
       ],
-      "reason": "no_dense_axis_bin",
-      "rgbd_depth_adjustment": {
-        "adjusted_target_depth_m": 1.4493521685600281,
-        "clearance_above_surface_m": -0.012,
-        "delta_depth_m": 0.008238398551940973,
-        "local_points": 142,
-        "local_radius_m": 0.035,
-        "measured_surface_depth_m": 1.4373521685600281,
-        "method": "local_radius",
-        "previous_target_depth_m": 1.4411137700080872,
-        "surface_depth_percentile": 10.0
+      "selected_band": {
+        "along_max_m": 0.0063186500848123744,
+        "along_min_m": 0.002062603956398519,
+        "point_count": 42,
+        "score": 0.07238271270804526,
+        "width_m": 0.06495869662263462,
+        "z_spread_m": 0.0056475877761841264
       },
       "target_xyz_m": [
-        -0.3187222480773926,
-        -0.07005240023136139,
-        1.4493521685600281
+        0.3726986050605774,
+        0.0911589078605175,
+        1.4280675053596497
       ],
       "xy_major_axis": [
-        0.9816699652778172,
-        0.19058877005597388
+        0.9996320543623403,
+        -0.027124820576870042
       ],
       "xy_minor_axis": [
-        -0.19058877005597388,
-        0.9816699652778172
+        -0.027124820576870042,
+        -0.9996320543623403
+      ],
+      "xyz_major_axis": [
+        0.9971848257773164,
+        -0.034100815487612846,
+        -0.06677991930620114
+      ],
+      "xyz_major_axis_base": [
+        0.03443426566624564,
+        -0.9971848257773165,
+        0.06660859244488916
       ]
     },
     "ok": true
   },
-  "stamp_sec": 1780056865.472862,
+  "stamp_sec": 1780154981.9566007,
   "step": 2
 }

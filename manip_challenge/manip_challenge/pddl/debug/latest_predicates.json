@@ -34,10 +34,10 @@
       "target_name": "hammer_0"
     },
     {
-      "bound_object_name": "coke_can_1",
+      "bound_object_name": "coke_can_0",
       "location": "bookshelf",
       "object_name": "coke_can",
-      "target_name": "coke_can_1"
+      "target_name": "coke_can_0"
     }
   ],
   "images": [],
@@ -54,6 +54,6 @@
     "storage left_storage",
     "storage right_storage"
   ],
-  "stamp_sec": 1780056936.89317,
+  "stamp_sec": 1780155082.9407244,
   "step": 6
 }
