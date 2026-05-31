@@ -47,7 +47,7 @@
         "standing": {
             "x": 0.0,
             "y": 0.0,
-            "z": 0.0,
+            "z": 0.02,
             "roll": 0.0,
             "pitch": 0.0,
             "yaw": 0.0,
@@ -73,7 +73,7 @@
             "roll": 0.0,
             "pitch": 0.0,
             "yaw": 0.0,
-            "grasp_value": 26,
+            "grasp_value": 29,
             "bbox_area": 10
         },
         "lying": {
@@ -91,7 +91,7 @@
         "standing": {
             "x": 0.0,
             "y": 0.0,
-            "z": 0.0,
+            "z": 0.02,
             "roll": 0.0,
             "pitch": 0.0,
             "yaw": 0.0,
