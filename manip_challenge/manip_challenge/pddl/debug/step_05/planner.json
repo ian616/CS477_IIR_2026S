@@ -3,17 +3,17 @@
   "plan": [
     {
       "args": [
-        "banana_0",
+        "meat_can_0",
         "table",
-        "left_storage"
+        "storage"
       ],
       "name": "move-target-to-goal",
-      "pddl": "(move-target-to-goal banana_0 table left_storage)",
-      "source": "external"
+      "pddl": "(move-target-to-goal meat_can_0 table storage)",
+      "source": "fallback"
     }
   ],
-  "problem": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/problem.pddl",
-  "raw_output": "(move-target-to-goal banana_0 table left_storage)\n; cost = 1 (unit cost)\n\n",
-  "stamp_sec": 1780156319.0872269,
+  "problem": "/home/ubuntu/cs477_ws/src/cs477_IIR/manip_challenge/manip_challenge/pddl/problem.pddl",
+  "raw_output": "PDDL_PLANNER_CMD is not set; using fallback planner.\nFallback planner selected:\n(move-target-to-goal meat_can_0 table storage)",
+  "stamp_sec": 1780194611.5542152,
   "step": 5
 }

@@ -1,15 +1,15 @@
 {
   "action": {
     "args": [
-      "banana_0",
+      "meat_can_0",
       "table",
-      "left_storage"
+      "storage"
     ],
     "name": "move-target-to-goal",
-    "pddl": "(move-target-to-goal banana_0 table left_storage)",
-    "source": "external"
+    "pddl": "(move-target-to-goal meat_can_0 table storage)",
+    "source": "fallback"
   },
   "event": "selected_action",
-  "stamp_sec": 1780156319.0892298,
+  "stamp_sec": 1780194611.554843,
   "step": 5
 }

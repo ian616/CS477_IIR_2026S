@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
-TARGET_OBJECTS = ("banana", "meat_can", "coke_can", "hammer", "strawberry")
+KNOWN_OBJECTS = ("banana", "meat_can", "coke_can", "hammer", "strawberry")
 BUFFER_LOCATIONS = ("buffer1", "buffer2")
 LOCATIONS = ("table", "left_storage", "right_storage", "bookshelf", *BUFFER_LOCATIONS)
 DESTINATION_TO_LOCATION = {
@@ -57,6 +57,7 @@ class ObjectState:
     foreground_points: int = 0
     bbox_xyxy: tuple[int, int, int, int] | None = None
     centroid_xyz: tuple[float, float, float] | None = None
+    grasp_xyz: tuple[float, float, float] | None = None
     depth_median: float | None = None
     blocks: set[str] = field(default_factory=set)
     blocked_by: set[str] = field(default_factory=set)

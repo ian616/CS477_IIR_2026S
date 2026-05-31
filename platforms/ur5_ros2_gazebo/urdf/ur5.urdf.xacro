@@ -139,7 +139,7 @@
     <!-- top-down view camera -->
     <xacro:include filename="$(find ur5_ros2_gazebo)/urdf/sensors/d435.urdf.xacro" />
     <!-- top-down view Camera Link -->
-    <xacro:sensor_d435 name="camera" topics_ns="camera" parent="world" >
+    <xacro:sensor_d435 name="camera" topics_ns="camera/camera" parent="world" >
       <origin xyz="0.65 0.0 1.4" rpy="0 1.575796 0"/>
     </xacro:sensor_d435>
     

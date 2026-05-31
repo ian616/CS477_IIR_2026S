@@ -16,6 +16,13 @@ from ..grasping.grasping_item import grasping_item
 
 DEFAULT_OBSERVE_JOINTS = [0., -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., 0.]
 
+_BOOKSHELF_WRIST_FLIP_OBJECTS = frozenset({'banana', 'hammer'})
+
+
+def _needs_wrist_flip(obj_name):
+    base = str(obj_name).strip().lower().split('_')[0]
+    return base in _BOOKSHELF_WRIST_FLIP_OBJECTS
+
 
 PLACE_CONFIGS = {
     "left storage": {
@@ -40,14 +47,16 @@ PLACE_CONFIGS = {
 
 
 # Helper function to dynamically calculate rotation time based on the angle difference
-def _calc_rot_time(start_angle, target_angle, sec_per_rad=1.2, min_time=0.8):
+def _calc_rot_time(start_angle, target_angle, sec_per_rad=1.2, min_time=0.8, max_time=None):
     """
     Calculates the required rotation time based on the difference between start_angle and target_angle.
     - sec_per_rad: Time allocated per radian (approx. 57 degrees). Lower = faster rotation.
     - min_time: Minimum guaranteed time to prevent sudden jerks or motor overloads.
+    - max_time: Optional upper clamp.
     """
     delta = abs(target_angle - start_angle)
-    return max(min_time, delta * sec_per_rad)
+    t = max(min_time, delta * sec_per_rad)
+    return min(t, max_time) if max_time is not None else t
 
 
 def _observe_joints(node):
@@ -56,9 +65,9 @@ def _observe_joints(node):
     return list(joints) if joints is not None else list(DEFAULT_OBSERVE_JOINTS)
 
 
-def _move_to_observe_and_notify(node, arm, retreat_pose, place_pan_angle, on_observe_ready, retreat_duration):
+def _move_to_observe_and_notify(node, arm, retreat_pose, place_pan_angle, on_observe_ready, retreat_duration, observe_rot_duration=None):
     observe_joint = _observe_joints(node)
-    rot_time_observe = _calc_rot_time(place_pan_angle, observe_joint[0])
+    rot_time_observe = observe_rot_duration if observe_rot_duration is not None else _calc_rot_time(place_pan_angle, observe_joint[0])
     arm.execute_trajectory([retreat_pose, observe_joint], durations=[retreat_duration, rot_time_observe])
     if on_observe_ready is not None:
         try:
@@ -258,18 +267,26 @@ def pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name,
 
     # Force all objects to the 2nd floor of the bookshelf
     place_pose.position.z = config["base_z"] + 0.15
-    place_pose.orientation.x = 0.5
-    place_pose.orientation.y = 0.5
-    place_pose.orientation.z = 0.5
-    place_pose.orientation.w = 0.5
+    if _needs_wrist_flip(obj_name):
+        # 90° wrist rotation for long objects (banana, hammer)
+        place_pose.orientation.x = 0.0
+        place_pose.orientation.y = 0.7071
+        place_pose.orientation.z = 0.0
+        place_pose.orientation.w = 0.7071
+    else:
+        place_pose.orientation.x = 0.5
+        place_pose.orientation.y = 0.5
+        place_pose.orientation.z = 0.5
+        place_pose.orientation.w = 0.5
 
+    wrist_angle = math.pi / 2 if _needs_wrist_flip(obj_name) else 0.0
     place_pan_angle = math.atan2(place_pose.position.y, place_pose.position.x)
-    place_joint = [place_pan_angle, -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., 0.]
+    place_joint = [place_pan_angle, -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., wrist_angle]
 
     place_approach = copy.deepcopy(place_pose)
     place_approach.position.x -= 0.2
 
-    rot_time_place = _calc_rot_time(pick_pan_angle, place_pan_angle)
+    rot_time_place = _calc_rot_time(pick_pan_angle, place_pan_angle, sec_per_rad=1.8, min_time=1.0, max_time=2.5)
 
     # Lift → rotate → approach → place in one smooth trajectory
     # Fire on_before_idle after place rotation ends (lift + rotate = 1.0 + rot_time_place)
@@ -289,10 +306,9 @@ def pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name,
         next_pick_joint = next_data['pick_joint']
         next_approach = next_data['approach_pose']
         next_grasp = next_data['grasp_pose']
-        rot_time_next = _calc_rot_time(place_pan_angle, next_pick_joint[0])
         arm.execute_trajectory(
             [retreat_pose, next_pick_joint, next_approach],
-            durations=[1.3, rot_time_next, 1.5],
+            durations=[1.5, 1.5, 1.5],
         )
 
         # [Test] Wait for user confirmation before grasping
@@ -309,9 +325,9 @@ def pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name,
         
     else:
         if skip_observe_after_place:
-            arm.execute_trajectory([retreat_pose], durations=[1.3])
+            arm.execute_trajectory([retreat_pose], durations=[1.5])
         else:
-            _move_to_observe_and_notify(node, arm, retreat_pose, place_pan_angle, on_observe_ready, retreat_duration=1.3)
+            _move_to_observe_and_notify(node, arm, retreat_pose, place_pan_angle, on_observe_ready, retreat_duration=1.5, observe_rot_duration=1.5)
 
     node.bookshelf_count += 1
     node.get_logger().info("PICK-and-PLACE sequence completed successfully!")

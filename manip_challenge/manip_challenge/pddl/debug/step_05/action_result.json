@@ -1,110 +1,31 @@
 {
   "action": {
     "args": [
-      "banana_0",
+      "meat_can_0",
       "table",
-      "left_storage"
+      "storage"
     ],
     "name": "move-target-to-goal",
-    "pddl": "(move-target-to-goal banana_0 table left_storage)",
-    "source": "external"
+    "pddl": "(move-target-to-goal meat_can_0 table storage)",
+    "source": "fallback"
   },
   "event": "action_result",
   "result": {
     "action": {
       "args": [
-        "banana_0",
+        "meat_can_0",
         "table",
-        "left_storage"
+        "storage"
       ],
       "name": "move-target-to-goal",
-      "pddl": "(move-target-to-goal banana_0 table left_storage)",
-      "source": "external"
+      "pddl": "(move-target-to-goal meat_can_0 table storage)",
+      "source": "fallback"
     },
-    "class_name": "banana",
-    "command_id": "step5-6c912f75",
-    "destination": "left storage",
-    "detected_pose_in_source": {
-      "orientation": {
-        "w": 1.0,
-        "x": 0.0,
-        "y": 0.0,
-        "z": 0.0
-      },
-      "position": {
-        "x": -0.19514784216880798,
-        "y": 0.28950195014476776,
-        "z": 1.4460332989692688
-      }
-    },
+    "command_id": "step5-2e69524a",
     "dry_run": false,
-    "grasp_pose_in_base": {
-      "orientation": {
-        "w": -3.4466843957224206e-05,
-        "x": -0.012016530281976493,
-        "y": 0.999923685089948,
-        "z": 0.0028680669722790497
-      },
-      "position": {
-        "x": 0.36571719750356585,
-        "y": 0.2277166605829873,
-        "z": -0.06722998256490675
-      }
-    },
-    "grasp_selection": {
-      "delta_from_raw_centroid_m": [
-        -0.0017362236976623535,
-        -0.017246708273887634,
-        0.004386246204376221
-      ],
-      "grasp_pose_source": "raw_centroid_xyz",
-      "grasp_pose_xyz_m": [
-        -0.19514784216880798,
-        0.28950195014476776,
-        1.4460332989692688
-      ],
-      "gripper_axis_rule": "3d_perpendicular_to_pca_major_axis",
-      "method": "local_thick_axis_band",
-      "points_path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260531_005156_325568_banana/banana_0/foreground_points.npy",
-      "raw_centroid_xyz_m": [
-        -0.19514784216880798,
-        0.28950195014476776,
-        1.4460332989692688
-      ],
-      "selected_band": {
-        "along_max_m": 0.002393396339503473,
-        "along_min_m": -0.005873263459245021,
-        "point_count": 34,
-        "score": 0.06423539526634299,
-        "width_m": 0.036988698040148156,
-        "z_spread_m": 0.029189765453338623
-      },
-      "target_xyz_m": [
-        -0.19688406586647034,
-        0.2722552418708801,
-        1.450419545173645
-      ],
-      "xy_major_axis": [
-        -0.9997130189697624,
-        0.023955786406700864
-      ],
-      "xy_minor_axis": [
-        -0.023955786406700864,
-        -0.9997130189697624
-      ],
-      "xyz_major_axis": [
-        -0.9996947543836497,
-        0.024059409057219244,
-        -0.005616306048607663
-      ],
-      "xyz_major_axis_base": [
-        -0.024031028776664187,
-        0.9996947543836499,
-        0.005736524535760346
-      ]
-    },
-    "ok": true
+    "error": "'storage'",
+    "ok": false
   },
-  "stamp_sec": 1780156346.062044,
+  "stamp_sec": 1780194611.5612276,
   "step": 5
 }

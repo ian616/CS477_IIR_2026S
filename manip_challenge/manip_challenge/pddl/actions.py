@@ -147,6 +147,7 @@ def move_target_to_goal(context: ActionContext, action: PlanAction, state) -> di
             get_next_pick_data=context.get_next_pick_data,
             on_observe_ready=context.on_observe_ready,
             skip_observe_after_place=context.skip_observe_after_place,
+            perception_info=prepared["grasp_selection"],
         )
     return {
         "ok": True,
@@ -202,6 +203,7 @@ def move_obstacle_to_buffer(context: ActionContext, action: PlanAction, state) -
             get_next_pick_data=context.get_next_pick_data,
             on_observe_ready=context.on_observe_ready,
             skip_observe_after_place=context.skip_observe_after_place,
+            perception_info=prepared["grasp_selection"],
         )
     return {
         "ok": True,

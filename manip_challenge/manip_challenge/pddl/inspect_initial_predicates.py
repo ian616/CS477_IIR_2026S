@@ -42,7 +42,7 @@ from manip_challenge.pddl.ros_helpers import (
     load_top_view_perception_module,
     ros_args_with_embedded_perception_defaults,
 )
-from manip_challenge.pddl.pddl_types import TARGET_OBJECTS
+from manip_challenge.pddl.pddl_types import KNOWN_OBJECTS
 
 
 class PredicateInspectionClient(Node):

@@ -9,7 +9,7 @@
     "pddl": "(move-target-to-goal meat_can_0 table storage)",
     "source": "fallback"
   },
-  "event": "executing_action",
-  "stamp_sec": 1780194611.5551314,
-  "step": 5
+  "event": "selected_action",
+  "stamp_sec": 1780194616.403279,
+  "step": 7
 }

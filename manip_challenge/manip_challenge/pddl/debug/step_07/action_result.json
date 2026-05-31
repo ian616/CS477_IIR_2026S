@@ -21,11 +21,11 @@
       "pddl": "(move-target-to-goal meat_can_0 table storage)",
       "source": "fallback"
     },
-    "command_id": "step4-131f1ebe",
+    "command_id": "step7-0c95cd77",
     "dry_run": false,
     "error": "'storage'",
     "ok": false
   },
-  "stamp_sec": 1780194609.176306,
-  "step": 4
+  "stamp_sec": 1780194616.4077635,
+  "step": 7
 }

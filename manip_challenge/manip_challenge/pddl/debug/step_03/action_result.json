@@ -3,10 +3,10 @@
     "args": [
       "meat_can_0",
       "table",
-      "left_storage"
+      "storage"
     ],
     "name": "move-target-to-goal",
-    "pddl": "(move-target-to-goal meat_can_0 table left_storage)",
+    "pddl": "(move-target-to-goal meat_can_0 table storage)",
     "source": "fallback"
   },
   "event": "action_result",
@@ -15,96 +15,17 @@
       "args": [
         "meat_can_0",
         "table",
-        "left_storage"
+        "storage"
       ],
       "name": "move-target-to-goal",
-      "pddl": "(move-target-to-goal meat_can_0 table left_storage)",
+      "pddl": "(move-target-to-goal meat_can_0 table storage)",
       "source": "fallback"
     },
-    "class_name": "meat_can",
-    "command_id": "step3-f2afe30e",
-    "destination": "left storage",
-    "detected_pose_in_source": {
-      "orientation": {
-        "w": 1.0,
-        "x": 0.0,
-        "y": 0.0,
-        "z": 0.0
-      },
-      "position": {
-        "x": 0.39300113916397095,
-        "y": 0.08834376931190491,
-        "z": 1.418458104133606
-      }
-    },
+    "command_id": "step3-81c05c47",
     "dry_run": false,
-    "grasp_pose_in_base": {
-      "orientation": {
-        "w": -0.06739807506712187,
-        "x": 0.9975053544540616,
-        "y": -0.02094194722057607,
-        "z": 0.0014149767963868027
-      },
-      "position": {
-        "x": 0.567080134316391,
-        "y": -0.35888833176261165,
-        "z": -0.0405519827336715
-      }
-    },
-    "grasp_selection": {
-      "delta_from_raw_centroid_m": [
-        0.006702348589897156,
-        0.006617754697799683,
-        -0.003005087375640869
-      ],
-      "grasp_pose_source": "raw_centroid_xyz",
-      "grasp_pose_xyz_m": [
-        0.39300113916397095,
-        0.08834376931190491,
-        1.418458104133606
-      ],
-      "gripper_axis_rule": "3d_perpendicular_to_pca_major_axis",
-      "method": "local_thick_axis_band",
-      "points_path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260531_005056_010878_meat_can/meat_can_0/foreground_points.npy",
-      "raw_centroid_xyz_m": [
-        0.39300113916397095,
-        0.08834376931190491,
-        1.418458104133606
-      ],
-      "selected_band": {
-        "along_max_m": 0.008463461961195531,
-        "along_min_m": 0.004385098879006573,
-        "point_count": 30,
-        "score": 0.07291589311488285,
-        "width_m": 0.0677709034933908,
-        "z_spread_m": 0.0020811080932616743
-      },
-      "target_xyz_m": [
-        0.3997034877538681,
-        0.09496152400970459,
-        1.415453016757965
-      ],
-      "xy_major_axis": [
-        0.9995710032459744,
-        0.029288384554909282
-      ],
-      "xy_minor_axis": [
-        0.029288384554909282,
-        -0.9995710032459744
-      ],
-      "xyz_major_axis": [
-        0.9900378686477143,
-        0.040915606787159345,
-        0.13472539391194777
-      ],
-      "xyz_major_axis_base": [
-        -0.041588675545755745,
-        -0.9900378686477145,
-        -0.1345191462574782
-      ]
-    },
-    "ok": true
+    "error": "'storage'",
+    "ok": false
   },
-  "stamp_sec": 1780156300.9970248,
+  "stamp_sec": 1780194606.8035653,
   "step": 3
 }

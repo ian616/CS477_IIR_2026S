@@ -6,7 +6,7 @@ import os
 import re
 from typing import Iterable
 
-from .pddl_types import DESTINATION_TO_LOCATION, Goal, TARGET_OBJECTS
+from .pddl_types import DESTINATION_TO_LOCATION, Goal, KNOWN_OBJECTS
 from .utils import load_dotenv, pddl_name
 
 
@@ -46,7 +46,7 @@ def _dedupe(goals: Iterable[Goal]) -> list[Goal]:
     seen = set()
     for goal in goals:
         key = (goal.object_name, goal.location)
-        if goal.object_name in TARGET_OBJECTS and goal.location and key not in seen:
+        if goal.object_name in KNOWN_OBJECTS and goal.location and key not in seen:
             seen.add(key)
             output.append(goal)
     return output
@@ -83,7 +83,7 @@ def parse_goals_rule_based(text: str) -> list[Goal]:
 
 
 def _gemini_prompt(text: str) -> str:
-    objects = ", ".join(TARGET_OBJECTS)
+    objects = ", ".join(KNOWN_OBJECTS)
     locations = "left_storage, right_storage, bookshelf"
     return (
         "Extract pick-and-place goals for a robot. Return only JSON with a top-level goals array. "

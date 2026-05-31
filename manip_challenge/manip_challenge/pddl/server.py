@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import copy
 import json
+import logging
 import math
 import os
 import shutil
@@ -70,7 +71,7 @@ from manip_challenge.pddl.ros_helpers import (
     save_grasp_selection_visualization,
     stop_child_processes,
 )
-from manip_challenge.pddl.pddl_types import Goal, ObjectState, PlanAction, PredicateState, TARGET_OBJECTS
+from manip_challenge.pddl.pddl_types import Goal, ObjectState, PlanAction, PredicateState, KNOWN_OBJECTS, BUFFER_LOCATIONS
 from manip_challenge.pddl.utils import PDDL_DIR, load_dotenv
 from manip_challenge.custom.grasping.grasping_item import (
     _load_grasp_database,
@@ -487,7 +488,7 @@ class PddlTampServer(Node):
         try:
             state = build_predicate_state(
                 [],
-                self.detect_object,
+                self.detect_object_with_grasp,
                 completed=set(),
                 occupied_buffers=set(),
                 scan_all_targets=True,
@@ -538,14 +539,14 @@ class PddlTampServer(Node):
         occupied_buffers: set[str],
         scan_all_targets: bool,
     ) -> PredicateState:
-        target_names = set(TARGET_OBJECTS if scan_all_targets else [goal.object_name for goal in goals])
-        target_names.update(goal.object_name for goal in goals)
+        goal_names = {goal.object_name for goal in goals}
         completed_classes = set(completed)
+        for obj in state.objects.values():
+            obj.is_target = obj.class_name in goal_names
         state.objects = {
             name: obj
             for name, obj in state.objects.items()
             if not (obj.is_target and obj.class_name in completed_classes)
-            and (not obj.is_target or obj.class_name in target_names)
         }
         _annotate_relations(state.objects)
         state.goals = _bind_goals_to_instances(goals, state.objects, completed_classes)
@@ -665,7 +666,7 @@ class PddlTampServer(Node):
         try:
             state = build_predicate_state(
                 goals,
-                self.detect_object,
+                self.detect_object_with_grasp,
                 completed=completed,
                 occupied_buffers=occupied_buffers,
                 scan_all_targets=scan_all_targets,
@@ -778,6 +779,15 @@ class PddlTampServer(Node):
         goals = parse_goals(command_text, use_gemini=not self.args.no_gemini)
         if not goals:
             raise ValueError("Could not parse any target goals from command.")
+
+        _valid_goal_locations = {"left_storage", "right_storage", "bookshelf"}
+        invalid_goals = [g for g in goals if g.location not in _valid_goal_locations]
+        for g in invalid_goals:
+            self.get_logger().warn(f"[PDDL] Ignoring goal with unknown destination: {g.object_name} -> {g.location}")
+        goals = [g for g in goals if g.location in _valid_goal_locations]
+        if not goals:
+            raise ValueError("No valid goals after filtering unknown destinations.")
+
         self.get_logger().info("[PDDL] Parsed goals:")
         for goal in goals:
             self.get_logger().info(f"[PDDL]   {goal.object_name} -> {goal.location}")
@@ -813,7 +823,7 @@ class PddlTampServer(Node):
                 if state is None:
                     state = build_predicate_state(
                         goals,
-                        self.detect_object,
+                        self.detect_object_with_grasp,
                         completed=completed,
                         occupied_buffers=occupied_buffers,
                         scan_all_targets=scan_all_targets,
@@ -1386,6 +1396,16 @@ class PddlTampServer(Node):
             raise RuntimeError(f"Perception service returned no result for '{obj_name}'.")
         return json.loads(result.data)
 
+    def detect_object_with_grasp(self, obj_name: str) -> dict:
+        detection = self.detect_object(obj_name)
+        if detection and detection.get("ok"):
+            try:
+                selection = self.select_grasp_target(detection, obj_name)
+                detection["grasp_selection"] = selection
+            except Exception as exc:
+                self.get_logger().debug(f"[GraspPredict] select_grasp_target failed for {obj_name}: {exc}")
+        return detection
+
     def select_grasp_target(self, detection: dict, obj_name: str) -> dict:
         points, points_path = load_grasp_points_from_detection(detection)
         if points is None or len(points) == 0:
@@ -1843,6 +1863,7 @@ def parse_args(argv=None):
 def main(argv=None):
     load_dotenv()
     args = parse_args(argv)
+    logging.basicConfig(level=logging.DEBUG, format="%(name)s %(levelname)s %(message)s")
     top_view_module = None if args.external_perception else load_top_view_perception_module()
     ros_argv = (
         ros_args_with_embedded_perception_defaults(argv or sys.argv, args, top_view_module)

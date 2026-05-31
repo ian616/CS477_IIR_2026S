@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import logging
 import math
 from dataclasses import replace
 from typing import Callable
 
 import numpy as np
 
-from .pddl_types import BUFFER_LOCATIONS, Goal, ObjectState, PredicateState, TARGET_OBJECTS
+logger = logging.getLogger(__name__)
+
+from .pddl_types import BUFFER_LOCATIONS, Goal, ObjectState, PredicateState, KNOWN_OBJECTS
 from .utils import pddl_name
 
 
@@ -58,13 +61,30 @@ def _bbox_center(bbox):
 
 
 def _distance(a: ObjectState, b: ObjectState) -> float | None:
-    if a.centroid_xyz and b.centroid_xyz:
-        return float(np.linalg.norm(np.asarray(a.centroid_xyz[:2]) - np.asarray(b.centroid_xyz[:2])))
+    a_xyz = a.grasp_xyz or a.centroid_xyz
+    b_xyz = b.grasp_xyz or b.centroid_xyz
+    if a_xyz and b_xyz:
+        return float(np.linalg.norm(np.asarray(a_xyz[:2]) - np.asarray(b_xyz[:2])))
     ac = _bbox_center(a.bbox_xyxy)
     bc = _bbox_center(b.bbox_xyxy)
     if ac and bc:
         return math.dist(ac, bc)
     return None
+
+
+def _dist_point_to_bbox(px: float, py: float, bbox) -> float:
+    x1, y1, x2, y2 = bbox
+    dx = max(x1 - px, 0.0, px - x2)
+    dy = max(y1 - py, 0.0, py - y2)
+    return math.sqrt(dx * dx + dy * dy)
+
+
+def _grasp_to_obstacle_dist(target: ObjectState, obstacle: ObjectState) -> float | None:
+    """Distance from target's grasp pixel (bbox center) to nearest edge of obstacle's bbox."""
+    gp = _bbox_center(target.bbox_xyxy)
+    if gp is None or not obstacle.bbox_xyxy:
+        return None
+    return _dist_point_to_bbox(gp[0], gp[1], obstacle.bbox_xyxy)
 
 
 def _choose_ambiguous_blocker(a: ObjectState, b: ObjectState) -> tuple[ObjectState, ObjectState] | None:
@@ -126,6 +146,9 @@ def object_from_detection(
     visible = confidence >= MIN_CONFIDENCE and mask_pixels >= MIN_MASK_PIXELS and points >= MIN_FOREGROUND_POINTS
     pose_known = centroid_tuple is not None and all(np.isfinite(centroid_tuple))
     graspable = visible and pose_known
+    grasp_sel = detection.get("grasp_selection") or {}
+    grasp_raw = grasp_sel.get("grasp_pose_xyz_m")
+    grasp_tuple = tuple(float(v) for v in grasp_raw) if grasp_raw and len(grasp_raw) >= 3 else None
     return ObjectState(
         name=name,
         class_name=class_name,
@@ -142,6 +165,7 @@ def object_from_detection(
         foreground_points=points,
         bbox_xyxy=bbox_tuple,
         centroid_xyz=centroid_tuple,
+        grasp_xyz=grasp_tuple,
         depth_median=depth_median,
         detection=detection,
     )
@@ -185,7 +209,7 @@ def _merge_all_detections(objects: dict[str, ObjectState], detection: dict) -> N
         class_name = pddl_name(raw.get("label", "unknown"))
         index = label_counts.get(class_name, 0)
         label_counts[class_name] = index + 1
-        if class_name in TARGET_OBJECTS:
+        if class_name in KNOWN_OBJECTS:
             continue
         obstacle = obstacle_from_yolo(raw, instance_index=index)
         if obstacle.name in objects:
@@ -245,20 +269,46 @@ def _annotate_relations(objects: dict[str, ObjectState]) -> None:
                         blocked.blocked_by.add(blocker.name)
                         blocked.clear = False
 
-            distance = _distance(a, b)
-            if distance is None:
-                continue
-            threshold = SAFE_DISTANCE_M if a.centroid_xyz and b.centroid_xyz else SAFE_PIXEL_DISTANCE
-            if distance < threshold:
+            # near: target-obstacle uses grasp pixel → nearest obstacle bbox edge.
+            # other pairs (target-target, obstacle-obstacle) use centroid/bbox-center distance.
+            if a.is_target != b.is_target:
+                target, obstacle = (a, b) if a.is_target else (b, a)
+                d = _grasp_to_obstacle_dist(target, obstacle)
+                threshold = SAFE_PIXEL_DISTANCE
+                mode = "grasp→bbox"
+            else:
+                d = _distance(a, b)
+                threshold = SAFE_DISTANCE_M if (a.grasp_xyz or a.centroid_xyz) and (b.grasp_xyz or b.centroid_xyz) else SAFE_PIXEL_DISTANCE
+                mode = "centroid"
+            is_near = d is not None and d < threshold
+            logger.debug(
+                "[near] %s(%s) ↔ %s(%s)  mode=%s  d=%s  thr=%.1f  near=%s",
+                a.name, "T" if a.is_target else "O",
+                b.name, "T" if b.is_target else "O",
+                mode,
+                f"{d:.1f}" if d is not None else "None",
+                threshold,
+                is_near,
+            )
+            if is_near:
                 a.near.add(b.name)
                 b.near.add(a.name)
-                # Obstacles can be moved away while near. Targets should not be
-                # moved to their goal until non-target clutter around them is cleared.
-                # Target-target proximity is handled by moving one clear target first.
-                if a.is_target and not b.is_target:
-                    a.safe = False
-                if b.is_target and not a.is_target:
-                    b.safe = False
+
+    # safe: derived solely from near — target is unsafe if any near neighbor is a non-target.
+    name_to_obj = {obj.name: obj for obj in objects.values()}
+    for obj in objects.values():
+        if obj.is_target:
+            xyz = obj.grasp_xyz or obj.centroid_xyz
+            xyz_str = f"({xyz[0]:.3f}, {xyz[1]:.3f}, {xyz[2]:.3f})" if xyz else "None"
+            for near_name in obj.near:
+                neighbor = name_to_obj.get(near_name)
+                if neighbor and not neighbor.is_target:
+                    obj.safe = False
+                    break
+            logger.debug(
+                "[safe] %s  xyz=%s  near=%s  safe=%s",
+                obj.name, xyz_str, sorted(obj.near), obj.safe,
+            )
 
 
 def _build_predicates(state: PredicateState) -> set[str]:
@@ -292,9 +342,12 @@ def _build_predicates(state: PredicateState) -> set[str]:
 def _objects_from_detection(class_name: str, detection: dict | None, is_target: bool) -> list[ObjectState]:
     class_name = pddl_name(class_name)
     objects = []
+    parent_grasp_selection = (detection or {}).get("grasp_selection")
     for index, instance in enumerate((detection or {}).get("instances") or []):
         instance_index = int(instance.get("instance_index", index))
         instance_name = pddl_name(instance.get("instance_name") or f"{class_name}_{instance_index}")
+        if parent_grasp_selection and "grasp_selection" not in instance:
+            instance = {**instance, "grasp_selection": parent_grasp_selection}
         objects.append(
             object_from_detection(
                 instance_name,
@@ -371,20 +424,21 @@ def build_predicate_state(
     objects: dict[str, ObjectState] = {}
     completed = set(completed or set())
     occupied_buffers = set(occupied_buffers or set())
-    target_names = set(TARGET_OBJECTS if scan_all_targets else [goal.object_name for goal in goals])
-    target_names.update(goal.object_name for goal in goals)
-    for name in sorted(target_names):
+    goal_names = {goal.object_name for goal in goals}
+    scan_names = set(KNOWN_OBJECTS if scan_all_targets else goal_names)
+    scan_names.update(goal_names)
+    for name in sorted(scan_names):
         if name in completed:
             continue
         try:
             detection = detect_fn(name)
-            facts = _objects_from_detection(name, detection, is_target=name in TARGET_OBJECTS)
+            facts = _objects_from_detection(name, detection, is_target=name in goal_names)
             for fact in facts:
                 objects[fact.name] = fact
             if detection and detection.get("ok"):
                 _merge_all_detections(objects, detection)
         except Exception as exc:
-            fact = object_from_detection(name, None, is_target=name in TARGET_OBJECTS, class_name=name, error=str(exc))
+            fact = object_from_detection(name, None, is_target=name in goal_names, class_name=name, error=str(exc))
             objects[fact.name] = fact
 
     _annotate_relations(objects)

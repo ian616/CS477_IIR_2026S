@@ -14,6 +14,6 @@
   ],
   "problem": "/home/ubuntu/cs477_ws/src/cs477_IIR/manip_challenge/manip_challenge/pddl/problem.pddl",
   "raw_output": "PDDL_PLANNER_CMD is not set; using fallback planner.\nFallback planner selected:\n(move-target-to-goal meat_can_0 table storage)",
-  "stamp_sec": 1780194606.7943425,
-  "step": 3
+  "stamp_sec": 1780194613.9143403,
+  "step": 6
 }

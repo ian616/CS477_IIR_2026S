@@ -3,13 +3,13 @@
     "args": [
       "meat_can_0",
       "table",
-      "left_storage"
+      "storage"
     ],
     "name": "move-target-to-goal",
-    "pddl": "(move-target-to-goal meat_can_0 table left_storage)",
+    "pddl": "(move-target-to-goal meat_can_0 table storage)",
     "source": "fallback"
   },
   "event": "executing_action",
-  "stamp_sec": 1780156284.0937047,
+  "stamp_sec": 1780194606.795806,
   "step": 3
 }
