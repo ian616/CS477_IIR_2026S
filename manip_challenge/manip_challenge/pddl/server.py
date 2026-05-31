@@ -52,7 +52,12 @@ from assignment_2.move_joint import ArmClient
 from manip_challenge.pddl.actions import ActionContext, execute_action
 from manip_challenge.pddl.nlp import parse_goals
 from manip_challenge.pddl.planner import plan
-from manip_challenge.pddl.predicate_builder import build_predicate_state
+from manip_challenge.pddl.predicate_builder import (
+    _annotate_relations,
+    _bind_goals_to_instances,
+    _build_predicates,
+    build_predicate_state,
+)
 from manip_challenge.pddl.problem_generator import ensure_domain, write_problem
 from manip_challenge.pddl.ros_helpers import (
     HOME_JOINTS,
@@ -65,7 +70,7 @@ from manip_challenge.pddl.ros_helpers import (
     save_grasp_selection_visualization,
     stop_child_processes,
 )
-from manip_challenge.pddl.pddl_types import Goal, ObjectState, PlanAction, PredicateState
+from manip_challenge.pddl.pddl_types import Goal, ObjectState, PlanAction, PredicateState, TARGET_OBJECTS
 from manip_challenge.pddl.utils import PDDL_DIR, load_dotenv
 from manip_challenge.custom.grasping.grasping_item import (
     _load_grasp_database,
@@ -376,6 +381,11 @@ class PddlTampServer(Node):
         self.prefetch_condition = threading.Condition(self.prefetch_lock)
         self.prefetch_states: dict[tuple, PredicateState] = {}
         self.prefetch_pending: set[tuple] = set()
+        self.warm_scene_condition = threading.Condition()
+        self.warm_scene_state: PredicateState | None = None
+        self.warm_scene_pending = False
+        self.warm_scene_scheduled = False
+        self.warm_scene_consumed = False
 
         self.get_logger().info(f"Waiting for perception service '{args.perception_service}'...")
         while rclpy.ok() and not self.perception_client.wait_for_service(timeout_sec=1.0):
@@ -384,6 +394,14 @@ class PddlTampServer(Node):
             f"PDDL TAMP server ready. Publish natural-language commands to '{args.command_topic}' "
             f"or call service '{args.service_name}'."
         )
+        self.warm_start_timer = None
+        if not self.args.disable_warm_start:
+            self.warm_scene_scheduled = True
+            self.warm_start_timer = self.create_timer(
+                0.5,
+                self.kickoff_warm_scene_scan,
+                callback_group=self.callback_group,
+            )
 
     def handle_executor_result(self, msg: String) -> None:
         try:
@@ -403,6 +421,8 @@ class PddlTampServer(Node):
         command_id = f"step{step_idx}-{uuid.uuid4().hex[:8]}"
         selected_object = state.objects.get(action.args[0]) if action.args else None
         next_completed, next_occupied = self.anticipated_progress_after_action(action, state)
+        if self.should_reuse_previous_topview(action):
+            self.seed_previous_topview_prefetch(action, state, next_completed, next_occupied, command_id)
         payload = {
             "event": "execute_action",
             "command_id": command_id,
@@ -446,6 +466,140 @@ class PddlTampServer(Node):
         result.setdefault("command_id", command_id)
         return result
 
+    def start_warm_scene_scan(self) -> None:
+        with self.warm_scene_condition:
+            if self.warm_scene_pending or self.warm_scene_state is not None:
+                return
+            self.warm_scene_pending = True
+        self.get_logger().info("[WarmStart] Starting initial top-view scene scan.")
+        worker = threading.Thread(target=self._warm_scene_worker, daemon=True)
+        worker.start()
+
+    def kickoff_warm_scene_scan(self) -> None:
+        if self.warm_start_timer is not None:
+            self.warm_start_timer.cancel()
+            self.warm_start_timer = None
+        with self.warm_scene_condition:
+            self.warm_scene_scheduled = False
+        self.start_warm_scene_scan()
+
+    def _warm_scene_worker(self) -> None:
+        try:
+            state = build_predicate_state(
+                [],
+                self.detect_object,
+                completed=set(),
+                occupied_buffers=set(),
+                scan_all_targets=True,
+            )
+        except Exception as exc:
+            self.get_logger().warn(f"[WarmStart] Initial scene scan failed: {exc}")
+            state = None
+        with self.warm_scene_condition:
+            self.warm_scene_state = state
+            self.warm_scene_pending = False
+            self.warm_scene_condition.notify_all()
+        if state is not None:
+            self.get_logger().info(
+                f"[WarmStart] Initial top-view scene ready: objects={len(state.objects)}"
+            )
+
+    def consume_warm_scene_state(
+        self,
+        goals: list[Goal],
+        completed: set[str],
+        occupied_buffers: set[str],
+        scan_all_targets: bool,
+    ) -> PredicateState | None:
+        if completed or occupied_buffers or self.args.disable_warm_start:
+            return None
+        deadline = time.monotonic() + float(self.args.warm_start_wait_timeout)
+        with self.warm_scene_condition:
+            if self.warm_scene_consumed:
+                return None
+            while self.warm_scene_scheduled or self.warm_scene_pending:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0.0:
+                    break
+                self.warm_scene_condition.wait(timeout=min(0.1, remaining))
+            if self.warm_scene_state is None:
+                return None
+            base = copy.deepcopy(self.warm_scene_state)
+            self.warm_scene_consumed = True
+        state = self.bind_goals_to_warm_scene(base, goals, completed, occupied_buffers, scan_all_targets)
+        self.get_logger().info("[WarmStart] Using initial top-view scene; running planner without a new scan.")
+        return state
+
+    def bind_goals_to_warm_scene(
+        self,
+        state: PredicateState,
+        goals: list[Goal],
+        completed: set[str],
+        occupied_buffers: set[str],
+        scan_all_targets: bool,
+    ) -> PredicateState:
+        target_names = set(TARGET_OBJECTS if scan_all_targets else [goal.object_name for goal in goals])
+        target_names.update(goal.object_name for goal in goals)
+        completed_classes = set(completed)
+        state.objects = {
+            name: obj
+            for name, obj in state.objects.items()
+            if not (obj.is_target and obj.class_name in completed_classes)
+            and (not obj.is_target or obj.class_name in target_names)
+        }
+        _annotate_relations(state.objects)
+        state.goals = _bind_goals_to_instances(goals, state.objects, completed_classes)
+        state.completed = set(completed)
+        state.occupied_buffers = set(occupied_buffers)
+        state.predicates = _build_predicates(state)
+        state.notes = [
+            *state.notes,
+            "used warm-start top-view scene captured before command",
+        ]
+        return state
+
+    @staticmethod
+    def should_reuse_previous_topview(action: PlanAction) -> bool:
+        return (
+            action.name == "move-target-to-goal"
+            and len(action.args) >= 3
+            and action.args[2] == "bookshelf"
+        )
+
+    def seed_previous_topview_prefetch(
+        self,
+        action: PlanAction,
+        state: PredicateState,
+        completed: set[str],
+        occupied_buffers: set[str],
+        command_id: str,
+    ) -> None:
+        scan_all_targets = not self.args.scan_goals_only
+        cached = copy.deepcopy(state)
+        cached.completed = set(completed)
+        cached.occupied_buffers = set(occupied_buffers)
+        completed_classes = set(completed)
+        cached.objects = {
+            name: obj
+            for name, obj in cached.objects.items()
+            if not (obj.is_target and obj.class_name in completed_classes)
+        }
+        cached.predicates = _build_predicates(cached)
+        cached.notes = [
+            *cached.notes,
+            f"reused previous top-view state after {action.pddl()} for bookshelf placement",
+        ]
+        key = self.prefetch_key(cached.goals, cached.completed, cached.occupied_buffers, scan_all_targets)
+        with self.prefetch_condition:
+            if key in self.prefetch_states or key in self.prefetch_pending:
+                return
+            self.prefetch_states[key] = cached
+            self.prefetch_condition.notify_all()
+        self.get_logger().info(
+            f"[Prefetch] Reusing previous top-view state for bookshelf action command_id={command_id}; "
+            f"completed={', '.join(sorted(completed)) or '<none>'}; objects={len(cached.objects)}"
+        )
+
     @staticmethod
     def prefetch_key(goals: list[Goal], completed: set[str], occupied_buffers: set[str], scan_all_targets: bool) -> tuple:
         goal_key = tuple((goal.object_name, goal.location) for goal in goals)
@@ -472,7 +626,7 @@ class PddlTampServer(Node):
             occupied_buffers.add(action.args[2])
         return completed, occupied_buffers
 
-    def start_scene_prefetch(self, prefetch_payload: dict | None, command_id: str) -> None:
+    def start_scene_prefetch(self, prefetch_payload: dict | None, command_id: str, trigger: str = "observe-ready") -> None:
         if not prefetch_payload:
             return
         try:
@@ -489,7 +643,7 @@ class PddlTampServer(Node):
                 return
             self.prefetch_pending.add(key)
         self.get_logger().info(
-            f"[Prefetch] Starting observe-ready scene scan for command_id={command_id}; "
+            f"[Prefetch] Starting {trigger} scene scan for command_id={command_id}; "
             f"completed={', '.join(sorted(completed)) or '<none>'}"
         )
         worker = threading.Thread(
@@ -653,15 +807,17 @@ class PddlTampServer(Node):
             scan_all_targets = not self.args.scan_goals_only
             state = self.consume_prefetched_state(goals, completed, occupied_buffers, scan_all_targets)
             if state is not None:
-                self.get_logger().info("[Prefetch] Using cached observe-ready scene scan.")
+                self.get_logger().info("[Prefetch] Using cached scene state.")
             else:
-                state = build_predicate_state(
-                    goals,
-                    self.detect_object,
-                    completed=completed,
-                    occupied_buffers=occupied_buffers,
-                    scan_all_targets=scan_all_targets,
-                )
+                state = self.consume_warm_scene_state(goals, completed, occupied_buffers, scan_all_targets)
+                if state is None:
+                    state = build_predicate_state(
+                        goals,
+                        self.detect_object,
+                        completed=completed,
+                        occupied_buffers=occupied_buffers,
+                        scan_all_targets=scan_all_targets,
+                    )
             scene_summary = {
                 "completed": sorted(completed),
                 "occupied_buffers": sorted(occupied_buffers),
@@ -1580,11 +1736,32 @@ class ManipulatorExecutor(Node):
                 obj = object_state_from_command(payload.get("selected_object"), action.args[0])
                 state = PredicateState(goals=[], objects={obj.name: obj})
                 prefetch_payload = payload.get("prefetch")
+                use_storage_place_prefetch = (
+                    action.name == "move-target-to-goal"
+                    and len(action.args) >= 3
+                    and action.args[2] in {"left_storage", "right_storage"}
+                )
+
+                def on_storage_place(_prefetch_payload=prefetch_payload, _command_id=command_id):
+                    self.coordinator.start_scene_prefetch(
+                        _prefetch_payload,
+                        _command_id,
+                        trigger="storage-place",
+                    )
 
                 def on_observe_ready(_prefetch_payload=prefetch_payload, _command_id=command_id):
-                    self.coordinator.start_scene_prefetch(_prefetch_payload, _command_id)
+                    self.coordinator.start_scene_prefetch(
+                        _prefetch_payload,
+                        _command_id,
+                        trigger="observe-ready",
+                    )
 
-                context = ActionContext(self.coordinator, on_observe_ready=on_observe_ready)
+                context = ActionContext(
+                    self.coordinator,
+                    on_before_idle=on_storage_place if use_storage_place_prefetch else None,
+                    on_observe_ready=None if use_storage_place_prefetch else on_observe_ready,
+                    skip_observe_after_place=use_storage_place_prefetch,
+                )
                 self.get_logger().info(
                     f"[Executor] Executing committed action {action.pddl()} command_id={command_id}"
                 )
@@ -1628,6 +1805,8 @@ def parse_args(argv=None):
     parser.add_argument("--tf-timeout", type=float, default=5.0)
     parser.add_argument("--action-timeout", type=float, default=300.0)
     parser.add_argument("--prefetch-wait-timeout", type=float, default=5.0)
+    parser.add_argument("--warm-start-wait-timeout", type=float, default=30.0)
+    parser.add_argument("--disable-warm-start", action="store_true", help="Do not scan the initial scene before the first command.")
     parser.add_argument("--executor-command-topic", default="/pddl_action_commands")
     parser.add_argument("--executor-result-topic", default="/pddl_action_results")
     parser.add_argument(

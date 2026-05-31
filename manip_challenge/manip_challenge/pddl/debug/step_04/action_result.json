@@ -1,29 +1,29 @@
 {
   "action": {
     "args": [
-      "coke_can_1",
+      "hammer_0",
       "table",
-      "bookshelf"
+      "right_storage"
     ],
     "name": "move-target-to-goal",
-    "pddl": "(move-target-to-goal coke_can_1 table bookshelf)",
+    "pddl": "(move-target-to-goal hammer_0 table right_storage)",
     "source": "external"
   },
   "event": "action_result",
   "result": {
     "action": {
       "args": [
-        "coke_can_1",
+        "hammer_0",
         "table",
-        "bookshelf"
+        "right_storage"
       ],
       "name": "move-target-to-goal",
-      "pddl": "(move-target-to-goal coke_can_1 table bookshelf)",
+      "pddl": "(move-target-to-goal hammer_0 table right_storage)",
       "source": "external"
     },
-    "class_name": "coke_can",
-    "command_id": "step4-445583bf",
-    "destination": "bookshelf",
+    "class_name": "hammer",
+    "command_id": "step4-c1c5f1ba",
+    "destination": "right storage",
     "detected_pose_in_source": {
       "orientation": {
         "w": 1.0,
@@ -32,90 +32,79 @@
         "z": 0.0
       },
       "position": {
-        "x": 0.2305237501859665,
-        "y": 0.07778959721326828,
-        "z": 1.368223702430725
+        "x": 0.29509541392326355,
+        "y": 0.25674644112586975,
+        "z": 1.458297848701477
       }
     },
     "dry_run": false,
     "grasp_pose_in_base": {
       "orientation": {
-        "w": 0.0,
-        "x": 0.036700755973987496,
-        "y": 0.9993263003198394,
-        "z": 0.0
+        "w": 0.01579832725987616,
+        "x": 0.9997899025682785,
+        "y": 0.013058368985572203,
+        "z": 0.00020634373900390316
       },
       "position": {
-        "x": 0.5778175795985411,
-        "y": -0.2130237501859663,
-        "z": 0.021519955866596385
+        "x": 0.3984225353485824,
+        "y": -0.26297442944868443,
+        "z": -0.07965235150367178
       }
     },
     "grasp_selection": {
       "delta_from_raw_centroid_m": [
-        0.008704252541065216,
-        -0.004391420632600784,
-        0.010740315437316905
+        0.010008066892623901,
+        -0.1207803338766098,
+        -0.004501819610595703
       ],
-      "grasp_pose_source": "raw_centroid_xy_with_adjusted_target_z",
+      "grasp_pose_source": "raw_centroid_xyz",
       "grasp_pose_xyz_m": [
-        0.2305237501859665,
-        0.07778959721326828,
-        1.368223702430725
+        0.29509541392326355,
+        0.25674644112586975,
+        1.458297848701477
       ],
-      "gripper_axis_base_xy": [
-        0.9973061090218757,
-        -0.07335206137285234
-      ],
-      "gripper_axis_base_yaw_rad": -0.07341799991627701,
-      "gripper_axis_rule": "perpendicular_to_pca_major_axis",
+      "gripper_axis_rule": "3d_perpendicular_to_pca_major_axis",
       "method": "local_thick_axis_band",
-      "pca_major_axis_base_xy": [
-        -0.07335206137285234,
-        -0.9973061090218757
-      ],
-      "pca_major_axis_base_yaw_rad": -1.6442143267111737,
-      "points_path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260529_211452_257908_coke_can/coke_can_1/foreground_points.npy",
+      "points_path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260531_005139_025549_hammer/hammer_0/foreground_points.npy",
       "raw_centroid_xyz_m": [
-        0.2305237501859665,
-        0.07778959721326828,
-        1.3574833869934082
+        0.29509541392326355,
+        0.25674644112586975,
+        1.458297848701477
       ],
-      "rgbd_depth_adjustment": {
-        "adjusted_target_depth_m": 1.368223702430725,
-        "clearance_above_surface_m": -0.012,
-        "delta_depth_m": 0.011186098575592052,
-        "local_points": 369,
-        "local_radius_m": 0.035,
-        "measured_surface_depth_m": 1.356223702430725,
-        "method": "local_radius",
-        "previous_target_depth_m": 1.357037603855133,
-        "surface_depth_percentile": 10.0
-      },
       "selected_band": {
-        "along_max_m": 0.008657821513706827,
-        "along_min_m": 0.006244413819893862,
-        "point_count": 20,
-        "score": 0.051061289729689666,
-        "width_m": 0.05044900564910168,
-        "z_spread_m": 0.009606873989105313
+        "along_max_m": 0.019857820564572998,
+        "along_min_m": 0.004531294654434415,
+        "point_count": 139,
+        "score": 0.18365606361185843,
+        "width_m": 0.16788747468468793,
+        "z_spread_m": 0.022677254676818803
       },
       "target_xyz_m": [
-        0.2392280027270317,
-        0.0733981765806675,
-        1.368223702430725
+        0.30510348081588745,
+        0.13596610724925995,
+        1.4537960290908813
       ],
       "xy_major_axis": [
-        0.9973060419541528,
-        0.07335297323041123
+        0.9996779495063947,
+        -0.025377101305909262
       ],
       "xy_minor_axis": [
-        -0.07335297323041123,
-        0.9973060419541528
+        0.025377101305909262,
+        0.9996779495063947
+      ],
+      "xyz_major_axis": [
+        0.999159783710453,
+        -0.02594643883141045,
+        -0.031725524860097394
+      ],
+      "xyz_major_axis_base": [
+        0.026104731139738102,
+        -0.999159783710453,
+        0.03159540516915027
       ]
     },
     "ok": true
   },
-  "stamp_sec": 1780056915.508965,
+  "stamp_sec": 1780156318.5516336,
   "step": 4
 }

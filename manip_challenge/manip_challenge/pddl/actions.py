@@ -66,7 +66,7 @@ def pose_from_xyz(xyz) -> Pose:
 class ActionContext:
     def __init__(self, server, on_before_idle=None, get_next_pick_data=None,
                  pick_already_done=False, prefetch_grasp_pose=None, prefetch_class_name=None,
-                 on_observe_ready=None):
+                 on_observe_ready=None, skip_observe_after_place=False):
         self.server = server
         self.on_before_idle = on_before_idle
         self.get_next_pick_data = get_next_pick_data
@@ -74,6 +74,7 @@ class ActionContext:
         self.prefetch_grasp_pose = prefetch_grasp_pose
         self.prefetch_class_name = prefetch_class_name
         self.on_observe_ready = on_observe_ready
+        self.skip_observe_after_place = skip_observe_after_place
 
 
 def _prepare_grasp(server, object_name: str, fact=None) -> dict[str, Any]:
@@ -124,6 +125,7 @@ def move_target_to_goal(context: ActionContext, action: PlanAction, state) -> di
                 get_next_pick_data=context.get_next_pick_data,
                 pick_already_done=True,
                 on_observe_ready=context.on_observe_ready,
+                skip_observe_after_place=context.skip_observe_after_place,
             )
         return {
             "ok": True,
@@ -144,6 +146,7 @@ def move_target_to_goal(context: ActionContext, action: PlanAction, state) -> di
             on_before_idle=context.on_before_idle,
             get_next_pick_data=context.get_next_pick_data,
             on_observe_ready=context.on_observe_ready,
+            skip_observe_after_place=context.skip_observe_after_place,
         )
     return {
         "ok": True,
@@ -179,6 +182,7 @@ def move_obstacle_to_buffer(context: ActionContext, action: PlanAction, state) -
                 get_next_pick_data=context.get_next_pick_data,
                 pick_already_done=True,
                 on_observe_ready=context.on_observe_ready,
+                skip_observe_after_place=context.skip_observe_after_place,
             )
         return {
             "ok": True,
@@ -197,6 +201,7 @@ def move_obstacle_to_buffer(context: ActionContext, action: PlanAction, state) -
             on_before_idle=context.on_before_idle,
             get_next_pick_data=context.get_next_pick_data,
             on_observe_ready=context.on_observe_ready,
+            skip_observe_after_place=context.skip_observe_after_place,
         )
     return {
         "ok": True,

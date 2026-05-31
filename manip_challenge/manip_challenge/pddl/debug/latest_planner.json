@@ -14,6 +14,6 @@
   ],
   "problem": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/problem.pddl",
   "raw_output": "(move-target-to-goal banana_0 table left_storage)\n; cost = 1 (unit cost)\n\n",
-  "stamp_sec": 1780056916.9497464,
+  "stamp_sec": 1780156319.0872269,
   "step": 5
 }

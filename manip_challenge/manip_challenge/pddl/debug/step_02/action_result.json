@@ -1,29 +1,29 @@
 {
   "action": {
     "args": [
-      "strawberry_0",
+      "coke_can_0",
       "table",
-      "right_storage"
+      "bookshelf"
     ],
     "name": "move-target-to-goal",
-    "pddl": "(move-target-to-goal strawberry_0 table right_storage)",
-    "source": "external"
+    "pddl": "(move-target-to-goal coke_can_0 table bookshelf)",
+    "source": "fallback"
   },
   "event": "action_result",
   "result": {
     "action": {
       "args": [
-        "strawberry_0",
+        "coke_can_0",
         "table",
-        "right_storage"
+        "bookshelf"
       ],
       "name": "move-target-to-goal",
-      "pddl": "(move-target-to-goal strawberry_0 table right_storage)",
-      "source": "external"
+      "pddl": "(move-target-to-goal coke_can_0 table bookshelf)",
+      "source": "fallback"
     },
-    "class_name": "strawberry",
-    "command_id": "step2-6bbacd43",
-    "destination": "right storage",
+    "class_name": "coke_can",
+    "command_id": "step2-56d0843a",
+    "destination": "bookshelf",
     "detected_pose_in_source": {
       "orientation": {
         "w": 1.0,
@@ -32,83 +32,79 @@
         "z": 0.0
       },
       "position": {
-        "x": -0.3187222480773926,
-        "y": -0.07005240023136139,
-        "z": 1.4493521685600281
+        "x": -0.08096149936318398,
+        "y": 0.13466518372297287,
+        "z": 1.3576581478118896
       }
     },
     "dry_run": false,
     "grasp_pose_in_base": {
       "orientation": {
-        "w": 0.0,
-        "x": 0.09573293335011436,
-        "y": 0.9954070551649624,
-        "z": 0.0
+        "w": -0.025672310087422903,
+        "x": -0.41965653675811304,
+        "y": 0.9056268632243978,
+        "z": 0.055401338046112046
       },
       "position": {
-        "x": 0.7252521151351788,
-        "y": 0.33622224807739276,
-        "z": -0.06034665488532842
+        "x": 0.519879550424012,
+        "y": 0.11440708465721455,
+        "z": 0.020459217613060975
       }
     },
     "grasp_selection": {
       "delta_from_raw_centroid_m": [
-        0.0,
-        0.0,
-        0.008238398551940973
+        -0.004194103181362152,
+        0.0033503323793411255,
+        -8.26120376586914e-05
       ],
-      "grasp_pose_source": "raw_centroid_xy_with_adjusted_target_z",
+      "grasp_pose_source": "raw_centroid_xyz",
       "grasp_pose_xyz_m": [
-        -0.3187222480773926,
-        -0.07005240023136139,
-        1.4493521685600281
+        -0.08096149936318398,
+        0.13466518372297287,
+        1.3576581478118896
       ],
-      "gripper_axis_base_xy": [
-        0.9816704109443651,
-        -0.1905864745366819
-      ],
-      "gripper_axis_base_yaw_rad": -0.19175953701692372,
-      "gripper_axis_rule": "perpendicular_to_pca_major_axis",
-      "method": "median_fallback",
-      "pca_major_axis_base_xy": [
-        -0.1905864745366819,
-        -0.9816704109443651
-      ],
-      "pca_major_axis_base_yaw_rad": -1.7625558638118204,
-      "points_path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260529_211356_013042_strawberry/strawberry_0/foreground_points.npy",
+      "gripper_axis_rule": "3d_perpendicular_to_pca_major_axis",
+      "method": "local_thick_axis_band",
+      "points_path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260531_005054_149228_coke_can/coke_can_0/foreground_points.npy",
       "raw_centroid_xyz_m": [
-        -0.3187222480773926,
-        -0.07005240023136139,
-        1.4411137700080872
+        -0.08096149936318398,
+        0.13466518372297287,
+        1.3576581478118896
       ],
-      "reason": "no_dense_axis_bin",
-      "rgbd_depth_adjustment": {
-        "adjusted_target_depth_m": 1.4493521685600281,
-        "clearance_above_surface_m": -0.012,
-        "delta_depth_m": 0.008238398551940973,
-        "local_points": 142,
-        "local_radius_m": 0.035,
-        "measured_surface_depth_m": 1.4373521685600281,
-        "method": "local_radius",
-        "previous_target_depth_m": 1.4411137700080872,
-        "surface_depth_percentile": 10.0
+      "selected_band": {
+        "along_max_m": -0.0035651439831363187,
+        "along_min_m": -0.005926968424452488,
+        "point_count": 20,
+        "score": 0.0555526400456108,
+        "width_m": 0.052386659619333226,
+        "z_spread_m": 0.009199535846710294
       },
       "target_xyz_m": [
-        -0.3187222480773926,
-        -0.07005240023136139,
-        1.4493521685600281
+        -0.08515560254454613,
+        0.138015516102314,
+        1.357575535774231
       ],
       "xy_major_axis": [
-        0.9816699652778172,
-        0.19058877005597388
+        -0.7553898459986339,
+        0.6552756523495743
       ],
       "xy_minor_axis": [
-        -0.19058877005597388,
-        0.9816699652778172
+        -0.6552756523495743,
+        -0.7553898459986339
+      ],
+      "xyz_major_axis": [
+        -0.641638165797774,
+        0.7578598634351813,
+        -0.11810542572496995
+      ],
+      "xyz_major_axis_base": [
+        -0.7572599053725725,
+        0.6416381657977739,
+        0.1218929854700064
       ]
     },
     "ok": true
   },
-  "stamp_sec": 1780056865.472862,
+  "stamp_sec": 1780156283.5772226,
   "step": 2
 }

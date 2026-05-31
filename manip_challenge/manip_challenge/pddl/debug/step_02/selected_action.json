@@ -1,15 +1,15 @@
 {
   "action": {
     "args": [
-      "strawberry_0",
+      "coke_can_0",
       "table",
-      "right_storage"
+      "bookshelf"
     ],
     "name": "move-target-to-goal",
-    "pddl": "(move-target-to-goal strawberry_0 table right_storage)",
-    "source": "external"
+    "pddl": "(move-target-to-goal coke_can_0 table bookshelf)",
+    "source": "fallback"
   },
   "event": "selected_action",
-  "stamp_sec": 1780056836.8543508,
+  "stamp_sec": 1780156257.7352931,
   "step": 2
 }
