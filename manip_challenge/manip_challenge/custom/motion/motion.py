@@ -168,15 +168,18 @@ def pick_place_storage(node, arm, grasp_pose, destination, obj_name,
     # 💡 Apply dynamic rotation time (Pick angle -> Place angle)
     rot_time_place = _calc_rot_time(pick_pan_angle, place_pan_angle)
 
-    # Lift -> rotate -> approach -> place in one smooth trajectory.
-    # Fire on_before_idle when the arm is over the storage approach pose, so
-    # perception can scan the table before the robot returns to observe.
-    if on_before_idle is not None:
-        threading.Timer(1.0 + rot_time_place + 1.5, on_before_idle).start()
+    # Move deterministically to the storage approach pose first.  Once the arm is
+    # actually above storage, trigger the prefetch scan before descending.
     arm.execute_trajectory(
-        [lift_pose, place_joint, place_approach, place_pose],
-        durations=[1.0, rot_time_place, 1.5, 1.0],
+        [lift_pose, place_joint, place_approach],
+        durations=[1.0, rot_time_place, 1.5],
     )
+    if on_before_idle is not None:
+        try:
+            on_before_idle()
+        except Exception as exc:
+            node.get_logger().warn(f"storage-place callback failed: {exc}")
+    arm.execute_trajectory([place_pose], durations=[1.0])
     move_gripper.gripper_open(node)
 
     retreat_pose = copy.deepcopy(place_pose)
