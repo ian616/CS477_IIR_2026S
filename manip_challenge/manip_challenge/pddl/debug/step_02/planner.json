@@ -5,15 +5,15 @@
       "args": [
         "meat_can_0",
         "table",
-        "buffer2"
+        "left_storage"
       ],
-      "name": "move-obstacle-to-buffer",
-      "pddl": "(move-obstacle-to-buffer meat_can_0 table buffer2)",
+      "name": "move-target-to-goal",
+      "pddl": "(move-target-to-goal meat_can_0 table left_storage)",
       "source": "fallback"
     }
   ],
-  "problem": "/home/ubuntu/cs477_ws/src/cs477_IIR/manip_challenge/manip_challenge/pddl/problem.pddl",
-  "raw_output": "PDDL_PLANNER_CMD is not set; using fallback planner.\nFallback planner selected:\n(move-obstacle-to-buffer meat_can_0 table buffer2)",
-  "stamp_sec": 1780198540.0352433,
+  "problem": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/problem.pddl",
+  "raw_output": "INFO     planner time limit: None\nINFO     planner memory limit: None\n\nINFO     Running translator.\nINFO     translator stdin: None\nINFO     translator time limit: None\nINFO     translator memory limit: None\nINFO     translator command line string: /usr/bin/python3 -m translate /home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/domain.pddl /home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/problem.pddl --sas-file output.sas\nParsing...\nParsing task\n\t->Parsing element #6 in init block\nUndefined object\nGot: coke_can_1\ntranslate exit code: 31\n\nDriver aborting after translate\nINFO     Planner time: 0.38s\n\n\nFallback planner selected:\n(move-target-to-goal meat_can_0 table left_storage)",
+  "stamp_sec": 1780241373.5765817,
   "step": 2
 }

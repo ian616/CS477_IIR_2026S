@@ -1,31 +1,110 @@
 {
   "action": {
     "args": [
-      "meat_can_0",
+      "hammer_0",
       "table",
-      "storage"
+      "right_storage"
     ],
     "name": "move-target-to-goal",
-    "pddl": "(move-target-to-goal meat_can_0 table storage)",
-    "source": "fallback"
+    "pddl": "(move-target-to-goal hammer_0 table right_storage)",
+    "source": "external"
   },
   "event": "action_result",
   "result": {
     "action": {
       "args": [
-        "meat_can_0",
+        "hammer_0",
         "table",
-        "storage"
+        "right_storage"
       ],
       "name": "move-target-to-goal",
-      "pddl": "(move-target-to-goal meat_can_0 table storage)",
-      "source": "fallback"
+      "pddl": "(move-target-to-goal hammer_0 table right_storage)",
+      "source": "external"
     },
-    "command_id": "step4-131f1ebe",
+    "class_name": "hammer",
+    "command_id": "step4-0e742c83",
+    "destination": "right storage",
+    "detected_pose_in_source": {
+      "orientation": {
+        "w": 1.0,
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "position": {
+        "x": 0.27945175766944885,
+        "y": 0.2605951726436615,
+        "z": 1.458993673324585
+      }
+    },
     "dry_run": false,
-    "error": "'storage'",
-    "ok": false
+    "grasp_pose_in_base": {
+      "orientation": {
+        "w": 7.355782432486104e-05,
+        "x": -0.005497950521323467,
+        "y": 0.9998953961851846,
+        "z": -0.01337773586913295
+      },
+      "position": {
+        "x": 0.3945640010399885,
+        "y": -0.24727278003960027,
+        "z": -0.0803306209623108
+      }
+    },
+    "grasp_selection": {
+      "delta_from_raw_centroid_m": [
+        -0.14205363392829895,
+        -0.009530916810035706,
+        0.0008623003959655762
+      ],
+      "grasp_pose_source": "raw_centroid_xyz",
+      "grasp_pose_xyz_m": [
+        0.27945175766944885,
+        0.2605951726436615,
+        1.458993673324585
+      ],
+      "gripper_axis_rule": "3d_perpendicular_to_pca_major_axis",
+      "method": "local_thick_axis_band",
+      "points_path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260601_003048_162323_hammer/hammer_0/foreground_points.npy",
+      "raw_centroid_xyz_m": [
+        0.27945175766944885,
+        0.2605951726436615,
+        1.458993673324585
+      ],
+      "selected_band": {
+        "along_max_m": -0.132837197276969,
+        "along_min_m": -0.14849399160108892,
+        "point_count": 136,
+        "score": 0.08562834819266447,
+        "width_m": 0.08852665910484758,
+        "z_spread_m": 0.021582424640655518
+      },
+      "target_xyz_m": [
+        0.1373981237411499,
+        0.2510642558336258,
+        1.4598559737205505
+      ],
+      "xy_major_axis": [
+        -0.9999402684464735,
+        0.010929754763685911
+      ],
+      "xy_minor_axis": [
+        -0.010929754763685911,
+        -0.9999402684464735
+      ],
+      "xyz_major_axis": [
+        -0.9995816174461617,
+        0.010858887254537024,
+        0.02680810756671807
+      ],
+      "xyz_major_axis_base": [
+        -0.010992782755160689,
+        0.9995816174461616,
+        -0.02675348184841208
+      ]
+    },
+    "ok": true
   },
-  "stamp_sec": 1780194609.176306,
+  "stamp_sec": 1780241503.809555,
   "step": 4
 }

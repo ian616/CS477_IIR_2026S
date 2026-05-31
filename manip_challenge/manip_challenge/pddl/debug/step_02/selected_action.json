@@ -3,13 +3,13 @@
     "args": [
       "meat_can_0",
       "table",
-      "buffer2"
+      "left_storage"
     ],
-    "name": "move-obstacle-to-buffer",
-    "pddl": "(move-obstacle-to-buffer meat_can_0 table buffer2)",
+    "name": "move-target-to-goal",
+    "pddl": "(move-target-to-goal meat_can_0 table left_storage)",
     "source": "fallback"
   },
   "event": "selected_action",
-  "stamp_sec": 1780198540.0357943,
+  "stamp_sec": 1780241373.5868077,
   "step": 2
 }

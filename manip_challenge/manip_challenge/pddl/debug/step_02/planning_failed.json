@@ -1,7 +1,0 @@
-{
-  "completed": [],
-  "event": "planning_failed",
-  "message": "No executable PDDL action found.",
-  "stamp_sec": 1780189480.2257318,
-  "step": 2
-}

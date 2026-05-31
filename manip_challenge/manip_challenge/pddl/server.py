@@ -788,6 +788,8 @@ class PddlTampServer(Node):
         if not goals:
             raise ValueError("No valid goals after filtering unknown destinations.")
 
+        self.reset_debug_artifacts()
+
         self.get_logger().info("[PDDL] Parsed goals:")
         for goal in goals:
             self.get_logger().info(f"[PDDL]   {goal.object_name} -> {goal.location}")
@@ -1236,6 +1238,8 @@ class PddlTampServer(Node):
     def save_step_artifacts(self, summary: dict, state, step_idx: int, command_text: str) -> None:
         debug_dir = PDDL_DIR / "debug"
         step_dir = debug_dir / f"step_{step_idx:02d}"
+        if step_dir.exists():
+            shutil.rmtree(step_dir)
         step_dir.mkdir(parents=True, exist_ok=True)
 
         images = []
@@ -1288,6 +1292,13 @@ class PddlTampServer(Node):
         predicates_path.write_text(text + "\n", encoding="utf-8")
         latest_path.write_text(text + "\n", encoding="utf-8")
         self.get_logger().info(f"[PDDL] Step artifacts saved: {predicates_path}")
+
+    def reset_debug_artifacts(self) -> None:
+        debug_dir = PDDL_DIR / "debug"
+        if debug_dir.exists():
+            shutil.rmtree(debug_dir)
+        debug_dir.mkdir(parents=True, exist_ok=True)
+        self.get_logger().info(f"[PDDL] Cleared previous debug artifacts: {debug_dir}")
 
     def save_step_json(self, step_idx: int, filename: str, payload: dict, latest_name: str | None = None) -> None:
         debug_dir = PDDL_DIR / "debug"

@@ -7,9 +7,9 @@
     ],
     "name": "move-target-to-goal",
     "pddl": "(move-target-to-goal banana_0 table left_storage)",
-    "source": "fallback"
+    "source": "external"
   },
   "event": "selected_action",
-  "stamp_sec": 1780202497.2844722,
-  "step": 1
+  "stamp_sec": 1780241504.3770173,
+  "step": 5
 }

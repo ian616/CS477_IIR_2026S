@@ -1,31 +1,103 @@
 {
   "action": {
     "args": [
-      "meat_can_0",
+      "strawberry_0",
       "table",
-      "storage"
+      "right_storage"
     ],
     "name": "move-target-to-goal",
-    "pddl": "(move-target-to-goal meat_can_0 table storage)",
-    "source": "fallback"
+    "pddl": "(move-target-to-goal strawberry_0 table right_storage)",
+    "source": "external"
   },
   "event": "action_result",
   "result": {
     "action": {
       "args": [
-        "meat_can_0",
+        "strawberry_0",
         "table",
-        "storage"
+        "right_storage"
       ],
       "name": "move-target-to-goal",
-      "pddl": "(move-target-to-goal meat_can_0 table storage)",
-      "source": "fallback"
+      "pddl": "(move-target-to-goal strawberry_0 table right_storage)",
+      "source": "external"
     },
-    "command_id": "step3-81c05c47",
+    "class_name": "strawberry",
+    "command_id": "step3-0b9435e8",
+    "destination": "right storage",
+    "detected_pose_in_source": {
+      "orientation": {
+        "w": 1.0,
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "position": {
+        "x": 0.28791841864585876,
+        "y": 0.09795314073562622,
+        "z": 1.441990613937378
+      }
+    },
     "dry_run": false,
-    "error": "'storage'",
-    "ok": false
+    "grasp_pose_in_base": {
+      "orientation": {
+        "w": 0.045474136899932883,
+        "x": 0.7937097364264558,
+        "y": 0.6056014266852606,
+        "z": 0.034696817891980036
+      },
+      "position": {
+        "x": 0.5586073608774572,
+        "y": -0.2557803583929684,
+        "z": -0.06406670057666758
+      }
+    },
+    "grasp_selection": {
+      "delta_from_raw_centroid_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "grasp_pose_source": "raw_centroid_xyz",
+      "grasp_pose_xyz_m": [
+        0.28791841864585876,
+        0.09795314073562622,
+        1.441990613937378
+      ],
+      "gripper_axis_rule": "3d_perpendicular_to_pca_major_axis",
+      "method": "median_fallback",
+      "points_path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260601_003000_456152_strawberry/strawberry_0/foreground_points.npy",
+      "raw_centroid_xyz_m": [
+        0.28791841864585876,
+        0.09795314073562622,
+        1.441990613937378
+      ],
+      "reason": "no_dense_axis_bin",
+      "target_xyz_m": [
+        0.28791841864585876,
+        0.09795314073562622,
+        1.441990613937378
+      ],
+      "xy_major_axis": [
+        0.19200440405005664,
+        -0.9813940639851978
+      ],
+      "xy_minor_axis": [
+        0.9813940639851978,
+        0.19200440405005664
+      ],
+      "xyz_major_axis": [
+        0.2623580297399664,
+        -0.9576048886824343,
+        -0.11900059412652289
+      ],
+      "xyz_major_axis_base": [
+        0.9581878818140637,
+        -0.2623580297399662,
+        0.11421141525977618
+      ]
+    },
+    "ok": true
   },
-  "stamp_sec": 1780194606.8035653,
+  "stamp_sec": 1780241461.3451188,
   "step": 3
 }
