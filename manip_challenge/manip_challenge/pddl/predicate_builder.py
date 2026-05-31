@@ -20,7 +20,7 @@ MIN_FOREGROUND_POINTS = 20
 BBOX_OVERLAP_THRESHOLD = 0.08
 DEPTH_ORDER_EPS_M = 0.008
 SAFE_DISTANCE_M = 0.11
-SAFE_PIXEL_DISTANCE = 95.0
+SAFE_PIXEL_DISTANCE = 20.0
 # Predicate tuning guide:
 # This file is the main swap point for symbolic state judgement.  Geometry,
 # masks, depth, and safety distances should be converted to boolean PDDL facts
@@ -59,17 +59,6 @@ def _bbox_center(bbox):
     x1, y1, x2, y2 = bbox
     return ((x1 + x2) * 0.5, (y1 + y2) * 0.5)
 
-
-def _distance(a: ObjectState, b: ObjectState) -> float | None:
-    a_xyz = a.grasp_xyz or a.centroid_xyz
-    b_xyz = b.grasp_xyz or b.centroid_xyz
-    if a_xyz and b_xyz:
-        return float(np.linalg.norm(np.asarray(a_xyz[:2]) - np.asarray(b_xyz[:2])))
-    ac = _bbox_center(a.bbox_xyxy)
-    bc = _bbox_center(b.bbox_xyxy)
-    if ac and bc:
-        return math.dist(ac, bc)
-    return None
 
 
 def _dist_point_to_bbox(px: float, py: float, bbox) -> float:
@@ -269,25 +258,17 @@ def _annotate_relations(objects: dict[str, ObjectState]) -> None:
                         blocked.blocked_by.add(blocker.name)
                         blocked.clear = False
 
-            # near: target-obstacle uses grasp pixel → nearest obstacle bbox edge.
-            # other pairs (target-target, obstacle-obstacle) use centroid/bbox-center distance.
-            if a.is_target != b.is_target:
-                target, obstacle = (a, b) if a.is_target else (b, a)
-                d = _grasp_to_obstacle_dist(target, obstacle)
-                threshold = SAFE_PIXEL_DISTANCE
-                mode = "grasp→bbox"
-            else:
-                d = _distance(a, b)
-                threshold = SAFE_DISTANCE_M if (a.grasp_xyz or a.centroid_xyz) and (b.grasp_xyz or b.centroid_xyz) else SAFE_PIXEL_DISTANCE
-                mode = "centroid"
-            is_near = d is not None and d < threshold
+            # near: target-obstacle pairs only, using grasp pixel → nearest obstacle bbox edge.
+            if a.is_target == b.is_target:
+                continue
+            target, obstacle = (a, b) if a.is_target else (b, a)
+            d = _grasp_to_obstacle_dist(target, obstacle)
+            is_near = d is not None and d < SAFE_PIXEL_DISTANCE
             logger.debug(
-                "[near] %s(%s) ↔ %s(%s)  mode=%s  d=%s  thr=%.1f  near=%s",
-                a.name, "T" if a.is_target else "O",
-                b.name, "T" if b.is_target else "O",
-                mode,
+                "[near] %s(T) ↔ %s(O)  d=%s  thr=%.1f  near=%s",
+                target.name, obstacle.name,
                 f"{d:.1f}" if d is not None else "None",
-                threshold,
+                SAFE_PIXEL_DISTANCE,
                 is_near,
             )
             if is_near:
