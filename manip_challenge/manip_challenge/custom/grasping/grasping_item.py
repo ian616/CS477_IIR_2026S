@@ -185,7 +185,7 @@ def grasping_item(node, arm, grasp_pose, obj_name, perception_info=None,
 
     # --- IGNORE ---
     # Remove after the transform values in the database are finalized.
-    corrected_grasp_pose = grasp_pose
+    # corrected_grasp_pose = grasp_pose
     # --------------
 
 
