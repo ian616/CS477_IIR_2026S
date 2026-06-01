@@ -1,10 +1,10 @@
 {
   "command": "Move the banana and the meat can to the left storage. Move the strawberry and the hammer in the right storage. Move the coke can on the shelf.",
   "completed": [
+    "banana",
     "coke_can",
     "hammer",
-    "meat_can",
-    "strawberry"
+    "meat_can"
   ],
   "event": "planning_step_start",
   "goals": [
@@ -41,116 +41,230 @@
   ],
   "images": [
     {
-      "class_name": "banana",
+      "class_name": "strawberry",
       "instance_index": 0,
       "kind": "annotated",
-      "object": "banana_0",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_05/banana_0_annotated.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260601_003134_470396_banana/banana_0/annotated.png"
+      "object": "strawberry_0",
+      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_05/strawberry_0_annotated.png",
+      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/results/wrist_seg/20260602_010610_635989_strawberry/strawberry_0/annotated.png"
     },
     {
-      "class_name": "banana",
+      "class_name": "strawberry",
       "instance_index": 0,
       "kind": "depth_png",
-      "object": "banana_0",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_05/banana_0_depth_png.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260601_003134_470396_banana/banana_0/depth.png"
+      "object": "strawberry_0",
+      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_05/strawberry_0_depth_png.png",
+      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/results/wrist_seg/20260602_010610_635989_strawberry/strawberry_0/depth.png"
     },
     {
-      "class_name": "banana",
+      "class_name": "strawberry",
       "instance_index": 0,
       "kind": "depth_visualization",
-      "object": "banana_0",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_05/banana_0_depth_visualization.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260601_003134_470396_banana/banana_0/depth_vis.png"
+      "object": "strawberry_0",
+      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_05/strawberry_0_depth_visualization.png",
+      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/results/wrist_seg/20260602_010610_635989_strawberry/strawberry_0/depth_vis.png"
     },
     {
-      "class_name": "banana",
+      "class_name": "strawberry",
       "instance_index": 0,
       "kind": "mask",
-      "object": "banana_0",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_05/banana_0_mask.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260601_003134_470396_banana/banana_0/mask.png"
+      "object": "strawberry_0",
+      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_05/strawberry_0_mask.png",
+      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/results/wrist_seg/20260602_010610_635989_strawberry/strawberry_0/mask.png"
     },
     {
-      "class_name": "banana",
+      "class_name": "strawberry",
       "instance_index": 0,
       "kind": "mask_full",
-      "object": "banana_0",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_05/banana_0_mask_full.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260601_003134_470396_banana/banana_0/mask_full.png"
+      "object": "strawberry_0",
+      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_05/strawberry_0_mask_full.png",
+      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/results/wrist_seg/20260602_010610_635989_strawberry/strawberry_0/mask_full.png"
     },
     {
-      "class_name": "banana",
+      "class_name": "strawberry",
       "instance_index": 0,
       "kind": "mask_overlay",
-      "object": "banana_0",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_05/banana_0_mask_overlay.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260601_003134_470396_banana/banana_0/mask_overlay.png"
+      "object": "strawberry_0",
+      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_05/strawberry_0_mask_overlay.png",
+      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/results/wrist_seg/20260602_010610_635989_strawberry/strawberry_0/mask_overlay.png"
     },
     {
-      "class_name": "banana",
+      "class_name": "strawberry",
       "instance_index": 0,
       "kind": "mask_raw",
-      "object": "banana_0",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_05/banana_0_mask_raw.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260601_003134_470396_banana/banana_0/mask_raw.png"
+      "object": "strawberry_0",
+      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_05/strawberry_0_mask_raw.png",
+      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/results/wrist_seg/20260602_010610_635989_strawberry/strawberry_0/mask_raw.png"
     },
     {
-      "class_name": "banana",
+      "class_name": "strawberry",
       "instance_index": 0,
       "kind": "rgb",
-      "object": "banana_0",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_05/banana_0_rgb.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260601_003134_470396_banana/banana_0/rgb.png"
+      "object": "strawberry_0",
+      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_05/strawberry_0_rgb.png",
+      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/results/wrist_seg/20260602_010610_635989_strawberry/strawberry_0/rgb.png"
     },
     {
-      "class_name": "banana",
+      "class_name": "strawberry",
       "instance_index": 0,
       "kind": "rgb_masked",
-      "object": "banana_0",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_05/banana_0_rgb_masked.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260601_003134_470396_banana/banana_0/rgb_masked.png"
+      "object": "strawberry_0",
+      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_05/strawberry_0_rgb_masked.png",
+      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/results/wrist_seg/20260602_010610_635989_strawberry/strawberry_0/rgb_masked.png"
+    },
+    {
+      "class_name": "strawberry",
+      "instance_index": 1,
+      "kind": "annotated",
+      "object": "strawberry_1",
+      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_05/strawberry_1_annotated.png",
+      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/results/wrist_seg/20260602_010610_635989_strawberry/strawberry_1/annotated.png"
+    },
+    {
+      "class_name": "strawberry",
+      "instance_index": 1,
+      "kind": "depth_png",
+      "object": "strawberry_1",
+      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_05/strawberry_1_depth_png.png",
+      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/results/wrist_seg/20260602_010610_635989_strawberry/strawberry_1/depth.png"
+    },
+    {
+      "class_name": "strawberry",
+      "instance_index": 1,
+      "kind": "depth_visualization",
+      "object": "strawberry_1",
+      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_05/strawberry_1_depth_visualization.png",
+      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/results/wrist_seg/20260602_010610_635989_strawberry/strawberry_1/depth_vis.png"
+    },
+    {
+      "class_name": "strawberry",
+      "instance_index": 1,
+      "kind": "mask",
+      "object": "strawberry_1",
+      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_05/strawberry_1_mask.png",
+      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/results/wrist_seg/20260602_010610_635989_strawberry/strawberry_1/mask.png"
+    },
+    {
+      "class_name": "strawberry",
+      "instance_index": 1,
+      "kind": "mask_full",
+      "object": "strawberry_1",
+      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_05/strawberry_1_mask_full.png",
+      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/results/wrist_seg/20260602_010610_635989_strawberry/strawberry_1/mask_full.png"
+    },
+    {
+      "class_name": "strawberry",
+      "instance_index": 1,
+      "kind": "mask_overlay",
+      "object": "strawberry_1",
+      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_05/strawberry_1_mask_overlay.png",
+      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/results/wrist_seg/20260602_010610_635989_strawberry/strawberry_1/mask_overlay.png"
+    },
+    {
+      "class_name": "strawberry",
+      "instance_index": 1,
+      "kind": "mask_raw",
+      "object": "strawberry_1",
+      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_05/strawberry_1_mask_raw.png",
+      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/results/wrist_seg/20260602_010610_635989_strawberry/strawberry_1/mask_raw.png"
+    },
+    {
+      "class_name": "strawberry",
+      "instance_index": 1,
+      "kind": "rgb",
+      "object": "strawberry_1",
+      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_05/strawberry_1_rgb.png",
+      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/results/wrist_seg/20260602_010610_635989_strawberry/strawberry_1/rgb.png"
+    },
+    {
+      "class_name": "strawberry",
+      "instance_index": 1,
+      "kind": "rgb_masked",
+      "object": "strawberry_1",
+      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_05/strawberry_1_rgb_masked.png",
+      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/results/wrist_seg/20260602_010610_635989_strawberry/strawberry_1/rgb_masked.png"
     }
   ],
   "notes": [],
   "objects": {
-    "banana_0": {
+    "strawberry_0": {
       "bbox_xyxy": [
-        66,
-        198,
-        134,
-        236
+        577,
+        165,
+        619,
+        211
       ],
       "blocked_by": [],
       "blocks": [],
       "centroid_xyz": [
-        -0.19628803431987762,
-        0.28836607933044434,
-        1.446478009223938
+        0.398179292678833,
+        -0.07684750854969025,
+        0.665544331073761
       ],
-      "class_name": "banana",
+      "class_name": "strawberry",
       "clear": true,
-      "confidence": 0.9483664035797119,
+      "confidence": 0.9162188768386841,
       "debug_files": {
-        "annotated": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260601_003134_470396_banana/banana_0/annotated.png",
-        "depth_png": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260601_003134_470396_banana/banana_0/depth.png",
-        "depth_visualization": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260601_003134_470396_banana/banana_0/depth_vis.png",
-        "mask": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260601_003134_470396_banana/banana_0/mask.png",
-        "mask_full": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260601_003134_470396_banana/banana_0/mask_full.png",
-        "mask_overlay": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260601_003134_470396_banana/banana_0/mask_overlay.png",
-        "mask_raw": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260601_003134_470396_banana/banana_0/mask_raw.png",
-        "rgb": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260601_003134_470396_banana/banana_0/rgb.png",
-        "rgb_masked": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260601_003134_470396_banana/banana_0/rgb_masked.png"
+        "annotated": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/results/wrist_seg/20260602_010610_635989_strawberry/strawberry_0/annotated.png",
+        "depth_png": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/results/wrist_seg/20260602_010610_635989_strawberry/strawberry_0/depth.png",
+        "depth_visualization": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/results/wrist_seg/20260602_010610_635989_strawberry/strawberry_0/depth_vis.png",
+        "mask": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/results/wrist_seg/20260602_010610_635989_strawberry/strawberry_0/mask.png",
+        "mask_full": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/results/wrist_seg/20260602_010610_635989_strawberry/strawberry_0/mask_full.png",
+        "mask_overlay": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/results/wrist_seg/20260602_010610_635989_strawberry/strawberry_0/mask_overlay.png",
+        "mask_raw": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/results/wrist_seg/20260602_010610_635989_strawberry/strawberry_0/mask_raw.png",
+        "rgb": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/results/wrist_seg/20260602_010610_635989_strawberry/strawberry_0/rgb.png",
+        "rgb_masked": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/results/wrist_seg/20260602_010610_635989_strawberry/strawberry_0/rgb_masked.png"
       },
-      "depth_median": 1.446478009223938,
+      "depth_median": 0.665544331073761,
       "detected": true,
       "error": null,
-      "foreground_points": 973,
+      "foreground_points": 1181,
       "graspable": true,
       "instance_index": 0,
       "location": "table",
-      "mask_pixels": 973,
+      "mask_pixels": 1181,
+      "near": [],
+      "pose_known": true,
+      "safe": true,
+      "target": true,
+      "visible": true
+    },
+    "strawberry_1": {
+      "bbox_xyxy": [
+        301,
+        261,
+        339,
+        299
+      ],
+      "blocked_by": [],
+      "blocks": [],
+      "centroid_xyz": [
+        -0.0007271747454069555,
+        0.06043747812509537,
+        0.6748436689376831
+      ],
+      "class_name": "strawberry",
+      "clear": true,
+      "confidence": 0.8942365646362305,
+      "debug_files": {
+        "annotated": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/results/wrist_seg/20260602_010610_635989_strawberry/strawberry_1/annotated.png",
+        "depth_png": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/results/wrist_seg/20260602_010610_635989_strawberry/strawberry_1/depth.png",
+        "depth_visualization": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/results/wrist_seg/20260602_010610_635989_strawberry/strawberry_1/depth_vis.png",
+        "mask": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/results/wrist_seg/20260602_010610_635989_strawberry/strawberry_1/mask.png",
+        "mask_full": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/results/wrist_seg/20260602_010610_635989_strawberry/strawberry_1/mask_full.png",
+        "mask_overlay": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/results/wrist_seg/20260602_010610_635989_strawberry/strawberry_1/mask_overlay.png",
+        "mask_raw": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/results/wrist_seg/20260602_010610_635989_strawberry/strawberry_1/mask_raw.png",
+        "rgb": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/results/wrist_seg/20260602_010610_635989_strawberry/strawberry_1/rgb.png",
+        "rgb_masked": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/results/wrist_seg/20260602_010610_635989_strawberry/strawberry_1/rgb_masked.png"
+      },
+      "depth_median": 0.6748436689376831,
+      "detected": true,
+      "error": null,
+      "foreground_points": 955,
+      "graspable": true,
+      "instance_index": 1,
+      "location": "table",
+      "mask_pixels": 955,
       "near": [],
       "pose_known": true,
       "safe": true,
@@ -160,21 +274,26 @@
   },
   "occupied_buffers": [],
   "predicates": [
-    "at banana_0 table",
+    "at strawberry_0 table",
+    "at strawberry_1 table",
     "buffer buffer1",
     "buffer buffer2",
     "buffer-free buffer1",
     "buffer-free buffer2",
-    "clear banana_0",
-    "goal-at banana_0 left_storage",
-    "graspable banana_0",
+    "clear strawberry_0",
+    "clear strawberry_1",
+    "goal-at strawberry_0 right_storage",
+    "graspable strawberry_0",
+    "graspable strawberry_1",
     "handempty",
-    "safe banana_0",
+    "safe strawberry_0",
+    "safe strawberry_1",
     "storage bookshelf",
     "storage left_storage",
     "storage right_storage",
-    "target banana_0"
+    "target strawberry_0",
+    "target strawberry_1"
   ],
-  "stamp_sec": 1780241503.8237255,
+  "stamp_sec": 1780329971.1427372,
   "step": 5
 }
