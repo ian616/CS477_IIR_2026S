@@ -12,6 +12,7 @@ import sys
 
 THIS_FILE = Path(__file__).resolve()
 PERCEPTION_DIR = THIS_FILE.parents[1]
+CUSTOM_DIR = PERCEPTION_DIR.parent
 PACKAGE_ROOT = THIS_FILE.parents[4]
 
 if str(PACKAGE_ROOT) not in sys.path:
@@ -21,7 +22,7 @@ from manip_challenge.custom.perception.icp.rgbd_seg_crop_server import RgbdSegCr
 
 
 DEFAULTS = {
-    "model_path": str(PERCEPTION_DIR / "model" / "yolov11_seg.pt"),
+    "model_path": str(CUSTOM_DIR / "best.pt"),
     "image_topic": "/camera/camera/color/image_raw",
     "depth_topic": "/camera/camera/depth/color/image_raw",
     "points_topic": "/camera/camera/depth/color/points",

@@ -177,8 +177,6 @@ move_gripper.gripper_open = executor_safe_gripper_open
 move_gripper.gripper_close = executor_safe_gripper_close
 
 from manip_challenge.custom.motion.motion import PLACE_CONFIGS, execute_pick_place_sequence  # noqa: E402
-from manip_challenge.custom.tamp.executor import execute_tamp_command  # noqa: E402
-from manip_challenge.custom.tamp.nlp import parse_task_goals  # noqa: E402
 
 
 # wrist_1=-1.0 keeps shoulder_lift + elbow + wrist_1 == -pi/2 for the vertical home posture.

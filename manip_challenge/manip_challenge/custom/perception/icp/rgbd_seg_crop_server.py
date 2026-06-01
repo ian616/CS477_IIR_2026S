@@ -6,6 +6,7 @@ the requested object's RGB-D pixels and organized point-cloud samples.
 """
 
 import json
+import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -16,6 +17,7 @@ import rclpy
 import sensor_msgs_py.point_cloud2 as pc2
 import std_msgs.msg
 from cv_bridge import CvBridge, CvBridgeError
+from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from riro_srvs.srv import StringString
@@ -42,7 +44,8 @@ except ImportError:
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PERCEPTION_DIR = SCRIPT_DIR.parent
-DEFAULT_MODEL_PATH = PERCEPTION_DIR / "model" / "yolov11_seg.pt"
+CUSTOM_DIR = PERCEPTION_DIR.parent
+DEFAULT_MODEL_PATH = CUSTOM_DIR / "best.pt"
 DEFAULT_SAVE_DIR = Path(
     "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/results"
 )
@@ -533,6 +536,7 @@ class RgbdSegCropServiceNode(Node):
         self.declare_parameter("image_topic", "/camera/camera/color/image_raw")
         self.declare_parameter("depth_topic", "/camera/camera/depth/color/image_raw")
         self.declare_parameter("points_topic", "/camera/camera/depth/color/points")
+        self.declare_parameter("input_wait_timeout", 5.0)
         self.declare_parameter("camera_frame", "camera_color_optical_frame")
         self.declare_parameter("bbox_padding_ratio", 0.02)
         self.declare_parameter("input_crop_ratio", 1.0)
@@ -548,6 +552,7 @@ class RgbdSegCropServiceNode(Node):
 
         self.target_label = parse_target_label(self.get_parameter("target_label").value)
         self.display = bool(self.get_parameter("display").value)
+        self.input_wait_timeout = float(self.get_parameter("input_wait_timeout").value)
         self.camera_frame = str(self.get_parameter("camera_frame").value)
         self.bbox_padding_ratio = float(self.get_parameter("bbox_padding_ratio").value)
         self.input_crop_ratio = float(self.get_parameter("input_crop_ratio").value)
@@ -574,11 +579,35 @@ class RgbdSegCropServiceNode(Node):
         self.annotated_img = None
         self.mask_img = None
         self.skip_counts = {}
+        self.callback_group = ReentrantCallbackGroup()
 
-        self.create_subscription(Image, self.get_parameter("image_topic").value, self.image_callback, qos_profile)
-        self.create_subscription(Image, self.get_parameter("depth_topic").value, self.depth_callback, qos_profile)
-        self.create_subscription(PointCloud2, self.get_parameter("points_topic").value, self.points_callback, qos_profile)
-        self.create_service(StringString, self.get_parameter("service_name").value, self.detect_callback)
+        self.create_subscription(
+            Image,
+            self.get_parameter("image_topic").value,
+            self.image_callback,
+            qos_profile,
+            callback_group=self.callback_group,
+        )
+        self.create_subscription(
+            Image,
+            self.get_parameter("depth_topic").value,
+            self.depth_callback,
+            qos_profile,
+            callback_group=self.callback_group,
+        )
+        self.create_subscription(
+            PointCloud2,
+            self.get_parameter("points_topic").value,
+            self.points_callback,
+            qos_profile,
+            callback_group=self.callback_group,
+        )
+        self.create_service(
+            StringString,
+            self.get_parameter("service_name").value,
+            self.detect_callback,
+            callback_group=self.callback_group,
+        )
 
         latched_qos = QoSProfile(depth=10)
         latched_qos.reliability = ReliabilityPolicy.BEST_EFFORT
@@ -589,7 +618,7 @@ class RgbdSegCropServiceNode(Node):
         self.roi_mask_pub = self.create_publisher(Image, self.get_parameter("roi_mask_topic").value, 10)
 
         display_hz = max(float(self.get_parameter("display_hz").value), 0.1)
-        self.timer = self.create_timer(1.0 / display_hz, self.timer_callback)
+        self.timer = self.create_timer(1.0 / display_hz, self.timer_callback, callback_group=self.callback_group)
         self.get_logger().info(
             f"{self.READY_LOG_NAME} ready. "
             f"model={self.detector.model_path}, save_dir={self.save_dir}, known_labels={', '.join(known_labels())}"
@@ -709,16 +738,32 @@ class RgbdSegCropServiceNode(Node):
         self.roi_info_pub.publish(msg)
         return response
 
-    def detect_and_save(self, target_label, request_text):
-        if self.latest_cv_img is None or self.latest_depth_img is None or self.latest_cloud is None:
-            missing = []
-            if self.latest_cv_img is None:
-                missing.append("RGB image")
-            if self.latest_depth_img is None:
-                missing.append("depth image")
-            if self.latest_cloud is None:
-                missing.append("organized point cloud")
+    def missing_detection_inputs(self):
+        missing = []
+        if self.latest_cv_img is None:
+            missing.append("RGB image")
+        if self.latest_depth_img is None:
+            missing.append("depth image")
+        if self.latest_cloud is None:
+            missing.append("organized point cloud")
+        return missing
+
+    def wait_for_detection_inputs(self):
+        missing = self.missing_detection_inputs()
+        if not missing:
+            return
+
+        timeout = max(0.0, self.input_wait_timeout)
+        deadline = time.monotonic() + timeout
+        self.get_logger().info(f"Waiting up to {timeout:.1f}s for {', '.join(missing)} before detection.")
+        while rclpy.ok() and missing and time.monotonic() < deadline:
+            time.sleep(0.02)
+            missing = self.missing_detection_inputs()
+        if missing:
             raise RuntimeError(f"{', '.join(missing)} has not been received yet.")
+
+    def detect_and_save(self, target_label, request_text):
+        self.wait_for_detection_inputs()
 
         target_model = get_model(target_label)
         if target_model is None:
