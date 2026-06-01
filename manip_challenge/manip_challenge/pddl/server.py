@@ -367,7 +367,9 @@ class PddlTampServer(Node):
         self.pddl_log_pub = self.create_publisher(String, args.log_topic, 10)
         self.grasp_pose_publisher = self.create_publisher(PoseStamped, '/grasp_target_pose', 10)
         self.corrected_grasp_pose_publisher = self.create_publisher(PoseStamped, '/corrected_grasp_pose', 10)
-        self.pca_debug_publisher = self.create_publisher(MarkerArray, '/grasp_pca_debug', 10)
+        self.pca_debug_publisher = self.create_publisher(MarkerArray, '/pca_debug', 10)
+        from sensor_msgs.msg import PointCloud2
+        self.pc2_publisher = self.create_publisher(PointCloud2, '/pca_debug_cloud', 10)
         self.executor_command_pub = self.create_publisher(String, args.executor_command_topic, 10)
         self.executor_result_sub = self.create_subscription(
             String,
@@ -1602,7 +1604,8 @@ class PddlTampServer(Node):
         # Centroid Sphere (Yellow)
         centroid_marker = Marker()
         centroid_marker.header.frame_id = "base_link"
-        centroid_marker.header.stamp = pose_msg.header.stamp
+        centroid_marker.header.stamp.sec = 0
+        centroid_marker.header.stamp.nanosec = 0
         centroid_marker.ns = "pca_debug"
         centroid_marker.id = 0
         centroid_marker.type = Marker.SPHERE
@@ -1621,7 +1624,8 @@ class PddlTampServer(Node):
             # 3D PCA Arrow (Cyan)
             pca_arrow = Marker()
             pca_arrow.header.frame_id = "base_link"
-            pca_arrow.header.stamp = pose_msg.header.stamp
+            pca_arrow.header.stamp.sec = 0
+            pca_arrow.header.stamp.nanosec = 0
             pca_arrow.ns = "pca_debug"
             pca_arrow.id = 1
             pca_arrow.type = Marker.ARROW
@@ -1645,28 +1649,24 @@ class PddlTampServer(Node):
         if points_path and os.path.isfile(points_path):
             try:
                 points = np.load(points_path)
-                pc_marker = Marker()
-                pc_marker.header.frame_id = source_frame
-                pc_marker.header.stamp = pose_msg.header.stamp
-                pc_marker.ns = "pca_debug"
-                pc_marker.id = 2
-                pc_marker.type = Marker.POINTS
-                pc_marker.action = Marker.ADD
-                pc_marker.scale.x = 0.005
-                pc_marker.scale.y = 0.005
-                pc_marker.color.r = 1.0
-                pc_marker.color.g = 0.5
-                pc_marker.color.b = 0.0
-                pc_marker.color.a = 0.5
                 
-                step = max(1, len(points) // 3000)
-                for pt in points[::step]:
-                    p = Point()
-                    p.x = float(pt[0])
-                    p.y = float(pt[1])
-                    p.z = float(pt[2])
-                    pc_marker.points.append(p)
-                marker_array.markers.append(pc_marker)
+                # Filter out NaN values
+                points = points.reshape(-1, points.shape[-1])[:, :3]
+                points = points[np.isfinite(points).all(axis=1)]
+                
+                # Create a proper PointCloud2 message
+                from sensor_msgs_py.point_cloud2 import create_cloud_xyz32
+                from std_msgs.msg import Header
+                
+                header = Header()
+                header.frame_id = source_frame
+                # timestamp 0 bypasses strict TF timing checks
+                header.stamp.sec = 0
+                header.stamp.nanosec = 0
+                
+                pc2 = create_cloud_xyz32(header, points)
+                self.pc2_publisher.publish(pc2)
+                self.get_logger().info(f"Published {len(points)} valid points to /pca_debug_cloud")
             except Exception as e:
                 self.get_logger().error(f"Failed to load point cloud for visualization: {e}")
             
@@ -1860,7 +1860,7 @@ def parse_args(argv=None):
     parser.add_argument("--grasp-surface-clearance", type=float, default=-0.012)
     parser.add_argument("--grasp-depth-local-radius", type=float, default=0.0005)
     parser.add_argument("--grasp-depth-percentile", type=float, default=10.0)
-    parser.add_argument("--grasp-y-offset", type=float, default=-0.0)
+    parser.add_argument("--grasp-y-offset", type=float, default=-0.015)
     parser.add_argument("--gripper-force", type=float, default=0.5)
     parser.add_argument("--gripper-close-pos", type=float, default=0.5)
     parser.add_argument("--gripper-settle-time", type=float, default=0.4)
