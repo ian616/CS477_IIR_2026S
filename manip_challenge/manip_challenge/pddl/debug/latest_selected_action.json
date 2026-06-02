@@ -3,13 +3,13 @@
     "args": [
       "banana_0",
       "table",
-      "bookshelf"
+      "left_storage"
     ],
     "name": "move-target-to-goal",
-    "pddl": "(move-target-to-goal banana_0 table bookshelf)",
-    "source": "external"
+    "pddl": "(move-target-to-goal banana_0 table left_storage)",
+    "source": "fallback"
   },
   "event": "selected_action",
-  "stamp_sec": 1780383533.980468,
-  "step": 5
+  "stamp_sec": 1780387912.1515656,
+  "step": 4
 }

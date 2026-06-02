@@ -2,30 +2,28 @@
   (:domain manip-tamp)
 
   (:objects
-    banana_0 - item
+    hammer - item
     left_storage right_storage bookshelf buffer1 buffer2 - location
   )
 
   (:init
-    (at banana_0 table)
+    (at hammer table)
     (buffer buffer1)
     (buffer buffer2)
     (buffer-free buffer1)
     (buffer-free buffer2)
-    (clear banana_0)
-    (goal-at banana_0 bookshelf)
-    (graspable banana_0)
+    (goal-at hammer right_storage)
     (handempty)
-    (safe banana_0)
+    (safe hammer)
     (storage bookshelf)
     (storage left_storage)
     (storage right_storage)
-    (target banana_0)
+    (target hammer)
   )
 
   (:goal
     (and
-      (at banana_0 bookshelf)
+      (at hammer right_storage)
     )
   )
 )

@@ -1,19 +1,18 @@
 {
-  "command": "Move the hammer to the right storage. Move the strawberry to the left storage. Move the banana to the bookshelf. Move the meat can to the left storage. Move the coke can to the right storage.",
+  "command": "Move the hammer to the right storage. Move the strawberry to the left storage. Move the banana to the left storage. Move the meat can to the left storage. Move the coke can to the right storage.",
   "completed": [
     "banana",
     "coke_can",
-    "hammer",
     "meat_can",
     "strawberry"
   ],
   "event": "planning_step_start",
   "goals": [
     {
-      "bound_object_name": "hammer_0",
+      "bound_object_name": null,
       "location": "right_storage",
       "object_name": "hammer",
-      "target_name": "hammer_0"
+      "target_name": "hammer"
     },
     {
       "bound_object_name": "strawberry_0",
@@ -23,15 +22,15 @@
     },
     {
       "bound_object_name": "banana_0",
-      "location": "bookshelf",
+      "location": "left_storage",
       "object_name": "banana",
       "target_name": "banana_0"
     },
     {
-      "bound_object_name": "meat_can_1",
+      "bound_object_name": "meat_can_0",
       "location": "left_storage",
       "object_name": "meat_can",
-      "target_name": "meat_can_1"
+      "target_name": "meat_can_0"
     },
     {
       "bound_object_name": "coke_can_0",
@@ -41,19 +40,49 @@
     }
   ],
   "images": [],
-  "notes": [],
-  "objects": {},
+  "notes": [
+    "hammer: No YOLO segmentation matched target='hammer'. seen=['banana', 'strawberry']. debug_image=/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/_debug_failures/20260602_171214_286478_hammer_detections.png"
+  ],
+  "objects": {
+    "hammer": {
+      "bbox_xyxy": null,
+      "blocked_by": [],
+      "blocks": [],
+      "centroid_xyz": null,
+      "class_name": "hammer",
+      "clear": false,
+      "confidence": 0.0,
+      "debug_files": {},
+      "depth_median": null,
+      "detected": false,
+      "error": "No YOLO segmentation matched target='hammer'. seen=['banana', 'strawberry']. debug_image=/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/_debug_failures/20260602_171214_286478_hammer_detections.png",
+      "foreground_points": 0,
+      "graspable": false,
+      "instance_index": null,
+      "location": "table",
+      "mask_pixels": 0,
+      "near": [],
+      "pose_known": false,
+      "safe": true,
+      "target": true,
+      "visible": false
+    }
+  },
   "occupied_buffers": [],
   "predicates": [
+    "at hammer table",
     "buffer buffer1",
     "buffer buffer2",
     "buffer-free buffer1",
     "buffer-free buffer2",
+    "goal-at hammer right_storage",
     "handempty",
+    "safe hammer",
     "storage bookshelf",
     "storage left_storage",
-    "storage right_storage"
+    "storage right_storage",
+    "target hammer"
   ],
-  "stamp_sec": 1780383570.1249146,
-  "step": 6
+  "stamp_sec": 1780387941.3249953,
+  "step": 5
 }

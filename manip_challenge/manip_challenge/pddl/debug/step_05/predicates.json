@@ -1,18 +1,18 @@
 {
-  "command": "Move the hammer to the right storage. Move the strawberry to the left storage. Move the banana to the bookshelf. Move the meat can to the left storage. Move the coke can to the right storage.",
+  "command": "Move the hammer to the right storage. Move the strawberry to the left storage. Move the banana to the left storage. Move the meat can to the left storage. Move the coke can to the right storage.",
   "completed": [
+    "banana",
     "coke_can",
-    "hammer",
     "meat_can",
     "strawberry"
   ],
   "event": "planning_step_start",
   "goals": [
     {
-      "bound_object_name": "hammer_0",
+      "bound_object_name": null,
       "location": "right_storage",
       "object_name": "hammer",
-      "target_name": "hammer_0"
+      "target_name": "hammer"
     },
     {
       "bound_object_name": "strawberry_0",
@@ -22,15 +22,15 @@
     },
     {
       "bound_object_name": "banana_0",
-      "location": "bookshelf",
+      "location": "left_storage",
       "object_name": "banana",
       "target_name": "banana_0"
     },
     {
-      "bound_object_name": "meat_can_1",
+      "bound_object_name": "meat_can_0",
       "location": "left_storage",
       "object_name": "meat_can",
-      "target_name": "meat_can_1"
+      "target_name": "meat_can_0"
     },
     {
       "bound_object_name": "coke_can_0",
@@ -39,142 +39,50 @@
       "target_name": "coke_can_0"
     }
   ],
-  "images": [
-    {
-      "class_name": "banana",
-      "instance_index": 0,
-      "kind": "annotated",
-      "object": "banana_0",
-      "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_05/banana_0_annotated.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_155850_180595_banana/banana_0/annotated.png"
-    },
-    {
-      "class_name": "banana",
-      "instance_index": 0,
-      "kind": "depth_png",
-      "object": "banana_0",
-      "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_05/banana_0_depth_png.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_155850_180595_banana/banana_0/depth.png"
-    },
-    {
-      "class_name": "banana",
-      "instance_index": 0,
-      "kind": "depth_visualization",
-      "object": "banana_0",
-      "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_05/banana_0_depth_visualization.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_155850_180595_banana/banana_0/depth_vis.png"
-    },
-    {
-      "class_name": "banana",
-      "instance_index": 0,
-      "kind": "mask",
-      "object": "banana_0",
-      "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_05/banana_0_mask.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_155850_180595_banana/banana_0/mask.png"
-    },
-    {
-      "class_name": "banana",
-      "instance_index": 0,
-      "kind": "mask_full",
-      "object": "banana_0",
-      "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_05/banana_0_mask_full.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_155850_180595_banana/banana_0/mask_full.png"
-    },
-    {
-      "class_name": "banana",
-      "instance_index": 0,
-      "kind": "mask_overlay",
-      "object": "banana_0",
-      "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_05/banana_0_mask_overlay.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_155850_180595_banana/banana_0/mask_overlay.png"
-    },
-    {
-      "class_name": "banana",
-      "instance_index": 0,
-      "kind": "mask_raw",
-      "object": "banana_0",
-      "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_05/banana_0_mask_raw.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_155850_180595_banana/banana_0/mask_raw.png"
-    },
-    {
-      "class_name": "banana",
-      "instance_index": 0,
-      "kind": "rgb",
-      "object": "banana_0",
-      "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_05/banana_0_rgb.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_155850_180595_banana/banana_0/rgb.png"
-    },
-    {
-      "class_name": "banana",
-      "instance_index": 0,
-      "kind": "rgb_masked",
-      "object": "banana_0",
-      "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_05/banana_0_rgb_masked.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_155850_180595_banana/banana_0/rgb_masked.png"
-    }
+  "images": [],
+  "notes": [
+    "hammer: No YOLO segmentation matched target='hammer'. seen=['banana', 'strawberry']. debug_image=/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/_debug_failures/20260602_171214_286478_hammer_detections.png"
   ],
-  "notes": [],
   "objects": {
-    "banana_0": {
-      "bbox_xyxy": [
-        186,
-        178,
-        246,
-        226
-      ],
+    "hammer": {
+      "bbox_xyxy": null,
       "blocked_by": [],
       "blocks": [],
-      "centroid_xyz": [
-        0.15128691494464874,
-        0.2240603268146515,
-        1.4498224258422852
-      ],
-      "class_name": "banana",
-      "clear": true,
-      "confidence": 0.9616807103157043,
-      "debug_files": {
-        "annotated": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_155850_180595_banana/banana_0/annotated.png",
-        "depth_png": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_155850_180595_banana/banana_0/depth.png",
-        "depth_visualization": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_155850_180595_banana/banana_0/depth_vis.png",
-        "mask": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_155850_180595_banana/banana_0/mask.png",
-        "mask_full": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_155850_180595_banana/banana_0/mask_full.png",
-        "mask_overlay": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_155850_180595_banana/banana_0/mask_overlay.png",
-        "mask_raw": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_155850_180595_banana/banana_0/mask_raw.png",
-        "rgb": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_155850_180595_banana/banana_0/rgb.png",
-        "rgb_masked": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_155850_180595_banana/banana_0/rgb_masked.png"
-      },
-      "depth_median": 1.4498224258422852,
-      "detected": true,
-      "error": null,
-      "foreground_points": 958,
-      "graspable": true,
-      "instance_index": 0,
+      "centroid_xyz": null,
+      "class_name": "hammer",
+      "clear": false,
+      "confidence": 0.0,
+      "debug_files": {},
+      "depth_median": null,
+      "detected": false,
+      "error": "No YOLO segmentation matched target='hammer'. seen=['banana', 'strawberry']. debug_image=/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/_debug_failures/20260602_171214_286478_hammer_detections.png",
+      "foreground_points": 0,
+      "graspable": false,
+      "instance_index": null,
       "location": "table",
-      "mask_pixels": 958,
+      "mask_pixels": 0,
       "near": [],
-      "pose_known": true,
+      "pose_known": false,
       "safe": true,
       "target": true,
-      "visible": true
+      "visible": false
     }
   },
   "occupied_buffers": [],
   "predicates": [
-    "at banana_0 table",
+    "at hammer table",
     "buffer buffer1",
     "buffer buffer2",
     "buffer-free buffer1",
     "buffer-free buffer2",
-    "clear banana_0",
-    "goal-at banana_0 bookshelf",
-    "graspable banana_0",
+    "goal-at hammer right_storage",
     "handempty",
-    "safe banana_0",
+    "safe hammer",
     "storage bookshelf",
     "storage left_storage",
     "storage right_storage",
-    "target banana_0"
+    "target hammer"
   ],
-  "stamp_sec": 1780383533.7539449,
+  "stamp_sec": 1780387941.3249953,
   "step": 5
 }

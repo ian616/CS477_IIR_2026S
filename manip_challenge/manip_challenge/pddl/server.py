@@ -1532,6 +1532,11 @@ class PddlTampServer(Node):
             major_axis_base_3d = self.transform_vector_to_base(xyz_major_axis, source_frame)
             
         if major_axis_base_3d is not None and np.linalg.norm(major_axis_base_3d) > 1e-6:
+            force_2d = any(name in obj_name for name in ["strawberry", "coke_can"])
+            if force_2d:
+                major_axis_base_3d = None
+
+        if major_axis_base_3d is not None and np.linalg.norm(major_axis_base_3d) > 1e-6:
             selection["xyz_major_axis_base"] = major_axis_base_3d.tolist()
             
             z_vertical = np.array([0.0, 0.0, -1.0])
