@@ -264,7 +264,7 @@ def _annotate_relations(objects: dict[str, ObjectState]) -> None:
             target, obstacle = (a, b) if a.is_target else (b, a)
             d = _grasp_to_obstacle_dist(target, obstacle)
             is_near = d is not None and d < SAFE_PIXEL_DISTANCE
-            logger.debug(
+            logger.info(
                 "[near] %s(T) ↔ %s(O)  d=%s  thr=%.1f  near=%s",
                 target.name, obstacle.name,
                 f"{d:.1f}" if d is not None else "None",
@@ -286,7 +286,7 @@ def _annotate_relations(objects: dict[str, ObjectState]) -> None:
                 if neighbor and not neighbor.is_target:
                     obj.safe = False
                     break
-            logger.debug(
+            logger.info(
                 "[safe] %s  xyz=%s  near=%s  safe=%s",
                 obj.name, xyz_str, sorted(obj.near), obj.safe,
             )

@@ -2,30 +2,54 @@
   (:domain manip-tamp)
 
   (:objects
-    banana_0 - item
+    banana_0 coke_can hammer_0 meat_can strawberry_0 - item
     left_storage right_storage bookshelf buffer1 buffer2 - location
   )
 
   (:init
     (at banana_0 table)
+    (at coke_can table)
+    (at hammer_0 table)
+    (at meat_can table)
+    (at strawberry_0 table)
+    (blocks hammer_0 banana_0)
     (buffer buffer1)
     (buffer buffer2)
     (buffer-free buffer1)
     (buffer-free buffer2)
-    (clear banana_0)
+    (clear hammer_0)
+    (clear strawberry_0)
     (goal-at banana_0 left_storage)
+    (goal-at coke_can bookshelf)
+    (goal-at hammer_0 right_storage)
+    (goal-at meat_can left_storage)
+    (goal-at strawberry_0 right_storage)
     (graspable banana_0)
+    (graspable hammer_0)
+    (graspable strawberry_0)
     (handempty)
     (safe banana_0)
+    (safe coke_can)
+    (safe hammer_0)
+    (safe meat_can)
+    (safe strawberry_0)
     (storage bookshelf)
     (storage left_storage)
     (storage right_storage)
     (target banana_0)
+    (target coke_can)
+    (target hammer_0)
+    (target meat_can)
+    (target strawberry_0)
   )
 
   (:goal
     (and
       (at banana_0 left_storage)
+      (at meat_can left_storage)
+      (at strawberry_0 right_storage)
+      (at hammer_0 right_storage)
+      (at coke_can bookshelf)
     )
   )
 )
