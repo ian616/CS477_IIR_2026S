@@ -32,7 +32,7 @@ Terminal 3:
 
 ```bash
 cd /home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl
-python3 client.py "Move the banana and the meat can to the left storage. Move the strawberry and the hammer in the right storage. Move the coke can on the shelf."
+python client.py "Move the banana and the meat can to the left storage. Move the strawberry and the hammer in the right storage. Move the coke can on the shelf."
 ```
 
 The client publishes the command once as `std_msgs/String` on `/task_commands`.

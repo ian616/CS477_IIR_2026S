@@ -87,6 +87,35 @@ from manip_challenge.custom.grasping.perception_features import extract_percepti
 patch_move_gripper()
 
 
+OBSERVE_JOINTS = list(HOME_JOINTS)
+OBSERVE_X_OFFSET_M = 0.15
+OBSERVE_RETREAT_DURATION_S = 2.0
+
+
+def move_arm_to_observe_pose(
+    arm,
+    observe_joints,
+    x_offset_m: float,
+    duration_s: float,
+    logger=None,
+    reason: str = "observe",
+) -> None:
+    if logger is not None:
+        logger.info(f"Moving to observe base joints for {reason}: {observe_joints}")
+    arm.move_joint(observe_joints)
+    x_offset_m = float(x_offset_m)
+    if abs(x_offset_m) <= 1e-6:
+        return
+    pose = copy.deepcopy(arm.fk_request(arm.js_joint_position, attach_tool=True))
+    pose.position.x -= x_offset_m
+    if logger is not None:
+        logger.info(
+            f"Retreating gripper in base -X for {reason}: "
+            f"offset={x_offset_m:.3f}m target_x={pose.position.x:.3f}"
+        )
+    arm.move_position(pose, duration=float(duration_s))
+
+
 class TfNode(Node):
     def __init__(self):
         super().__init__("pddl_tamp_tf_node")
@@ -424,6 +453,7 @@ class PddlTampServer(Node):
             f"PDDL TAMP server ready. Publish natural-language commands to '{args.command_topic}' "
             f"or call service '{args.service_name}'."
         )
+        self.reset_debug_artifacts()
         self.warm_start_timer = None
         if not self.args.disable_warm_start:
             self.warm_scene_scheduled = True
@@ -499,7 +529,7 @@ class PddlTampServer(Node):
             if self.warm_scene_pending or self.warm_scene_state is not None:
                 return
             self.warm_scene_pending = True
-        self.get_logger().info("[WarmStart] Starting initial wrist-camera scene scan from home pose.")
+        self.get_logger().info("[WarmStart] Starting initial top-view scene scan from observe pose.")
         worker = threading.Thread(target=self._warm_scene_worker, daemon=True)
         worker.start()
 
@@ -515,7 +545,7 @@ class PddlTampServer(Node):
         try:
             state = build_predicate_state(
                 [],
-                self.detect_object_with_grasp_wrist,
+                self.detect_object_with_grasp,
                 completed=set(),
                 occupied_buffers=set(),
                 scan_all_targets=True,
@@ -529,8 +559,9 @@ class PddlTampServer(Node):
             self.warm_scene_condition.notify_all()
         if state is not None:
             self.get_logger().info(
-                f"[WarmStart] Initial wrist-camera scene ready: objects={len(state.objects)}"
+                f"[WarmStart] Initial top-view scene ready: objects={len(state.objects)}"
             )
+            self.save_warm_start_artifacts(state)
 
     def consume_warm_scene_state(
         self,
@@ -555,7 +586,7 @@ class PddlTampServer(Node):
             base = copy.deepcopy(self.warm_scene_state)
             self.warm_scene_consumed = True
         state = self.bind_goals_to_warm_scene(base, goals, completed, occupied_buffers, scan_all_targets)
-        self.get_logger().info("[WarmStart] Using initial wrist-camera scene; running planner without a new scan.")
+        self.get_logger().info("[WarmStart] Using initial top-view scene; running planner without a new scan.")
         return state
 
     def bind_goals_to_warm_scene(
@@ -582,9 +613,21 @@ class PddlTampServer(Node):
         state.predicates = _build_predicates(state)
         state.notes = [
             *state.notes,
-            "used warm-start wrist-camera scene captured from home pose before command",
+            "used warm-start top-view scene captured from observe pose before command",
         ]
         return state
+
+    def move_to_observe_pose(self, reason: str = "observe") -> None:
+        if self.args.dry_run or self.args.no_home:
+            return
+        move_arm_to_observe_pose(
+            self.arm,
+            self.args.observe_joints,
+            self.args.observe_x_offset,
+            self.args.observe_retreat_duration,
+            logger=self.get_logger(),
+            reason=reason,
+        )
 
     @staticmethod
     def prefetch_key(goals: list[Goal], completed: set[str], occupied_buffers: set[str], scan_all_targets: bool) -> tuple:
@@ -781,8 +824,6 @@ class PddlTampServer(Node):
         if not goals:
             raise ValueError("No valid goals after filtering unknown destinations.")
 
-        self.reset_debug_artifacts()
-
         self.get_logger().info("[PDDL] Parsed goals:")
         for goal in goals:
             self.get_logger().info(f"[PDDL]   {goal.object_name} -> {goal.location}")
@@ -796,17 +837,12 @@ class PddlTampServer(Node):
             goals=[goal.__dict__ for goal in goals],
         )
 
-        if not self.args.dry_run and not self.args.no_home:
-            self.get_logger().info("[PDDL] Returning to home before planning.")
-            self.arm.move_joint(HOME_JOINTS)
-
         completed: set[str] = set()
         occupied_buffers: set[str] = set()
         steps = []
         scenes = []
         domain_path = ensure_domain(PDDL_DIR / "domain.pddl")
         problem_path = PDDL_DIR / "problem.pddl"
-        force_wrist_scene_scan = False
 
         for step_idx in range(1, self.args.max_steps + 1):
             self.get_logger().info(f"[PDDL] ===== planning step {step_idx}/{self.args.max_steps} =====")
@@ -814,17 +850,6 @@ class PddlTampServer(Node):
             state = self.consume_prefetched_state(goals, completed, occupied_buffers, scan_all_targets)
             if state is not None:
                 self.get_logger().info("[Prefetch] Using cached scene state.")
-                force_wrist_scene_scan = False
-            elif force_wrist_scene_scan:
-                self.get_logger().info("[PDDL] Using wrist-camera scene scan after bookshelf placement.")
-                state = build_predicate_state(
-                    goals,
-                    self.detect_object_with_grasp_wrist,
-                    completed=completed,
-                    occupied_buffers=occupied_buffers,
-                    scan_all_targets=scan_all_targets,
-                )
-                force_wrist_scene_scan = False
             else:
                 state = self.consume_warm_scene_state(goals, completed, occupied_buffers, scan_all_targets)
                 if state is None:
@@ -995,10 +1020,8 @@ class PddlTampServer(Node):
             if action.name == "move-target-to-goal" and result.get("ok"):
                 moved = state.objects.get(action.args[0])
                 completed.add(moved.class_name if moved is not None and moved.class_name else action.args[0])
-                force_wrist_scene_scan = len(action.args) >= 3 and action.args[2] == "bookshelf"
             elif action.name == "move-obstacle-to-buffer" and result.get("ok"):
                 occupied_buffers.add(action.args[2])
-                force_wrist_scene_scan = False
 
             self.get_logger().info("[PDDL] Replanning after action execution.")
             self.publish_pddl_log(
@@ -1299,6 +1322,60 @@ class PddlTampServer(Node):
         predicates_path.write_text(text + "\n", encoding="utf-8")
         latest_path.write_text(text + "\n", encoding="utf-8")
         self.get_logger().info(f"[PDDL] Step artifacts saved: {predicates_path}")
+
+    def save_warm_start_artifacts(self, state: PredicateState) -> None:
+        summary = {
+            "completed": sorted(state.completed),
+            "occupied_buffers": sorted(state.occupied_buffers),
+            "objects": {name: object_summary(obj) for name, obj in state.objects.items()},
+            "predicates": sorted(state.predicates),
+            "notes": state.notes,
+        }
+        debug_dir = PDDL_DIR / "debug"
+        warm_dir = debug_dir / "warm_start"
+        if warm_dir.exists():
+            shutil.rmtree(warm_dir)
+        warm_dir.mkdir(parents=True, exist_ok=True)
+
+        images = []
+        for object_name, obj in sorted(summary["objects"].items()):
+            for key, source_text in sorted((obj.get("debug_files") or {}).items()):
+                source = Path(source_text)
+                if not source.is_file():
+                    continue
+                suffix = source.suffix or ".png"
+                filename = f"{self.safe_debug_filename(object_name)}_{self.safe_debug_filename(key)}{suffix}"
+                destination = warm_dir / filename
+                try:
+                    shutil.copyfile(source, destination)
+                except OSError as exc:
+                    self.get_logger().warn(f"[WarmStart] Could not save debug image '{source}': {exc}")
+                    continue
+                images.append({
+                    "object": object_name,
+                    "class_name": obj.get("class_name"),
+                    "instance_index": obj.get("instance_index"),
+                    "kind": key,
+                    "source": str(source),
+                    "path": str(destination),
+                })
+
+        payload = {
+            "event": "warm_start_scene",
+            "stamp_sec": time.time(),
+            "completed": summary["completed"],
+            "occupied_buffers": summary["occupied_buffers"],
+            "objects": summary["objects"],
+            "predicates": summary["predicates"],
+            "notes": summary["notes"],
+            "images": images,
+        }
+        text = json.dumps(payload, indent=2, sort_keys=True)
+        predicates_path = warm_dir / "predicates.json"
+        predicates_path.write_text(text + "\n", encoding="utf-8")
+        (debug_dir / "latest_warm_start_predicates.json").write_text(text + "\n", encoding="utf-8")
+        (debug_dir / "latest_predicates.json").write_text(text + "\n", encoding="utf-8")
+        self.get_logger().info(f"[WarmStart] Debug artifacts saved: {predicates_path}")
 
     def reset_debug_artifacts(self) -> None:
         debug_dir = PDDL_DIR / "debug"
@@ -1792,11 +1869,6 @@ class ManipulatorExecutor(Node):
                     and len(action.args) >= 3
                     and action.args[2] in {"left_storage", "right_storage"}
                 )
-                use_bookshelf_wrist_prefetch = (
-                    action.name == "move-target-to-goal"
-                    and len(action.args) >= 3
-                    and action.args[2] == "bookshelf"
-                )
 
                 def on_storage_place(_prefetch_payload=prefetch_payload, _command_id=command_id):
                     self.coordinator.start_scene_prefetch(
@@ -1809,8 +1881,7 @@ class ManipulatorExecutor(Node):
                     self.coordinator.start_scene_prefetch(
                         _prefetch_payload,
                         _command_id,
-                        trigger="bookshelf-home" if use_bookshelf_wrist_prefetch else "observe-ready",
-                        use_wrist=use_bookshelf_wrist_prefetch,
+                        trigger="observe-ready",
                     )
 
                 context = ActionContext(
@@ -1869,8 +1940,26 @@ def parse_args(argv=None):
     parser.add_argument("--executor-result-topic", default="/pddl_action_results")
     parser.add_argument(
         "--observe-joints",
-        default="0.0,-1.57079632679,1.0,-1.0471975512,-1.57079632679,0.0",
-        help="Comma-separated six-joint pose used for top-view observation after each place.",
+        default=",".join(str(value) for value in OBSERVE_JOINTS),
+        help="Comma-separated six-joint base pose used before the Cartesian -X observation retreat.",
+    )
+    parser.add_argument(
+        "--observe-x-offset",
+        type=float,
+        default=OBSERVE_X_OFFSET_M,
+        help="Base-frame -X distance in meters used to retreat the gripper for top-view observation.",
+    )
+    parser.add_argument(
+        "--observe-y-offset",
+        type=float,
+        default=None,
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--observe-retreat-duration",
+        type=float,
+        default=OBSERVE_RETREAT_DURATION_S,
+        help="Duration in seconds for the Cartesian -X observation retreat.",
     )
     parser.add_argument("--max-steps", type=int, default=int(os.environ.get("PDDL_TAMP_MAX_STEPS", "8")))
     parser.add_argument("--one-step", action="store_true", help="Execute only the first selected physical action.")
@@ -1905,6 +1994,16 @@ def main(argv=None):
     top_view_module = None if args.external_perception else load_top_view_perception_module()
     ros_argv = argv
     rclpy.init(args=ros_argv)
+    arm = ArmClient()
+    if not args.dry_run and not args.no_home:
+        move_arm_to_observe_pose(
+            arm,
+            args.observe_joints,
+            args.observe_x_offset,
+            args.observe_retreat_duration,
+            logger=arm.get_logger(),
+            reason="startup",
+        )
     perception_node = None
     wrist_perception_node = None
     tf_node = TfNode()
@@ -1923,13 +2022,10 @@ def main(argv=None):
             default_params=wrist_defaults,
         )
         wrist_perception_node.get_logger().info("Embedded wrist-camera perception is running inside PDDL TAMP server.")
-    arm = ArmClient()
     server = PddlTampServer(args, tf_node.tf_buffer, arm)
     manipulator_executor = ManipulatorExecutor(args, server)
     child_processes = []
     try:
-        if not args.no_home:
-            arm.move_joint(HOME_JOINTS)
         executor = MultiThreadedExecutor(num_threads=4)
         if perception_node is not None:
             executor.add_node(perception_node)
