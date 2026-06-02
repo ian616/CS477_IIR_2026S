@@ -1,0 +1,103 @@
+{
+  "action": {
+    "args": [
+      "strawberry_0",
+      "table",
+      "left_storage"
+    ],
+    "name": "move-target-to-goal",
+    "pddl": "(move-target-to-goal strawberry_0 table left_storage)",
+    "source": "external"
+  },
+  "event": "action_result",
+  "result": {
+    "action": {
+      "args": [
+        "strawberry_0",
+        "table",
+        "left_storage"
+      ],
+      "name": "move-target-to-goal",
+      "pddl": "(move-target-to-goal strawberry_0 table left_storage)",
+      "source": "external"
+    },
+    "class_name": "strawberry",
+    "command_id": "step3-3c474519",
+    "destination": "left storage",
+    "detected_pose_in_source": {
+      "orientation": {
+        "w": 1.0,
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "position": {
+        "x": 0.17776218056678772,
+        "y": 0.0799458771944046,
+        "z": 1.4421802759170532
+      }
+    },
+    "dry_run": false,
+    "grasp_pose_in_base": {
+      "orientation": {
+        "w": 0.06860263995950272,
+        "x": 0.9943732851503522,
+        "y": -0.08052690653241901,
+        "z": -0.005555618255634022
+      },
+      "position": {
+        "x": 0.5750264002069393,
+        "y": -0.16188864270393594,
+        "z": -0.06431122014451016
+      }
+    },
+    "grasp_selection": {
+      "delta_from_raw_centroid_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "grasp_pose_source": "raw_centroid_xyz",
+      "grasp_pose_xyz_m": [
+        0.17776218056678772,
+        0.0799458771944046,
+        1.4421802759170532
+      ],
+      "gripper_axis_rule": "3d_perpendicular_to_pca_major_axis",
+      "method": "median_fallback",
+      "points_path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_155812_532158_strawberry/strawberry_0/foreground_points.npy",
+      "raw_centroid_xyz_m": [
+        0.17776218056678772,
+        0.0799458771944046,
+        1.4421802759170532
+      ],
+      "reason": "no_dense_axis_bin",
+      "target_xyz_m": [
+        0.17776218056678772,
+        0.0799458771944046,
+        1.4421802759170532
+      ],
+      "xy_major_axis": [
+        0.9917998270645814,
+        0.1278010290829706
+      ],
+      "xy_minor_axis": [
+        -0.1278010290829706,
+        0.9917998270645814
+      ],
+      "xyz_major_axis": [
+        0.9776181902298116,
+        0.16006994932675,
+        -0.1365294307258304
+      ],
+      "xyz_major_axis_base": [
+        -0.15938534902538629,
+        -0.9776181902298118,
+        0.1373280184370376
+      ]
+    },
+    "ok": true
+  },
+  "stamp_sec": 1780383515.6124787,
+  "step": 3
+}

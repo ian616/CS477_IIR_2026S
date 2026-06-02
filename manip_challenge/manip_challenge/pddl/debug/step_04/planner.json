@@ -1,0 +1,29 @@
+{
+  "event": "planner_output",
+  "plan": [
+    {
+      "args": [
+        "hammer_0",
+        "table",
+        "right_storage"
+      ],
+      "name": "move-target-to-goal",
+      "pddl": "(move-target-to-goal hammer_0 table right_storage)",
+      "source": "external"
+    },
+    {
+      "args": [
+        "banana_0",
+        "table",
+        "bookshelf"
+      ],
+      "name": "move-target-to-goal",
+      "pddl": "(move-target-to-goal banana_0 table bookshelf)",
+      "source": "external"
+    }
+  ],
+  "problem": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/problem.pddl",
+  "raw_output": "(move-target-to-goal hammer_0 table right_storage)\n(move-target-to-goal banana_0 table bookshelf)\n; cost = 2 (unit cost)\n\n",
+  "stamp_sec": 1780383515.84907,
+  "step": 4
+}

@@ -40,7 +40,7 @@ def executor_safe_gripper_goto(node, pos, force=1.0, timeout=3.0, **kwargs):
     margin = float(getattr(node, "gripper_result_timeout_margin", 8.0))
     strict = bool(getattr(node, "strict_gripper_result", False))
     tolerance = float(kwargs.get("tolerance", 0.004)) #0.007 is failed
-    max_retries = int(kwargs.get("max_retries", 10))
+    max_retries = int(kwargs.get("max_retries", 5))
 
     if not hasattr(node, "_pddl_gripper_client"):
         node._pddl_gripper_client = ActionClient(
@@ -140,9 +140,25 @@ def executor_safe_gripper_goto(node, pos, force=1.0, timeout=3.0, **kwargs):
     return {"ok": False, "timed_out": False, "position": float(pos)}
 
 
-def executor_safe_gripper_open(node, force=1.0, timeout=1.0, gripper_open_pos=0.0, **kwargs):
-    node.get_logger().info("Opening gripper.")
-    return executor_safe_gripper_goto(node, gripper_open_pos, force=force, timeout=timeout, **kwargs)
+def executor_safe_gripper_open(node, force=1.0, timeout=1.0, gripper_open_pos=0.0, shake=False, **kwargs):
+    if not shake:
+        node.get_logger().info("Opening gripper.")
+        return executor_safe_gripper_goto(node, gripper_open_pos, force=force, timeout=timeout, **kwargs)
+
+    node.get_logger().info("Opening gripper with shake loop.")
+    shake_tries = int(kwargs.get("shake_tries", 3))
+    shake_close_pos = float(kwargs.get("shake_close_pos", 0.4))
+    
+    result = None
+    for i in range(shake_tries):
+        node.get_logger().info(f"Shake loop {i+1}/{shake_tries}: Opening...")
+        result = executor_safe_gripper_goto(node, gripper_open_pos, force=force, timeout=timeout, **kwargs)
+        
+        if i < shake_tries - 1:
+            node.get_logger().info(f"Shake loop {i+1}/{shake_tries}: Closing slightly to shake off object...")
+            executor_safe_gripper_goto(node, shake_close_pos, force=force, timeout=timeout, **kwargs)
+            
+    return result
 
 
 def executor_safe_gripper_close(node, force=1.0, timeout=3.0, gripper_close_pos=None, **kwargs):

@@ -29,7 +29,7 @@
             "roll": 0.0,
             "pitch": 0.0,
             "yaw": 0.0,
-            "grasp_value": 27,
+            "grasp_value": 30,
             "bbox_area": 10
         },
         "lying": {
@@ -39,7 +39,7 @@
             "roll": 0.0,
             "pitch": 0.0,
             "yaw": 0.0,
-            "grasp_value": 27,
+            "grasp_value": 30,
             "bbox_area": 10
         }
     },
@@ -106,7 +106,7 @@
             "pitch": 0.0,
             "yaw": 0.0,
             "grasp_value": 3,
-            "bbox_area": 0.007214982673634867
+            "bbox_area": 0.007252040085987911
         }
     }
 }

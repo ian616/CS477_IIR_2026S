@@ -1,0 +1,15 @@
+{
+  "action": {
+    "args": [
+      "hammer_0",
+      "table",
+      "right_storage"
+    ],
+    "name": "move-target-to-goal",
+    "pddl": "(move-target-to-goal hammer_0 table right_storage)",
+    "source": "external"
+  },
+  "event": "executing_action",
+  "stamp_sec": 1780383515.852812,
+  "step": 4
+}

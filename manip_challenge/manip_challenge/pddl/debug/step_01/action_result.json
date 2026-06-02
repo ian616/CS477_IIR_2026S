@@ -1,0 +1,110 @@
+{
+  "action": {
+    "args": [
+      "coke_can_0",
+      "table",
+      "right_storage"
+    ],
+    "name": "move-target-to-goal",
+    "pddl": "(move-target-to-goal coke_can_0 table right_storage)",
+    "source": "fallback"
+  },
+  "event": "action_result",
+  "result": {
+    "action": {
+      "args": [
+        "coke_can_0",
+        "table",
+        "right_storage"
+      ],
+      "name": "move-target-to-goal",
+      "pddl": "(move-target-to-goal coke_can_0 table right_storage)",
+      "source": "fallback"
+    },
+    "class_name": "coke_can",
+    "command_id": "step1-0cd10828",
+    "destination": "right storage",
+    "detected_pose_in_source": {
+      "orientation": {
+        "w": 1.0,
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "position": {
+        "x": -0.03555239737033844,
+        "y": 0.10927005857229233,
+        "z": 1.4197109937667847
+      }
+    },
+    "dry_run": false,
+    "grasp_pose_in_base": {
+      "orientation": {
+        "w": -0.0023348819043276896,
+        "x": -0.5021955296439514,
+        "y": 0.8647415995739939,
+        "z": 0.004020484838238579
+      },
+      "position": {
+        "x": 0.5459831777979591,
+        "y": 0.053107696087990194,
+        "z": -0.04180878181703638
+      }
+    },
+    "grasp_selection": {
+      "delta_from_raw_centroid_m": [
+        0.0003534499555826187,
+        0.003978777676820755,
+        -0.0011497139930725098
+      ],
+      "grasp_pose_source": "raw_centroid_xyz",
+      "grasp_pose_xyz_m": [
+        -0.03555239737033844,
+        0.10927005857229233,
+        1.4197109937667847
+      ],
+      "gripper_axis_rule": "3d_perpendicular_to_pca_major_axis",
+      "method": "local_thick_axis_band",
+      "points_path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_155739_528772_coke_can/coke_can_0/foreground_points.npy",
+      "raw_centroid_xyz_m": [
+        -0.03555239737033844,
+        0.10927005857229233,
+        1.4197109937667847
+      ],
+      "selected_band": {
+        "along_max_m": -0.0008984041192244829,
+        "along_min_m": -0.005966958612743892,
+        "point_count": 36,
+        "score": 0.059437543749374835,
+        "width_m": 0.051953287370268796,
+        "z_spread_m": 0.01798856258392334
+      },
+      "target_xyz_m": [
+        -0.03519894741475582,
+        0.11324883624911308,
+        1.4185612797737122
+      ],
+      "xy_major_axis": [
+        -0.4955935179019197,
+        0.8685545837848072
+      ],
+      "xy_minor_axis": [
+        -0.8685545837848072,
+        -0.4955935179019197
+      ],
+      "xyz_major_axis": [
+        -0.4955669714145934,
+        0.8685555906791624,
+        -0.0049560814096299855
+      ],
+      "xyz_major_axis_base": [
+        -0.8685199564918484,
+        0.49556697141459327,
+        0.00929849548936268
+      ]
+    },
+    "ok": true
+  },
+  "stamp_sec": 1780383477.5742402,
+  "step": 1
+}

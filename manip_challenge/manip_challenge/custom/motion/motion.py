@@ -198,7 +198,8 @@ def pick_place_storage(node, arm, grasp_pose, destination, obj_name,
         except Exception as exc:
             node.get_logger().warn(f"storage-place callback failed: {exc}")
     arm.execute_trajectory([place_pose], durations=[1.0])
-    move_gripper.gripper_open(node)
+    shake = (obj_name.startswith("meat_can") and getattr(node, "last_grasped_state", "") == "lying")
+    move_gripper.gripper_open(node, shake=shake)
 
     retreat_pose = copy.deepcopy(place_pose)
     retreat_pose.position.z += 0.20
@@ -317,7 +318,8 @@ def pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name,
         [lift_pose, place_joint, place_approach, place_pose],
         durations=[1.0, rot_time_place, 1.5, 1.0],
     )
-    move_gripper.gripper_open(node)
+    shake = (obj_name.startswith("meat_can") and getattr(node, "last_grasped_state", "") == "lying")
+    move_gripper.gripper_open(node, shake=shake)
 
     retreat_pose = copy.deepcopy(place_pose)
     retreat_pose.position.x -= 0.3
