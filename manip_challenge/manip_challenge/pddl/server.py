@@ -67,12 +67,12 @@ from manip_challenge.pddl.ros_helpers import (
     load_grasp_points_from_detection,
     load_top_view_perception_module,
     patch_move_gripper,
-    ros_args_with_embedded_perception_defaults,
     save_grasp_selection_visualization,
     stop_child_processes,
 )
 from manip_challenge.pddl.pddl_types import Goal, ObjectState, PlanAction, PredicateState, KNOWN_OBJECTS, BUFFER_LOCATIONS
 from manip_challenge.pddl.utils import PDDL_DIR, load_dotenv
+from manip_challenge.custom.perception.icp.rgbd_seg_crop_server import RgbdSegCropServiceNode
 from manip_challenge.custom.grasping.grasping_item import (
     _load_grasp_database,
     _lookup_object_grasp_configs,
@@ -220,6 +220,24 @@ def object_state_from_command(payload: dict | None, fallback_name: str) -> Objec
 
 VERTICAL_DOWN_GRASP_QUATERNION = np.asarray([0.0, 1.0, 0.0, 0.0], dtype=np.float64)
 GRASP_AXIS_ENDPOINT_OFFSET_M = 0.05
+WRIST_VIEW_DEFAULTS = {
+    "model_path": str(Path(__file__).resolve().parents[1] / "custom" / "best.pt"),
+    "image_topic": "/wrist_camera/wrist_camera/color/image_raw",
+    "depth_topic": "/wrist_camera/wrist_camera/depth/color/image_raw",
+    "points_topic": "/wrist_camera/wrist_camera/depth/color/points",
+    "camera_frame": "wrist_camera_color_optical_frame",
+    "service_name": "detect_object_rgbd_seg_crop",
+    "display": False,
+    "confidence": 0.35,
+    "input_crop_ratio": 1.0,
+    "save_dir": str(Path(__file__).resolve().parents[1] / "custom" / "perception" / "icp" / "results" / "wrist_seg"),
+    "annotated_image_topic": "/wrist_view/seg/detection_image",
+    "roi_mask_topic": "/wrist_view/seg/mask",
+    "roi_info_topic": "/wrist_view/seg/info",
+    "roi_points_topic": "/wrist_view/seg/points",
+    "max_depth_m": 1.5,
+    "depth_margin_m": 0.04,
+}
 
 
 def grasp_pose_xyz_from_selection(selection):
@@ -347,6 +365,11 @@ class PddlTampServer(Node):
             args.perception_service,
             callback_group=self.callback_group,
         )
+        self.wrist_perception_client = self.create_client(
+            StringString,
+            args.wrist_perception_service,
+            callback_group=self.callback_group,
+        )
         self.command_service = self.create_service(
             StringString,
             args.service_name,
@@ -390,9 +413,12 @@ class PddlTampServer(Node):
         self.warm_scene_scheduled = False
         self.warm_scene_consumed = False
 
-        self.get_logger().info(f"Waiting for perception service '{args.perception_service}'...")
+        self.get_logger().info(f"Waiting for top-view perception service '{args.perception_service}'...")
         while rclpy.ok() and not self.perception_client.wait_for_service(timeout_sec=1.0):
             self.get_logger().info(f"Still waiting for '{args.perception_service}'...")
+        self.get_logger().info(f"Waiting for wrist perception service '{args.wrist_perception_service}'...")
+        while rclpy.ok() and not self.wrist_perception_client.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info(f"Still waiting for '{args.wrist_perception_service}'...")
         self.get_logger().info(
             f"PDDL TAMP server ready. Publish natural-language commands to '{args.command_topic}' "
             f"or call service '{args.service_name}'."
@@ -424,8 +450,6 @@ class PddlTampServer(Node):
         command_id = f"step{step_idx}-{uuid.uuid4().hex[:8]}"
         selected_object = state.objects.get(action.args[0]) if action.args else None
         next_completed, next_occupied = self.anticipated_progress_after_action(action, state)
-        if self.should_reuse_previous_topview(action):
-            self.seed_previous_topview_prefetch(action, state, next_completed, next_occupied, command_id)
         payload = {
             "event": "execute_action",
             "command_id": command_id,
@@ -474,7 +498,7 @@ class PddlTampServer(Node):
             if self.warm_scene_pending or self.warm_scene_state is not None:
                 return
             self.warm_scene_pending = True
-        self.get_logger().info("[WarmStart] Starting initial top-view scene scan.")
+        self.get_logger().info("[WarmStart] Starting initial wrist-camera scene scan from home pose.")
         worker = threading.Thread(target=self._warm_scene_worker, daemon=True)
         worker.start()
 
@@ -490,7 +514,7 @@ class PddlTampServer(Node):
         try:
             state = build_predicate_state(
                 [],
-                self.detect_object_with_grasp,
+                self.detect_object_with_grasp_wrist,
                 completed=set(),
                 occupied_buffers=set(),
                 scan_all_targets=True,
@@ -504,7 +528,7 @@ class PddlTampServer(Node):
             self.warm_scene_condition.notify_all()
         if state is not None:
             self.get_logger().info(
-                f"[WarmStart] Initial top-view scene ready: objects={len(state.objects)}"
+                f"[WarmStart] Initial wrist-camera scene ready: objects={len(state.objects)}"
             )
 
     def consume_warm_scene_state(
@@ -530,7 +554,7 @@ class PddlTampServer(Node):
             base = copy.deepcopy(self.warm_scene_state)
             self.warm_scene_consumed = True
         state = self.bind_goals_to_warm_scene(base, goals, completed, occupied_buffers, scan_all_targets)
-        self.get_logger().info("[WarmStart] Using initial top-view scene; running planner without a new scan.")
+        self.get_logger().info("[WarmStart] Using initial wrist-camera scene; running planner without a new scan.")
         return state
 
     def bind_goals_to_warm_scene(
@@ -557,51 +581,9 @@ class PddlTampServer(Node):
         state.predicates = _build_predicates(state)
         state.notes = [
             *state.notes,
-            "used warm-start top-view scene captured before command",
+            "used warm-start wrist-camera scene captured from home pose before command",
         ]
         return state
-
-    @staticmethod
-    def should_reuse_previous_topview(action: PlanAction) -> bool:
-        return (
-            action.name == "move-target-to-goal"
-            and len(action.args) >= 3
-            and action.args[2] == "bookshelf"
-        )
-
-    def seed_previous_topview_prefetch(
-        self,
-        action: PlanAction,
-        state: PredicateState,
-        completed: set[str],
-        occupied_buffers: set[str],
-        command_id: str,
-    ) -> None:
-        scan_all_targets = not self.args.scan_goals_only
-        cached = copy.deepcopy(state)
-        cached.completed = set(completed)
-        cached.occupied_buffers = set(occupied_buffers)
-        completed_classes = set(completed)
-        cached.objects = {
-            name: obj
-            for name, obj in cached.objects.items()
-            if not (obj.is_target and obj.class_name in completed_classes)
-        }
-        cached.predicates = _build_predicates(cached)
-        cached.notes = [
-            *cached.notes,
-            f"reused previous top-view state after {action.pddl()} for bookshelf placement",
-        ]
-        key = self.prefetch_key(cached.goals, cached.completed, cached.occupied_buffers, scan_all_targets)
-        with self.prefetch_condition:
-            if key in self.prefetch_states or key in self.prefetch_pending:
-                return
-            self.prefetch_states[key] = cached
-            self.prefetch_condition.notify_all()
-        self.get_logger().info(
-            f"[Prefetch] Reusing previous top-view state for bookshelf action command_id={command_id}; "
-            f"completed={', '.join(sorted(completed)) or '<none>'}; objects={len(cached.objects)}"
-        )
 
     @staticmethod
     def prefetch_key(goals: list[Goal], completed: set[str], occupied_buffers: set[str], scan_all_targets: bool) -> tuple:
@@ -629,7 +611,13 @@ class PddlTampServer(Node):
             occupied_buffers.add(action.args[2])
         return completed, occupied_buffers
 
-    def start_scene_prefetch(self, prefetch_payload: dict | None, command_id: str, trigger: str = "observe-ready") -> None:
+    def start_scene_prefetch(
+        self,
+        prefetch_payload: dict | None,
+        command_id: str,
+        trigger: str = "observe-ready",
+        use_wrist: bool = False,
+    ) -> None:
         if not prefetch_payload:
             return
         try:
@@ -646,12 +634,13 @@ class PddlTampServer(Node):
                 return
             self.prefetch_pending.add(key)
         self.get_logger().info(
-            f"[Prefetch] Starting {trigger} scene scan for command_id={command_id}; "
+            f"[Prefetch] Starting {trigger} {'wrist-camera' if use_wrist else 'top-view'} scene scan "
+            f"for command_id={command_id}; "
             f"completed={', '.join(sorted(completed)) or '<none>'}"
         )
         worker = threading.Thread(
             target=self._prefetch_scene_worker,
-            args=(key, goals, completed, occupied_buffers, scan_all_targets, command_id),
+            args=(key, goals, completed, occupied_buffers, scan_all_targets, command_id, use_wrist),
             daemon=True,
         )
         worker.start()
@@ -664,11 +653,12 @@ class PddlTampServer(Node):
         occupied_buffers: set[str],
         scan_all_targets: bool,
         command_id: str,
+        use_wrist: bool,
     ) -> None:
         try:
             state = build_predicate_state(
                 goals,
-                self.detect_object_with_grasp,
+                self.detect_object_with_grasp_wrist if use_wrist else self.detect_object_with_grasp,
                 completed=completed,
                 occupied_buffers=occupied_buffers,
                 scan_all_targets=scan_all_targets,
@@ -815,6 +805,7 @@ class PddlTampServer(Node):
         scenes = []
         domain_path = ensure_domain(PDDL_DIR / "domain.pddl")
         problem_path = PDDL_DIR / "problem.pddl"
+        force_wrist_scene_scan = False
 
         for step_idx in range(1, self.args.max_steps + 1):
             self.get_logger().info(f"[PDDL] ===== planning step {step_idx}/{self.args.max_steps} =====")
@@ -822,6 +813,17 @@ class PddlTampServer(Node):
             state = self.consume_prefetched_state(goals, completed, occupied_buffers, scan_all_targets)
             if state is not None:
                 self.get_logger().info("[Prefetch] Using cached scene state.")
+                force_wrist_scene_scan = False
+            elif force_wrist_scene_scan:
+                self.get_logger().info("[PDDL] Using wrist-camera scene scan after bookshelf placement.")
+                state = build_predicate_state(
+                    goals,
+                    self.detect_object_with_grasp_wrist,
+                    completed=completed,
+                    occupied_buffers=occupied_buffers,
+                    scan_all_targets=scan_all_targets,
+                )
+                force_wrist_scene_scan = False
             else:
                 state = self.consume_warm_scene_state(goals, completed, occupied_buffers, scan_all_targets)
                 if state is None:
@@ -992,8 +994,10 @@ class PddlTampServer(Node):
             if action.name == "move-target-to-goal" and result.get("ok"):
                 moved = state.objects.get(action.args[0])
                 completed.add(moved.class_name if moved is not None and moved.class_name else action.args[0])
+                force_wrist_scene_scan = len(action.args) >= 3 and action.args[2] == "bookshelf"
             elif action.name == "move-obstacle-to-buffer" and result.get("ok"):
                 occupied_buffers.add(action.args[2])
+                force_wrist_scene_scan = False
 
             self.get_logger().info("[PDDL] Replanning after action execution.")
             self.publish_pddl_log(
@@ -1395,19 +1399,25 @@ class PddlTampServer(Node):
             return (Path("/tmp/.X11-unix") / f"X{display_num}").exists()
         return True
 
-    def detect_object(self, obj_name: str) -> dict:
+    def detect_object_from_client(self, obj_name: str, client, service_name: str) -> dict:
         req = StringString.Request()
         req.data = obj_name
-        future = self.perception_client.call_async(req)
+        future = client.call_async(req)
         deadline = time.monotonic() + self.args.perception_timeout
         while rclpy.ok() and not future.done():
             if time.monotonic() > deadline:
-                raise TimeoutError(f"Timed out waiting for perception result for '{obj_name}'.")
+                raise TimeoutError(f"Timed out waiting for perception result from '{service_name}' for '{obj_name}'.")
             time.sleep(0.02)
         result = future.result()
         if result is None:
-            raise RuntimeError(f"Perception service returned no result for '{obj_name}'.")
+            raise RuntimeError(f"Perception service '{service_name}' returned no result for '{obj_name}'.")
         return json.loads(result.data)
+
+    def detect_object(self, obj_name: str) -> dict:
+        return self.detect_object_from_client(obj_name, self.perception_client, self.args.perception_service)
+
+    def detect_object_wrist(self, obj_name: str) -> dict:
+        return self.detect_object_from_client(obj_name, self.wrist_perception_client, self.args.wrist_perception_service)
 
     def detect_object_with_grasp(self, obj_name: str) -> dict:
         detection = self.detect_object(obj_name)
@@ -1417,6 +1427,16 @@ class PddlTampServer(Node):
                 detection["grasp_selection"] = selection
             except Exception as exc:
                 self.get_logger().debug(f"[GraspPredict] select_grasp_target failed for {obj_name}: {exc}")
+        return detection
+
+    def detect_object_with_grasp_wrist(self, obj_name: str) -> dict:
+        detection = self.detect_object_wrist(obj_name)
+        if detection and detection.get("ok"):
+            try:
+                selection = self.select_grasp_target(detection, obj_name)
+                detection["grasp_selection"] = selection
+            except Exception as exc:
+                self.get_logger().debug(f"[GraspPredict] wrist select_grasp_target failed for {obj_name}: {exc}")
         return detection
 
     def select_grasp_target(self, detection: dict, obj_name: str) -> dict:
@@ -1774,6 +1794,11 @@ class ManipulatorExecutor(Node):
                     and len(action.args) >= 3
                     and action.args[2] in {"left_storage", "right_storage"}
                 )
+                use_bookshelf_wrist_prefetch = (
+                    action.name == "move-target-to-goal"
+                    and len(action.args) >= 3
+                    and action.args[2] == "bookshelf"
+                )
 
                 def on_storage_place(_prefetch_payload=prefetch_payload, _command_id=command_id):
                     self.coordinator.start_scene_prefetch(
@@ -1786,7 +1811,8 @@ class ManipulatorExecutor(Node):
                     self.coordinator.start_scene_prefetch(
                         _prefetch_payload,
                         _command_id,
-                        trigger="observe-ready",
+                        trigger="bookshelf-home" if use_bookshelf_wrist_prefetch else "observe-ready",
+                        use_wrist=use_bookshelf_wrist_prefetch,
                     )
 
                 context = ActionContext(
@@ -1833,6 +1859,7 @@ def parse_args(argv=None):
     parser.add_argument("--command-topic", default="/task_commands")
     parser.add_argument("--log-topic", default="/pddl_tamp_log")
     parser.add_argument("--perception-service", default="detect_object_top_rgbd_seg_crop")
+    parser.add_argument("--wrist-perception-service", default="detect_object_rgbd_seg_crop")
     parser.add_argument("--camera-frame", default="camera_color_optical_frame")
     parser.add_argument("--perception-timeout", type=float, default=15.0)
     parser.add_argument("--tf-timeout", type=float, default=5.0)
@@ -1878,17 +1905,26 @@ def main(argv=None):
     args = parse_args(argv)
     logging.basicConfig(level=logging.DEBUG, format="%(name)s %(levelname)s %(message)s")
     top_view_module = None if args.external_perception else load_top_view_perception_module()
-    ros_argv = (
-        ros_args_with_embedded_perception_defaults(argv or sys.argv, args, top_view_module)
-        if top_view_module is not None
-        else argv
-    )
+    ros_argv = argv
     rclpy.init(args=ros_argv)
     perception_node = None
+    wrist_perception_node = None
     tf_node = TfNode()
     if top_view_module is not None:
-        perception_node = top_view_module.RgbdSegCropServiceNode()
+        top_defaults = dict(top_view_module.DEFAULTS)
+        top_defaults["service_name"] = args.perception_service
+        perception_node = top_view_module.RgbdSegCropServiceNode(
+            node_name="pddl_top_view_seg_crop_service_node",
+            default_params=top_defaults,
+        )
         perception_node.get_logger().info("Embedded top-view perception is running inside PDDL TAMP server.")
+        wrist_defaults = dict(WRIST_VIEW_DEFAULTS)
+        wrist_defaults["service_name"] = args.wrist_perception_service
+        wrist_perception_node = RgbdSegCropServiceNode(
+            node_name="pddl_wrist_seg_crop_service_node",
+            default_params=wrist_defaults,
+        )
+        wrist_perception_node.get_logger().info("Embedded wrist-camera perception is running inside PDDL TAMP server.")
     arm = ArmClient()
     server = PddlTampServer(args, tf_node.tf_buffer, arm)
     manipulator_executor = ManipulatorExecutor(args, server)
@@ -1899,6 +1935,8 @@ def main(argv=None):
         executor = MultiThreadedExecutor(num_threads=4)
         if perception_node is not None:
             executor.add_node(perception_node)
+        if wrist_perception_node is not None:
+            executor.add_node(wrist_perception_node)
         executor.add_node(tf_node)
         executor.add_node(server)
         executor.add_node(manipulator_executor)
@@ -1913,6 +1951,8 @@ def main(argv=None):
         tf_node.destroy_node()
         if perception_node is not None:
             perception_node.destroy_node()
+        if wrist_perception_node is not None:
+            wrist_perception_node.destroy_node()
         arm.destroy_node()
         rclpy.shutdown()
         stop_child_processes(child_processes)

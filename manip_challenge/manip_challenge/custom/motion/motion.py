@@ -15,6 +15,7 @@ from ..grasping.grasping_item import grasping_item
 
 
 DEFAULT_OBSERVE_JOINTS = [0., -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., 0.]
+DEFAULT_HOME_JOINTS = [0.0, -math.pi / 2.0, 1.0, -1.0, -math.pi / 2.0, 0.0]
 
 _BOOKSHELF_WRIST_FLIP_OBJECTS = frozenset({'banana', 'hammer'})
 
@@ -65,6 +66,12 @@ def _observe_joints(node):
     return list(joints) if joints is not None else list(DEFAULT_OBSERVE_JOINTS)
 
 
+def _home_joints(node):
+    args = getattr(node, "args", None)
+    joints = getattr(args, "home_joints", None)
+    return list(joints) if joints is not None else list(DEFAULT_HOME_JOINTS)
+
+
 def _move_to_observe_and_notify(node, arm, retreat_pose, place_pan_angle, on_observe_ready, retreat_duration, observe_rot_duration=None):
     observe_joint = _observe_joints(node)
     rot_time_observe = observe_rot_duration if observe_rot_duration is not None else _calc_rot_time(place_pan_angle, observe_joint[0])
@@ -74,6 +81,17 @@ def _move_to_observe_and_notify(node, arm, retreat_pose, place_pan_angle, on_obs
             on_observe_ready()
         except Exception as exc:
             node.get_logger().warn(f"observe-ready callback failed: {exc}")
+
+
+def _move_to_home_and_notify(node, arm, retreat_pose, place_pan_angle, on_observe_ready, retreat_duration):
+    home_joint = _home_joints(node)
+    rot_time_home = _calc_rot_time(place_pan_angle, home_joint[0])
+    arm.execute_trajectory([retreat_pose, home_joint], durations=[retreat_duration, rot_time_home])
+    if on_observe_ready is not None:
+        try:
+            on_observe_ready()
+        except Exception as exc:
+            node.get_logger().warn(f"home-ready callback failed: {exc}")
 
 
 def transform_pose(node, tf_buffer, pose, source_frame, target_frame):
@@ -330,7 +348,7 @@ def pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name,
         if skip_observe_after_place:
             arm.execute_trajectory([retreat_pose], durations=[1.5])
         else:
-            _move_to_observe_and_notify(node, arm, retreat_pose, place_pan_angle, on_observe_ready, retreat_duration=1.5, observe_rot_duration=1.5)
+            _move_to_home_and_notify(node, arm, retreat_pose, place_pan_angle, on_observe_ready, retreat_duration=1.5)
 
     node.bookshelf_count += 1
     node.get_logger().info("PICK-and-PLACE sequence completed successfully!")

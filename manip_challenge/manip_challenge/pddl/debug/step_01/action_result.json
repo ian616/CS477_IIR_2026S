@@ -1,29 +1,29 @@
 {
   "action": {
     "args": [
-      "coke_can_0",
+      "hammer_0",
       "table",
-      "bookshelf"
+      "right_storage"
     ],
     "name": "move-target-to-goal",
-    "pddl": "(move-target-to-goal coke_can_0 table bookshelf)",
+    "pddl": "(move-target-to-goal hammer_0 table right_storage)",
     "source": "fallback"
   },
   "event": "action_result",
   "result": {
     "action": {
       "args": [
-        "coke_can_0",
+        "hammer_0",
         "table",
-        "bookshelf"
+        "right_storage"
       ],
       "name": "move-target-to-goal",
-      "pddl": "(move-target-to-goal coke_can_0 table bookshelf)",
+      "pddl": "(move-target-to-goal hammer_0 table right_storage)",
       "source": "fallback"
     },
-    "class_name": "coke_can",
-    "command_id": "step1-a40cba18",
-    "destination": "bookshelf",
+    "class_name": "hammer",
+    "command_id": "step1-d6036cb8",
+    "destination": "right storage",
     "detected_pose_in_source": {
       "orientation": {
         "w": 1.0,
@@ -32,72 +32,79 @@
         "z": 0.0
       },
       "position": {
-        "x": -0.08080967515707016,
-        "y": 0.13446791470050812,
-        "z": 1.3576529026031494
+        "x": 0.3129035234451294,
+        "y": 0.0993947759270668,
+        "z": 0.6793532967567444
       }
     },
     "dry_run": false,
     "grasp_pose_in_base": {
       "orientation": {
-        "w": -0.056437124334095264,
-        "x": 0.8940568254677955,
-        "y": 0.4435013780743549,
-        "z": -0.027995918943551037
+        "w": 0.00019834297896001072,
+        "x": -0.012271753743638886,
+        "y": 0.9997941007411342,
+        "z": -0.01615923399623565
       },
       "position": {
-        "x": 0.5199913835846564,
-        "y": 0.11422267757920034,
-        "z": 0.020469249552941816
+        "x": 0.3956993039289128,
+        "y": -0.1870105336123194,
+        "z": -0.0810290249200251
       }
     },
     "grasp_selection": {
       "delta_from_raw_centroid_m": [
-        0.0,
-        0.0,
-        0.0
+        -0.06805510073900223,
+        -0.009766459465026855,
+        0.00010639429092407227
       ],
       "grasp_pose_source": "raw_centroid_xyz",
       "grasp_pose_xyz_m": [
-        -0.08080967515707016,
-        0.13446791470050812,
-        1.3576529026031494
+        0.3129035234451294,
+        0.0993947759270668,
+        0.6793532967567444
       ],
       "gripper_axis_rule": "3d_perpendicular_to_pca_major_axis",
-      "method": "median_fallback",
-      "points_path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260601_002802_977594_coke_can/coke_can_0/foreground_points.npy",
+      "method": "local_thick_axis_band",
+      "points_path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/results/wrist_seg/20260602_010301_768538_hammer/hammer_0/foreground_points.npy",
       "raw_centroid_xyz_m": [
-        -0.08080967515707016,
-        0.13446791470050812,
-        1.3576529026031494
+        0.3129035234451294,
+        0.0993947759270668,
+        0.6793532967567444
       ],
-      "reason": "no_dense_axis_bin",
+      "selected_band": {
+        "along_max_m": -0.061054988311011714,
+        "along_min_m": -0.0724624624046567,
+        "point_count": 464,
+        "score": 0.11201527926985115,
+        "width_m": 0.09303885941202841,
+        "z_spread_m": 0.015601539611816428
+      },
       "target_xyz_m": [
-        -0.08080967515707016,
-        0.13446791470050812,
-        1.3576529026031494
+        0.24484842270612717,
+        0.08962831646203995,
+        0.6794596910476685
       ],
       "xy_major_axis": [
-        0.7398529298419637,
-        -0.6727686394328012
+        -0.9998099409531802,
+        0.01949569109312275
       ],
       "xy_minor_axis": [
-        0.6727686394328012,
-        0.7398529298419637
+        -0.01949569109312275,
+        -0.9998099409531802
       ],
       "xyz_major_axis": [
-        0.6002427572860922,
-        -0.7904896764878289,
-        0.12179779838633015
+        -0.9992855341841687,
+        0.019386955900617755,
+        0.0324432906957352
       ],
       "xyz_major_axis_base": [
-        0.7898708500269718,
-        -0.600242757286092,
-        -0.1257484497051906
+        -0.024532043856059123,
+        0.9991765664334208,
+        -0.03231668167625313
       ]
     },
     "ok": true
   },
-  "stamp_sec": 1780241372.8559475,
+  "stamp_sec": 1780329861.992174,
   "step": 1
 }

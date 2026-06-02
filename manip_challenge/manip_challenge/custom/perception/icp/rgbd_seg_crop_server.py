@@ -523,32 +523,43 @@ class RgbdSegCropServiceNode(Node):
     DEFAULT_SERVICE_NAME = "detect_object_rgbd_seg_crop"
     READY_LOG_NAME = "YOLO segmentation RGB-D crop service"
 
-    def __init__(self):
-        super().__init__(self.NODE_NAME)
+    def __init__(self, node_name=None, default_params=None):
+        super().__init__(node_name or self.NODE_NAME)
+        default_params = dict(default_params or {})
 
-        self.declare_parameter("model_path", str(DEFAULT_MODEL_PATH))
-        self.declare_parameter("confidence", 0.35)
-        self.declare_parameter("iou", 0.45)
-        self.declare_parameter("display", True)
-        self.declare_parameter("display_hz", 5.0)
-        self.declare_parameter("target_label", "")
-        self.declare_parameter("service_name", self.DEFAULT_SERVICE_NAME)
-        self.declare_parameter("image_topic", "/camera/camera/color/image_raw")
-        self.declare_parameter("depth_topic", "/camera/camera/depth/color/image_raw")
-        self.declare_parameter("points_topic", "/camera/camera/depth/color/points")
-        self.declare_parameter("input_wait_timeout", 5.0)
-        self.declare_parameter("camera_frame", "camera_color_optical_frame")
-        self.declare_parameter("bbox_padding_ratio", 0.02)
-        self.declare_parameter("input_crop_ratio", 1.0)
-        self.declare_parameter("min_roi_points", 30)
-        self.declare_parameter("max_depth_m", 1.5)
-        self.declare_parameter("depth_filter", True)
-        self.declare_parameter("depth_margin_m", 0.04)
-        self.declare_parameter("save_dir", str(DEFAULT_SAVE_DIR))
-        self.declare_parameter("annotated_image_topic", "/yolov11_seg/rgbd_crop_detection_image")
-        self.declare_parameter("roi_mask_topic", "/yolov11_seg/rgbd_crop_mask")
-        self.declare_parameter("roi_info_topic", "/yolov11_seg/rgbd_crop_info")
-        self.declare_parameter("roi_points_topic", "/yolov11_seg/rgbd_crop_points")
+        def param_default(name, fallback):
+            value = default_params.get(name, fallback)
+            if isinstance(fallback, bool) and isinstance(value, str):
+                return value.strip().lower() in {"1", "true", "yes", "on"}
+            if isinstance(fallback, float) and isinstance(value, str):
+                return float(value)
+            if isinstance(fallback, int) and not isinstance(fallback, bool) and isinstance(value, str):
+                return int(value)
+            return value
+
+        self.declare_parameter("model_path", param_default("model_path", str(DEFAULT_MODEL_PATH)))
+        self.declare_parameter("confidence", param_default("confidence", 0.35))
+        self.declare_parameter("iou", param_default("iou", 0.45))
+        self.declare_parameter("display", param_default("display", True))
+        self.declare_parameter("display_hz", param_default("display_hz", 5.0))
+        self.declare_parameter("target_label", param_default("target_label", ""))
+        self.declare_parameter("service_name", param_default("service_name", self.DEFAULT_SERVICE_NAME))
+        self.declare_parameter("image_topic", param_default("image_topic", "/camera/camera/color/image_raw"))
+        self.declare_parameter("depth_topic", param_default("depth_topic", "/camera/camera/depth/color/image_raw"))
+        self.declare_parameter("points_topic", param_default("points_topic", "/camera/camera/depth/color/points"))
+        self.declare_parameter("input_wait_timeout", param_default("input_wait_timeout", 5.0))
+        self.declare_parameter("camera_frame", param_default("camera_frame", "camera_color_optical_frame"))
+        self.declare_parameter("bbox_padding_ratio", param_default("bbox_padding_ratio", 0.02))
+        self.declare_parameter("input_crop_ratio", param_default("input_crop_ratio", 1.0))
+        self.declare_parameter("min_roi_points", param_default("min_roi_points", 30))
+        self.declare_parameter("max_depth_m", param_default("max_depth_m", 1.5))
+        self.declare_parameter("depth_filter", param_default("depth_filter", True))
+        self.declare_parameter("depth_margin_m", param_default("depth_margin_m", 0.04))
+        self.declare_parameter("save_dir", param_default("save_dir", str(DEFAULT_SAVE_DIR)))
+        self.declare_parameter("annotated_image_topic", param_default("annotated_image_topic", "/yolov11_seg/rgbd_crop_detection_image"))
+        self.declare_parameter("roi_mask_topic", param_default("roi_mask_topic", "/yolov11_seg/rgbd_crop_mask"))
+        self.declare_parameter("roi_info_topic", param_default("roi_info_topic", "/yolov11_seg/rgbd_crop_info"))
+        self.declare_parameter("roi_points_topic", param_default("roi_points_topic", "/yolov11_seg/rgbd_crop_points"))
 
         self.target_label = parse_target_label(self.get_parameter("target_label").value)
         self.display = bool(self.get_parameter("display").value)

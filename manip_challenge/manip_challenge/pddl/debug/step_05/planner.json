@@ -3,17 +3,17 @@
   "plan": [
     {
       "args": [
-        "banana_0",
+        "strawberry_0",
         "table",
-        "left_storage"
+        "right_storage"
       ],
       "name": "move-target-to-goal",
-      "pddl": "(move-target-to-goal banana_0 table left_storage)",
+      "pddl": "(move-target-to-goal strawberry_0 table right_storage)",
       "source": "external"
     }
   ],
   "problem": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/problem.pddl",
-  "raw_output": "(move-target-to-goal banana_0 table left_storage)\n; cost = 1 (unit cost)\n\n",
-  "stamp_sec": 1780241504.374195,
+  "raw_output": "(move-target-to-goal strawberry_0 table right_storage)\n; cost = 1 (unit cost)\n\n",
+  "stamp_sec": 1780329971.8882174,
   "step": 5
 }

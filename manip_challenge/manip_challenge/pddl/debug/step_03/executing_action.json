@@ -1,15 +1,15 @@
 {
   "action": {
     "args": [
-      "strawberry_0",
+      "meat_can_0",
       "table",
-      "right_storage"
+      "left_storage"
     ],
     "name": "move-target-to-goal",
-    "pddl": "(move-target-to-goal strawberry_0 table right_storage)",
-    "source": "external"
+    "pddl": "(move-target-to-goal meat_can_0 table left_storage)",
+    "source": "fallback"
   },
   "event": "executing_action",
-  "stamp_sec": 1780241412.84918,
+  "stamp_sec": 1780329906.5349598,
   "step": 3
 }
