@@ -77,6 +77,7 @@ from manip_challenge.custom.grasping.grasping_item import (
     _load_grasp_database,
     _lookup_object_grasp_configs,
     _select_state_config,
+    _measured_object_area_from_features,
     _extract_grasp_transform,
 )
 from manip_challenge.custom.grasping.pose_math import apply_grasp_transform
@@ -1596,17 +1597,11 @@ class PddlTampServer(Node):
         # PREVIEW CORRECTED POSE (from grasp_database.json)
         try:
             perception_features = extract_perception_features(detection)
-            pca_bbox_width = perception_features.get("pca_bbox_width_m")
-            pca_bbox_length = perception_features.get("pca_bbox_length_m")
-            pca_bbox_area = perception_features.get("pca_bbox_area_m2")
-            if pca_bbox_area is None and pca_bbox_width is not None and pca_bbox_length is not None:
-                pca_bbox_area = float(pca_bbox_width) * float(pca_bbox_length)
-            if pca_bbox_area is None:
-                pca_bbox_area = perception_features.get("bbox_area_px2")
+            measured_area, measured_area_source = _measured_object_area_from_features(perception_features)
                 
             database = _load_grasp_database()
             matched_name, object_configs = _lookup_object_grasp_configs(database, obj_name)
-            item_state, grasp_config, _ = _select_state_config(object_configs, pca_bbox_area)
+            item_state, grasp_config, _ = _select_state_config(object_configs, measured_area)
             grasp_transform = _extract_grasp_transform(grasp_config)
             
             corrected_grasp_pose = apply_grasp_transform(grasp_pose, grasp_transform)
@@ -1616,7 +1611,10 @@ class PddlTampServer(Node):
             corrected_msg.pose = corrected_grasp_pose
             self.corrected_grasp_pose_publisher.publish(corrected_msg)
             
-            self.get_logger().info(f"Published preview of corrected grasp pose for '{obj_name}' (state={item_state}, area={pca_bbox_area})")
+            self.get_logger().info(
+                f"Published preview of corrected grasp pose for '{obj_name}' "
+                f"(state={item_state}, area={measured_area}, source={measured_area_source})"
+            )
         except Exception as e:
             self.get_logger().warn(f"Failed to publish preview of corrected grasp pose: {e}")
         

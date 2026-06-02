@@ -6,6 +6,11 @@ from pathlib import Path
 
 import numpy as np
 
+try:
+    import cv2
+except ImportError:
+    cv2 = None
+
 
 def _as_float_list(values, expected_len=None):
     if values is None:
@@ -87,6 +92,78 @@ def _pca_bbox_from_points(points_path, major_axis, minor_axis, percentile_low=2.
     }
 
 
+def _triangle_area_sum(a, b, c, project_xy=False):
+    if len(a) == 0:
+        return 0.0
+    if project_xy:
+        a = a.copy()
+        b = b.copy()
+        c = c.copy()
+        a[:, 2] = 0.0
+        b[:, 2] = 0.0
+        c[:, 2] = 0.0
+    return float(0.5 * np.linalg.norm(np.cross(b - a, c - a), axis=1).sum())
+
+
+def _masked_cloud_mesh_area(cloud, valid_mask, project_xy=False):
+    if cloud is None or cloud.ndim != 3 or cloud.shape[-1] < 3:
+        return None
+    if valid_mask is None or valid_mask.shape[:2] != cloud.shape[:2]:
+        return None
+    if np.count_nonzero(valid_mask) < 3:
+        return None
+
+    points = np.asarray(cloud[:, :, :3], dtype=np.float64)
+    v00 = valid_mask[:-1, :-1]
+    v01 = valid_mask[:-1, 1:]
+    v10 = valid_mask[1:, :-1]
+    v11 = valid_mask[1:, 1:]
+
+    p00 = points[:-1, :-1]
+    p01 = points[:-1, 1:]
+    p10 = points[1:, :-1]
+    p11 = points[1:, 1:]
+
+    tri_a = v00 & v01 & v10
+    tri_b = v11 & v10 & v01
+    area = _triangle_area_sum(p00[tri_a], p01[tri_a], p10[tri_a], project_xy=project_xy)
+    area += _triangle_area_sum(p11[tri_b], p10[tri_b], p01[tri_b], project_xy=project_xy)
+    return area
+
+
+def _mask_area_from_cloud(cloud_path, mask_path):
+    if cv2 is None or not cloud_path or not mask_path:
+        return {}
+
+    cloud_file = Path(cloud_path).expanduser()
+    mask_file = Path(mask_path).expanduser()
+    if not cloud_file.is_file() or not mask_file.is_file():
+        return {}
+
+    try:
+        cloud = np.load(cloud_file)
+        mask = cv2.imread(str(mask_file), cv2.IMREAD_GRAYSCALE)
+    except Exception:
+        return {}
+
+    if mask is None or cloud is None or cloud.ndim != 3 or cloud.shape[-1] < 3:
+        return {}
+    if mask.shape[:2] != cloud.shape[:2]:
+        mask = cv2.resize(mask, (cloud.shape[1], cloud.shape[0]), interpolation=cv2.INTER_NEAREST)
+
+    valid_mask = (mask > 0) & np.isfinite(cloud[:, :, :3]).all(axis=2) & (cloud[:, :, 2] > 0.0)
+    if np.count_nonzero(valid_mask) < 3:
+        return {}
+
+    projected_area = _masked_cloud_mesh_area(cloud, valid_mask, project_xy=True)
+    surface_area = _masked_cloud_mesh_area(cloud, valid_mask, project_xy=False)
+    return {
+        "mask_projected_area_m2": projected_area,
+        "mask_surface_area_m2": surface_area,
+        "mask_area_valid_points": int(np.count_nonzero(valid_mask)),
+    }
+
+
 def extract_perception_features(perception_info):
     """Extract target pose/PCA/bbox values from two-view perception output."""
     perception_info = perception_info or {}
@@ -151,6 +228,10 @@ def extract_perception_features(perception_info):
                 pca_minor_axis_xy,
             )
         )
+    mask_area_info = _mask_area_from_cloud(
+        files.get("cloud_npy"),
+        files.get("mask_cloud_size") or files.get("mask"),
+    )
 
     return {
         "target_position_xyz_m": target_position_xyz_m,
@@ -162,4 +243,5 @@ def extract_perception_features(perception_info):
         "pca_minor_axis_xy": pca_minor_axis_xy,
         **bbox_info,
         **pca_bbox_info,
+        **mask_area_info,
     }

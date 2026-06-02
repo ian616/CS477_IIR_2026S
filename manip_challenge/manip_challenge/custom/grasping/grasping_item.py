@@ -74,13 +74,15 @@ def _read_bbox_area(config):
     if not isinstance(config, dict):
         return None
 
-    value = config.get("bbox_area")
+    value = config.get("area_m2")
+    if value is None:
+        value = config.get("bbox_area")
     if value is None:
         return None
     return float(value)
 
 
-def _select_state_config(object_configs, pca_bbox_area):
+def _select_state_config(object_configs, measured_area):
     if _is_transform_config(object_configs):
         return "default", object_configs, {}
 
@@ -105,8 +107,8 @@ def _select_state_config(object_configs, pca_bbox_area):
         if bbox_area is not None
     }
 
-    if pca_bbox_area is not None and bbox_area_by_state:
-        measured_area = float(pca_bbox_area)
+    if measured_area is not None and bbox_area_by_state:
+        measured_area = float(measured_area)
         selected_state = min(
             bbox_area_by_state,
             key=lambda state: (
@@ -120,6 +122,24 @@ def _select_state_config(object_configs, pca_bbox_area):
         selected_state = next(iter(state_configs))
 
     return selected_state, state_configs[selected_state], bbox_area_by_state
+
+
+def _measured_object_area_from_features(perception_features):
+    for key in (
+        "mask_projected_area_m2",
+        "mask_surface_area_m2",
+        "pca_bbox_area_m2",
+    ):
+        value = perception_features.get(key)
+        if value is not None:
+            return float(value), key
+
+    width = perception_features.get("pca_bbox_width_m")
+    length = perception_features.get("pca_bbox_length_m")
+    if width is not None and length is not None:
+        return float(width) * float(length), "pca_bbox_width_m*pca_bbox_length_m"
+
+    return None, None
 
 
 def _extract_grasp_transform(config):
@@ -139,18 +159,12 @@ def grasping_item(node, arm, grasp_pose, obj_name, perception_info=None,
     target_orientation_deg = perception_features["target_orientation_yaw_deg"]
     pca_major_axis = perception_features["pca_major_axis_xy"]
     pca_minor_axis = perception_features["pca_minor_axis_xy"]
-    pca_bbox_width = perception_features.get("pca_bbox_width_m")
-    pca_bbox_length = perception_features.get("pca_bbox_length_m")
-    pca_bbox_area = perception_features.get("pca_bbox_area_m2")
-    if pca_bbox_area is None and pca_bbox_width is not None and pca_bbox_length is not None:
-        pca_bbox_area = float(pca_bbox_width) * float(pca_bbox_length)
-    if pca_bbox_area is None:
-        pca_bbox_area = perception_features.get("bbox_area_px2")
+    measured_area, measured_area_source = _measured_object_area_from_features(perception_features)
 
     try:
         database = _load_grasp_database()
         matched_name, object_configs = _lookup_object_grasp_configs(database, obj_name)
-        item_state, grasp_config, bbox_area_by_state = _select_state_config(object_configs, pca_bbox_area)
+        item_state, grasp_config, bbox_area_by_state = _select_state_config(object_configs, measured_area)
         grasp_transform = _extract_grasp_transform(grasp_config)
         corrected_grasp_pose = apply_grasp_transform(grasp_pose, grasp_transform)
 
@@ -161,8 +175,8 @@ def grasping_item(node, arm, grasp_pose, obj_name, perception_info=None,
         # Log
         node.get_logger().info(
             f"\n<Grasping> Loaded grasp transform for '{matched_name}' "
-            f"state='{item_state}' using pca_bbox_area_m2={pca_bbox_area}, "
-            f"bbox_area_by_state={bbox_area_by_state}: "
+            f"state='{item_state}' using measured_area_m2={measured_area} "
+            f"source={measured_area_source}, area_by_state={bbox_area_by_state}: "
             f"x={grasp_transform['x']:.4f}, y={grasp_transform['y']:.4f}, "
             f"z={grasp_transform['z']:.4f}, "
             f"roll={grasp_transform['roll']:.4f}, "
