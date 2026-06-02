@@ -1581,6 +1581,8 @@ class PddlTampServer(Node):
             pca_bbox_area = perception_features.get("pca_bbox_area_m2")
             if pca_bbox_area is None and pca_bbox_width is not None and pca_bbox_length is not None:
                 pca_bbox_area = float(pca_bbox_width) * float(pca_bbox_length)
+            if pca_bbox_area is None:
+                pca_bbox_area = perception_features.get("bbox_area_px2")
                 
             database = _load_grasp_database()
             matched_name, object_configs = _lookup_object_grasp_configs(database, obj_name)
@@ -1594,7 +1596,7 @@ class PddlTampServer(Node):
             corrected_msg.pose = corrected_grasp_pose
             self.corrected_grasp_pose_publisher.publish(corrected_msg)
             
-            self.get_logger().info(f"Published preview of corrected grasp pose for '{obj_name}' (state={item_state})")
+            self.get_logger().info(f"Published preview of corrected grasp pose for '{obj_name}' (state={item_state}, area={pca_bbox_area})")
         except Exception as e:
             self.get_logger().warn(f"Failed to publish preview of corrected grasp pose: {e}")
         

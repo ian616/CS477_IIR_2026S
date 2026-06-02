@@ -7,7 +7,7 @@
             "roll": 0.0,
             "pitch": 0.0,
             "yaw": 0.0,
-            "grasp_value": 27,
+            "grasp_value": 33,
             "bbox_area": 10
         },
         "lying": {
@@ -17,7 +17,7 @@
             "roll": 0.0,
             "pitch": 0.0,
             "yaw": 0.0,
-            "grasp_value": 27,
+            "grasp_value": 33,
             "bbox_area": 10
         }
     },
@@ -57,7 +57,7 @@
         "lying": {
             "x": 0.0,
             "y": 0.0,
-            "z": 0.0,
+            "z": 0.02,
             "roll": 0.0,
             "pitch": 0.0,
             "yaw": 0.0,
@@ -91,12 +91,12 @@
         "standing": {
             "x": 0.0,
             "y": 0.0,
-            "z": 0.02,
+            "z": 0.0125,
             "roll": 0.0,
             "pitch": 0.0,
             "yaw": 0.0,
-            "grasp_value": 19,
-            "bbox_area": 10
+            "grasp_value": 24,
+            "bbox_area": 0.005141309580288734
         },
         "lying": {
             "x": 0.0,
@@ -106,7 +106,7 @@
             "pitch": 0.0,
             "yaw": 0.0,
             "grasp_value": 3,
-            "bbox_area": 10
+            "bbox_area": 0.007214982673634867
         }
     }
 }

@@ -144,6 +144,8 @@ def grasping_item(node, arm, grasp_pose, obj_name, perception_info=None,
     pca_bbox_area = perception_features.get("pca_bbox_area_m2")
     if pca_bbox_area is None and pca_bbox_width is not None and pca_bbox_length is not None:
         pca_bbox_area = float(pca_bbox_width) * float(pca_bbox_length)
+    if pca_bbox_area is None:
+        pca_bbox_area = perception_features.get("bbox_area_px2")
 
     try:
         database = _load_grasp_database()

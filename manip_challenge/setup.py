@@ -60,6 +60,7 @@ setup(
             'add_object_set1   = manip_challenge.add_object_set1:main',
             'add_object_set2   = manip_challenge.add_object_set2:main',
             'add_random_object = manip_challenge.add_random_object:main',
+            'spawn_custom_objects = manip_challenge.spawn_custom_objects:main',
             'init_joints  = manip_challenge.init_joints:main',
             'world_model_gazebo = manip_challenge.world_model_gazebo:main',
             'get_joint    = manip_challenge.get_joint:main',            
