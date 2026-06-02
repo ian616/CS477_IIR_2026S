@@ -170,7 +170,7 @@
       </inertial>            
     </link>
 
-    <xacro:sensor_d435 name="wrist_camera" topics_ns="wrist_camera" parent="wrist_camera_base_link" >
+    <xacro:sensor_d435 name="wrist_camera" topics_ns="wrist_camera/wrist_camera" parent="wrist_camera_base_link" >
       <origin xyz="0.0 0.06 0.015" rpy="-1.575796 -1.575796 0"/>
     </xacro:sensor_d435>
     

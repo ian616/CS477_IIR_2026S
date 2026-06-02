@@ -3,33 +3,17 @@
   "plan": [
     {
       "args": [
-<<<<<<< Updated upstream
-        "strawberry_0",
+        "banana_0",
         "table",
-        "right_storage"
+        "left_storage"
       ],
       "name": "move-target-to-goal",
-      "pddl": "(move-target-to-goal strawberry_0 table right_storage)",
-      "source": "external"
-    }
-  ],
-  "problem": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/problem.pddl",
-  "raw_output": "(move-target-to-goal strawberry_0 table right_storage)\n; cost = 1 (unit cost)\n\n",
-  "stamp_sec": 1780329971.8882174,
-  "step": 5
-=======
-        "strawberry_1",
-        "table",
-        "buffer1"
-      ],
-      "name": "move-obstacle-to-buffer",
-      "pddl": "(move-obstacle-to-buffer strawberry_1 table buffer1)",
+      "pddl": "(move-target-to-goal banana_0 table left_storage)",
       "source": "fallback"
     }
   ],
-  "problem": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/problem.pddl",
-  "raw_output": "python3: can't open file '/home/alvan/run_fast_downward.py': [Errno 2] No such file or directory\n\nFallback planner selected:\n(move-obstacle-to-buffer strawberry_1 table buffer1)",
-  "stamp_sec": 1780326247.1606195,
+  "problem": "/home/ubuntu/cs477_ws/src/cs477_IIR/manip_challenge/manip_challenge/pddl/problem.pddl",
+  "raw_output": "PDDL_PLANNER_CMD is not set; using fallback planner.\nFallback planner selected:\n(move-target-to-goal banana_0 table left_storage)",
+  "stamp_sec": 1780367574.6192136,
   "step": 1
->>>>>>> Stashed changes
 }
