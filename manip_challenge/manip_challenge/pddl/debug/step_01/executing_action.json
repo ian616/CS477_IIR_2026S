@@ -1,6 +1,7 @@
 {
   "action": {
     "args": [
+<<<<<<< Updated upstream
       "hammer_0",
       "table",
       "right_storage"
@@ -11,5 +12,17 @@
   },
   "event": "executing_action",
   "stamp_sec": 1780329821.6418352,
+=======
+      "strawberry_1",
+      "table",
+      "buffer1"
+    ],
+    "name": "move-obstacle-to-buffer",
+    "pddl": "(move-obstacle-to-buffer strawberry_1 table buffer1)",
+    "source": "fallback"
+  },
+  "event": "executing_action",
+  "stamp_sec": 1780326247.1625714,
+>>>>>>> Stashed changes
   "step": 1
 }
