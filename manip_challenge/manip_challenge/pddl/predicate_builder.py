@@ -8,6 +8,11 @@ from typing import Callable
 
 import numpy as np
 
+try:
+    import cv2 as _cv2
+except ImportError:
+    _cv2 = None
+
 logger = logging.getLogger(__name__)
 if not logger.handlers:
     _handler = logging.StreamHandler()
@@ -16,7 +21,7 @@ if not logger.handlers:
     logger.setLevel(logging.INFO)
 
 from .pddl_types import BUFFER_LOCATIONS, Goal, ObjectState, PredicateState, KNOWN_OBJECTS
-from .utils import pddl_name
+from .utils import pddl_name, PDDL_DIR
 
 
 MIN_CONFIDENCE = 0.12
@@ -25,7 +30,7 @@ MIN_FOREGROUND_POINTS = 20
 BBOX_OVERLAP_THRESHOLD = 0.08
 DEPTH_ORDER_EPS_M = 0.008
 SAFE_DISTANCE_M = 0.11
-SAFE_PIXEL_DISTANCE = 20.0
+SAFE_PIXEL_DISTANCE = 10.0
 # Predicate tuning guide:
 # This file is the main swap point for symbolic state judgement.  Geometry,
 # masks, depth, and safety distances should be converted to boolean PDDL facts
@@ -73,12 +78,211 @@ def _dist_point_to_bbox(px: float, py: float, bbox) -> float:
     return math.sqrt(dx * dx + dy * dy)
 
 
+def _load_mask_pixels(mask_path: str) -> np.ndarray | None:
+    """Load a binary mask PNG and return Nx2 float32 array of (x, y) nonzero pixel coords."""
+    if not mask_path or _cv2 is None:
+        return None
+    try:
+        mask = _cv2.imread(mask_path, _cv2.IMREAD_GRAYSCALE)
+        if mask is None:
+            return None
+        ys, xs = np.nonzero(mask)
+        if len(xs) == 0:
+            return None
+        return np.column_stack([xs, ys]).astype(np.float32)
+    except Exception:
+        return None
+
+
+def _grasp_pixel(target: ObjectState) -> tuple[float, float] | None:
+    """Grasp point in image pixels: mask centroid of mask_full, fallback to bbox center."""
+    files = (target.detection or {}).get("files") or {}
+    for key in ("mask_full", "mask"):
+        pixels = _load_mask_pixels(files.get(key))
+        if pixels is not None:
+            return float(np.median(pixels[:, 0])), float(np.median(pixels[:, 1]))
+    return _bbox_center(target.bbox_xyxy)
+
+
+def _dist_point_to_seg(px: float, py: float, mask_path: str) -> float | None:
+    """Minimum pixel distance from (px, py) to any nonzero pixel in mask_path."""
+    pixels = _load_mask_pixels(mask_path)
+    if pixels is None:
+        return None
+    diff = pixels - np.array([px, py], dtype=np.float32)
+    return float(np.min(np.hypot(diff[:, 0], diff[:, 1])))
+
+
 def _grasp_to_obstacle_dist(target: ObjectState, obstacle: ObjectState) -> float | None:
-    """Distance from target's grasp pixel (bbox center) to nearest edge of obstacle's bbox."""
-    gp = _bbox_center(target.bbox_xyxy)
-    if gp is None or not obstacle.bbox_xyxy:
+    """Min distance from target's grasp pixel to obstacle's segmentation mask (or bbox edge)."""
+    gp = _grasp_pixel(target)
+    if gp is None:
+        return None
+    files = (obstacle.detection or {}).get("files") or {}
+    for key in ("mask_full", "mask"):
+        mask_path = files.get(key)
+        if mask_path:
+            d = _dist_point_to_seg(gp[0], gp[1], mask_path)
+            if d is not None:
+                return d
+    if not obstacle.bbox_xyxy:
         return None
     return _dist_point_to_bbox(gp[0], gp[1], obstacle.bbox_xyxy)
+
+
+def _put_text(img, text, pos, scale=0.45, color=(255, 255, 255)):
+    _cv2.putText(img, text, pos, _cv2.FONT_HERSHEY_SIMPLEX, scale, (0, 0, 0), 3, _cv2.LINE_AA)
+    _cv2.putText(img, text, pos, _cv2.FONT_HERSHEY_SIMPLEX, scale, color, 1, _cv2.LINE_AA)
+
+
+def _visualize_safe_check(objects: dict) -> None:
+    """Save safe-check debug image to pddl/debug/safe_check.png."""
+    if _cv2 is None:
+        return
+
+    visible = [obj for obj in objects.values() if obj.visible]
+    if not visible:
+        return
+
+    # --- Scene canvas (background) ---
+    canvas = None
+    for obj in visible:
+        files = (obj.detection or {}).get("files") or {}
+        bg_path = files.get("annotated") or files.get("mask_overlay")
+        if bg_path:
+            canvas = _cv2.imread(bg_path)
+            if canvas is not None:
+                break
+    if canvas is None:
+        canvas = np.zeros((480, 640, 3), dtype=np.uint8)
+    H, W = canvas.shape[:2]
+
+    def _overlay(path, color_bgr, alpha=0.45):
+        if not path:
+            return None
+        m = _cv2.imread(path, _cv2.IMREAD_GRAYSCALE)
+        if m is None:
+            return None
+        if m.shape[:2] != (H, W):
+            m = _cv2.resize(m, (W, H), interpolation=_cv2.INTER_NEAREST)
+        where = m > 0
+        canvas[where] = np.clip(
+            canvas[where].astype(np.float32) * (1 - alpha)
+            + np.array(color_bgr, dtype=np.float32) * alpha,
+            0, 255,
+        ).astype(np.uint8)
+        ys, xs = np.nonzero(m)
+        return np.column_stack([xs, ys]).astype(np.float32) if len(xs) else None
+
+    # Overlay masks, collect pixel sets and grasp points
+    obj_pixels: dict[str, np.ndarray | None] = {}
+    obj_grasp: dict[str, tuple[int, int] | None] = {}
+    for obj in visible:
+        files = (obj.detection or {}).get("files") or {}
+        color = (0, 200, 0) if obj.is_target else (0, 0, 220)
+        pixels = None
+        for key in ("mask_full", "mask"):
+            pixels = _overlay(files.get(key), color)
+            if pixels is not None:
+                break
+        if pixels is None and obj.bbox_xyxy:
+            x1, y1, x2, y2 = obj.bbox_xyxy
+            _cv2.rectangle(canvas, (x1, y1), (x2, y2), color, 2)
+        obj_pixels[obj.name] = pixels
+        if obj.is_target:
+            gp = _grasp_pixel(obj)
+            obj_grasp[obj.name] = (int(round(gp[0])), int(round(gp[1]))) if gp else None
+        else:
+            obj_grasp[obj.name] = None
+
+    name_to_obj = {obj.name: obj for obj in visible}
+
+    # Pre-compute distances for all target-obstacle pairs
+    # dist_map[(t_name, o_name)] = (d_px, endpoint_px)
+    dist_map: dict[tuple[str, str], tuple[float, tuple[int, int]]] = {}
+    for t_name, gp in obj_grasp.items():
+        if gp is None:
+            continue
+        for o_name, o_pixels in obj_pixels.items():
+            obstacle = name_to_obj.get(o_name)
+            if obstacle is None or obstacle.is_target:
+                continue
+            if o_pixels is not None and len(o_pixels) > 0:
+                diff = o_pixels - np.array([gp[0], gp[1]], dtype=np.float32)
+                idx = int(np.argmin(np.hypot(diff[:, 0], diff[:, 1])))
+                ep = (int(round(o_pixels[idx, 0])), int(round(o_pixels[idx, 1])))
+                d_px = float(np.hypot(diff[idx, 0], diff[idx, 1]))
+            elif obstacle.bbox_xyxy:
+                x1, y1, x2, y2 = obstacle.bbox_xyxy
+                ep = (int(np.clip(gp[0], x1, x2)), int(np.clip(gp[1], y1, y2)))
+                d_px = _dist_point_to_bbox(gp[0], gp[1], obstacle.bbox_xyxy)
+            else:
+                continue
+            dist_map[(t_name, o_name)] = (d_px, ep)
+
+    # Draw lines only (no text on scene)
+    for (t_name, o_name), (d_px, ep) in dist_map.items():
+        gp = obj_grasp[t_name]
+        if gp is None:
+            continue
+        target = name_to_obj[t_name]
+        is_near = o_name in target.near
+        _cv2.line(canvas, gp, ep, (0, 60, 255) if is_near else (60, 220, 60), 2)
+
+    # Grasp point markers
+    for t_name, gp in obj_grasp.items():
+        if gp is None:
+            continue
+        is_safe = name_to_obj[t_name].safe
+        _cv2.drawMarker(canvas, gp, (0, 255, 255) if is_safe else (0, 80, 255),
+                        _cv2.MARKER_CROSS, 20, 2)
+
+    # --- Info panel (right side) ---
+    ROW_H = 30
+    PANEL_W = 300
+    panel_h = max(H, ROW_H * (len(visible) + 3))
+    panel = np.full((panel_h, PANEL_W, 3), 25, dtype=np.uint8)
+
+    _put_text(panel, f"thr = {SAFE_PIXEL_DISTANCE:.0f} px", (10, 22), scale=0.48,
+              color=(180, 180, 180))
+    _cv2.line(panel, (6, 32), (PANEL_W - 6, 32), (70, 70, 70), 1)
+
+    # Collect min distance per obstacle (across all targets)
+    obs_min_dist: dict[str, tuple[float, str]] = {}  # o_name -> (min_d, t_name)
+    for (t_name, o_name), (d_px, _) in dist_map.items():
+        if o_name not in obs_min_dist or d_px < obs_min_dist[o_name][0]:
+            obs_min_dist[o_name] = (d_px, t_name)
+
+    for i, obj in enumerate(visible):
+        y = 32 + ROW_H * (i + 1)
+        tag = "T" if obj.is_target else "O"
+        tag_color = (100, 240, 100) if obj.is_target else (80, 100, 255)
+
+        _put_text(panel, f"[{tag}]", (8, y), scale=0.45, color=tag_color)
+        _put_text(panel, obj.name, (50, y), scale=0.45, color=(220, 220, 220))
+
+        if obj.is_target:
+            status = "SAFE" if obj.safe else "UNSAFE"
+            status_color = (100, 240, 100) if obj.safe else (60, 60, 255)
+            _put_text(panel, status, (190, y), scale=0.45, color=status_color)
+        else:
+            # Show distance from nearest target
+            if obj.name in obs_min_dist:
+                d_px, t_name = obs_min_dist[obj.name]
+                target = name_to_obj[t_name]
+                is_near = obj.name in target.near
+                d_color = (60, 60, 255) if is_near else (80, 220, 80)
+                _put_text(panel, f"{d_px:.0f} px", (190, y), scale=0.45, color=d_color)
+
+    # Combine scene + panel
+    if panel_h > H:
+        canvas = np.pad(canvas, ((0, panel_h - H), (0, 0), (0, 0)), constant_values=30)
+    sep = np.full((panel_h, 2, 3), 60, dtype=np.uint8)
+    combined = np.hstack([canvas, sep, panel])
+
+    debug_dir = PDDL_DIR / "debug"
+    debug_dir.mkdir(parents=True, exist_ok=True)
+    _cv2.imwrite(str(debug_dir / "safe_check.png"), combined)
 
 
 def _choose_ambiguous_blocker(a: ObjectState, b: ObjectState) -> tuple[ObjectState, ObjectState] | None:
@@ -294,6 +498,8 @@ def _annotate_relations(objects: dict[str, ObjectState]) -> None:
                 f"[safe] {obj.name}  xyz={xyz_str}  near={sorted(obj.near)}  safe={obj.safe}",
                 flush=True,
             )
+
+    _visualize_safe_check(objects)
 
 
 def _build_predicates(state: PredicateState) -> set[str]:

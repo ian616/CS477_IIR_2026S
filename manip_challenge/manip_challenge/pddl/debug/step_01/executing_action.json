@@ -3,13 +3,13 @@
     "args": [
       "meat_can_0",
       "table",
-      "buffer2"
+      "bookshelf"
     ],
-    "name": "move-obstacle-to-buffer",
-    "pddl": "(move-obstacle-to-buffer meat_can_0 table buffer2)",
+    "name": "move-target-to-goal",
+    "pddl": "(move-target-to-goal meat_can_0 table bookshelf)",
     "source": "external"
   },
   "event": "executing_action",
-  "stamp_sec": 1780447969.723879,
+  "stamp_sec": 1780450635.4730532,
   "step": 1
 }
