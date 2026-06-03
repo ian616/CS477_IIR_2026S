@@ -486,7 +486,8 @@ class PddlTampServer(Node):
             f"PDDL TAMP server ready. Publish natural-language commands to '{args.command_topic}' "
             f"or call service '{args.service_name}'."
         )
-        self.reset_debug_artifacts()
+        if self.args.debug:
+            self.reset_debug_artifacts()
         self.warm_start_timer = None
         if not self.args.disable_warm_start:
             self.warm_scene_scheduled = True
@@ -729,7 +730,7 @@ class PddlTampServer(Node):
         state.completed = completed
         state.occupied_buffers = occupied_buffers
         state.buffered_obstacles = buffered_obstacles
-        _annotate_relations(state.objects)
+        _annotate_relations(state.objects, debug=self.args.debug)
         state.goals = _bind_goals_to_instances(goals, state.objects, completed)
         state.relation_input_objects = sorted(obj.name for obj in state.objects.values() if obj.relation_candidate)
         state.predicates = _build_predicates(state)
@@ -822,6 +823,7 @@ class PddlTampServer(Node):
                 completed=set(),
                 occupied_buffers=set(),
                 scan_all_targets=True,
+                debug=self.args.debug,
             )
         except Exception as exc:
             self.get_logger().warn(f"[WarmStart] Initial scene scan failed: {exc}")
@@ -905,7 +907,7 @@ class PddlTampServer(Node):
         if not removed:
             return state
         state.objects = kept
-        _annotate_relations(state.objects)
+        _annotate_relations(state.objects, debug=self.args.debug)
         state.goals = _bind_goals_to_instances(state.goals, state.objects, state.completed)
         state.predicates = _build_predicates(state)
         state.notes.append(
@@ -1035,6 +1037,7 @@ class PddlTampServer(Node):
                 completed=set(),
                 occupied_buffers=set(),
                 scan_all_targets=scan_all_targets,
+                debug=self.args.debug,
             )
             self.reconcile_state_with_ledger(state, goals, action_ledger)
         except Exception as exc:
@@ -1198,6 +1201,7 @@ class PddlTampServer(Node):
                         completed=set(),
                         occupied_buffers=set(),
                         scan_all_targets=scan_all_targets,
+                        debug=self.args.debug,
                     )
                     self.reconcile_state_with_ledger(state, goals, action_ledger)
             completed = set(state.completed)
@@ -1218,7 +1222,10 @@ class PddlTampServer(Node):
             }
             self.save_step_artifacts(scene_summary, state, step_idx, command_text)
             scenes.append(scene_summary)
-            self.log_state(scene_summary)
+            if self.args.debug:
+                self.log_state(scene_summary)
+            else:
+                self.log_state_summary(scene_summary, step_idx)
             self.publish_json(self.pred_pub, scene_summary)
             self.publish_pddl_log(
                 "predicate_judgement",
@@ -1242,7 +1249,10 @@ class PddlTampServer(Node):
             generated_problem = write_problem(state, problem_path)
             self.get_logger().info(f"[PDDL] Generated problem: {generated_problem}")
             actions, raw_output = plan(domain_path, generated_problem, state)
-            self.get_logger().info("[PDDL] Planner raw output:\n" + raw_output)
+            if self.args.debug:
+                self.get_logger().info("[PDDL] Planner raw output:\n" + raw_output)
+            else:
+                self.get_logger().info(f"[PDDL] Planner returned {len(actions)} action(s).")
             plan_payload = [action.to_dict() for action in actions]
             self.save_step_json(
                 step_idx,
@@ -1348,7 +1358,12 @@ class PddlTampServer(Node):
             result = self.dispatch_action_to_executor(action, state, step_idx, action_ledger)
             steps.append(result)
             self.publish_json(self.result_pub, {"event": "action_result", "result": result})
-            self.get_logger().info("[PDDL] Action execution result: " + json.dumps(result, sort_keys=True))
+            if self.args.debug:
+                self.get_logger().info("[PDDL] Action execution result: " + json.dumps(result, sort_keys=True))
+            else:
+                self.get_logger().info(
+                    f"[PDDL] Action result ok={result.get('ok')} destination={result.get('destination', '<none>')}"
+                )
             self.save_step_json(
                 step_idx,
                 "action_result.json",
@@ -1452,6 +1467,27 @@ class PddlTampServer(Node):
             )
         self.get_logger().info("[PDDL]   predicates: " + ", ".join(summary["predicates"]))
         for note in summary["notes"]:
+            self.get_logger().warn("[PDDL]   note: " + note)
+
+    def log_state_summary(self, summary: dict, step_idx: int) -> None:
+        objects = summary.get("objects") or {}
+        visible = sum(1 for obj in objects.values() if obj.get("visible"))
+        ready_targets = [
+            name
+            for name, obj in objects.items()
+            if obj.get("target") and obj.get("graspable") and obj.get("clear") and obj.get("safe")
+        ]
+        blocked_targets = [
+            name
+            for name, obj in objects.items()
+            if obj.get("target") and obj.get("blocked_by")
+        ]
+        self.get_logger().info(
+            f"[PDDL] Step {step_idx}: objects={len(objects)} visible={visible} "
+            f"predicates={len(summary.get('predicates') or [])} "
+            f"ready_targets={ready_targets or '<none>'} blocked_targets={blocked_targets or '<none>'}"
+        )
+        for note in summary.get("notes") or []:
             self.get_logger().warn("[PDDL]   note: " + note)
 
     def judgement_log_lines(self, summary: dict, step_idx: int) -> list[str]:
@@ -1651,6 +1687,8 @@ class PddlTampServer(Node):
             self.get_logger().info("[PDDL] No usable GUI display found; debug image was saved only.")
 
     def save_step_artifacts(self, summary: dict, state, step_idx: int, command_text: str) -> None:
+        if not self.args.debug:
+            return
         debug_dir = PDDL_DIR / "debug"
         step_dir = debug_dir / f"step_{step_idx:02d}"
         if step_dir.exists():
@@ -1715,6 +1753,8 @@ class PddlTampServer(Node):
         self.get_logger().info(f"[PDDL] Step artifacts saved: {predicates_path}")
 
     def save_warm_start_artifacts(self, state: PredicateState) -> None:
+        if not self.args.debug:
+            return
         summary = {
             "completed": sorted(state.completed),
             "occupied_buffers": sorted(state.occupied_buffers),
@@ -1781,6 +1821,8 @@ class PddlTampServer(Node):
         self.get_logger().info(f"[WarmStart] Debug artifacts saved: {predicates_path}")
 
     def reset_debug_artifacts(self) -> None:
+        if not self.args.debug:
+            return
         debug_dir = PDDL_DIR / "debug"
         if debug_dir.exists():
             shutil.rmtree(debug_dir)
@@ -1788,6 +1830,8 @@ class PddlTampServer(Node):
         self.get_logger().info(f"[PDDL] Cleared previous debug artifacts: {debug_dir}")
 
     def save_step_json(self, step_idx: int, filename: str, payload: dict, latest_name: str | None = None) -> None:
+        if not self.args.debug:
+            return
         debug_dir = PDDL_DIR / "debug"
         step_dir = debug_dir / f"step_{step_idx:02d}"
         step_dir.mkdir(parents=True, exist_ok=True)
@@ -1810,6 +1854,8 @@ class PddlTampServer(Node):
         corrected_grasp_pose: Pose | None,
         correction: dict | None,
     ) -> None:
+        if not self.args.debug:
+            return
         visualization = selection.setdefault("visualization", {})
         summary_path_text = visualization.get("summary_json")
         if summary_path_text:
@@ -1848,10 +1894,410 @@ class PddlTampServer(Node):
             },
         })
 
+        image_paths = self.save_grasp_pose_debug_image(
+            obj_name,
+            selection,
+            source_frame,
+            base_pose,
+            target_pose_base,
+            grasp_pose,
+            corrected_grasp_pose,
+            correction,
+        )
+        if image_paths:
+            visualization.update(image_paths)
+            payload["visualization"] = visualization
+
         summary_path.parent.mkdir(parents=True, exist_ok=True)
         summary_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         visualization["summary_json"] = str(summary_path)
         self.get_logger().info(f"[GraspDebug] saved grasp pose debug: {summary_path}")
+
+    def save_grasp_pose_debug_image(
+        self,
+        obj_name: str,
+        selection: dict,
+        source_frame: str,
+        base_pose: Pose,
+        target_pose_base: Pose | None,
+        grasp_pose: Pose,
+        corrected_grasp_pose: Pose | None,
+        correction: dict | None,
+    ) -> dict[str, str] | None:
+        if cv2 is None:
+            return None
+
+        points = self.load_grasp_debug_points(selection.get("points_path"))
+        debug_dir = PDDL_DIR / "debug"
+        grasp_dir = debug_dir / "grasp_debug"
+        grasp_dir.mkdir(parents=True, exist_ok=True)
+
+        safe_name = self.safe_debug_filename(obj_name)
+        png_path = grasp_dir / f"{safe_name}_latest_grasp_overview.png"
+        latest_path = debug_dir / "latest_grasp_overview.png"
+
+        try:
+            image = self.render_grasp_pose_debug_image(
+                obj_name,
+                points,
+                selection,
+                source_frame,
+                base_pose,
+                target_pose_base,
+                grasp_pose,
+                corrected_grasp_pose,
+                correction,
+            )
+            cv2.imwrite(str(png_path), image)
+            cv2.imwrite(str(latest_path), image)
+        except Exception as exc:
+            self.get_logger().warn(f"[GraspDebug] failed to render grasp debug image: {exc}")
+            return None
+
+        self.get_logger().info(f"[GraspDebug] saved grasp overview image: {png_path}")
+        return {
+            "pddl_grasp_overview_png": str(png_path),
+            "latest_pddl_grasp_overview_png": str(latest_path),
+        }
+
+    @staticmethod
+    def load_grasp_debug_points(points_path_text: str | None) -> np.ndarray:
+        if not points_path_text:
+            return np.empty((0, 3), dtype=np.float64)
+        path = Path(points_path_text).expanduser()
+        if not path.is_file():
+            return np.empty((0, 3), dtype=np.float64)
+        points = np.load(str(path))
+        points = np.asarray(points, dtype=np.float64).reshape(-1, np.asarray(points).shape[-1])[:, :3]
+        return points[np.isfinite(points).all(axis=1) & (points[:, 2] > 0.0)]
+
+    @staticmethod
+    def grasp_debug_band_mask(points: np.ndarray, selection: dict) -> np.ndarray:
+        if len(points) == 0:
+            return np.zeros(0, dtype=bool)
+        band = selection.get("selected_band") or {}
+        center = selection.get("pca_xy_center_m")
+        major = selection.get("xy_major_axis")
+        if not all(key in band for key in ("along_min_m", "along_max_m")) or center is None or major is None:
+            return np.zeros(len(points), dtype=bool)
+        try:
+            center_arr = np.asarray(center, dtype=np.float64)[:2]
+            major_arr = np.asarray(major, dtype=np.float64)[:2]
+            norm = float(np.linalg.norm(major_arr))
+            if center_arr.shape[0] < 2 or major_arr.shape[0] < 2 or norm < 1e-9:
+                return np.zeros(len(points), dtype=bool)
+            along = (points[:, :2] - center_arr) @ (major_arr / norm)
+            return (along >= float(band["along_min_m"])) & (along < float(band["along_max_m"]))
+        except Exception:
+            return np.zeros(len(points), dtype=bool)
+
+    def render_grasp_pose_debug_image(
+        self,
+        obj_name: str,
+        points: np.ndarray,
+        selection: dict,
+        source_frame: str,
+        base_pose: Pose,
+        target_pose_base: Pose | None,
+        grasp_pose: Pose,
+        corrected_grasp_pose: Pose | None,
+        correction: dict | None,
+    ) -> np.ndarray:
+        width, height = 1680, 1120
+        image = np.full((height, width, 3), 250, dtype=np.uint8)
+        panel_w, panel_h = width // 2, height // 2
+        panels = {
+            "xy": (0, 0, panel_w, panel_h),
+            "pca": (panel_w, 0, panel_w, panel_h),
+            "xz": (0, panel_h, panel_w, panel_h),
+            "base": (panel_w, panel_h, panel_w, panel_h),
+        }
+        cv2.line(image, (panel_w, 0), (panel_w, height), (210, 210, 210), 1)
+        cv2.line(image, (0, panel_h), (width, panel_h), (210, 210, 210), 1)
+
+        raw = self.finite_debug_xyz(selection.get("raw_centroid_xyz_m"))
+        target = self.finite_debug_xyz(selection.get("target_xyz_m"))
+        grasp_ref = self.finite_debug_xyz(selection.get("grasp_pose_xyz_m"))
+        center_xy = self.finite_debug_xy(selection.get("pca_xy_center_m"))
+        major = self.finite_debug_xy(selection.get("xy_major_axis"))
+        minor = self.finite_debug_xy(selection.get("xy_minor_axis"))
+        selected_mask = self.grasp_debug_band_mask(points, selection)
+
+        self.draw_source_xy_panel(image, panels["xy"], points, selected_mask, raw, target, grasp_ref, center_xy, major, minor, obj_name, source_frame)
+        self.draw_source_pca_panel(image, panels["pca"], points, selected_mask, raw, target, grasp_ref, center_xy, major, minor, selection)
+        self.draw_source_xz_panel(image, panels["xz"], points, selected_mask, raw, target, grasp_ref)
+        self.draw_base_pose_panel(
+            image,
+            panels["base"],
+            obj_name,
+            selection,
+            base_pose,
+            target_pose_base,
+            grasp_pose,
+            corrected_grasp_pose,
+            correction,
+        )
+        return image
+
+    @staticmethod
+    def finite_debug_xyz(values) -> np.ndarray | None:
+        if values is None:
+            return None
+        try:
+            arr = np.asarray(values, dtype=np.float64)[:3]
+        except Exception:
+            return None
+        return arr if arr.shape[0] == 3 and np.isfinite(arr).all() else None
+
+    @staticmethod
+    def finite_debug_xy(values) -> np.ndarray | None:
+        if values is None:
+            return None
+        try:
+            arr = np.asarray(values, dtype=np.float64)[:2]
+        except Exception:
+            return None
+        return arr if arr.shape[0] == 2 and np.isfinite(arr).all() else None
+
+    @staticmethod
+    def debug_panel_bounds(points2: np.ndarray, fallback=None) -> tuple[np.ndarray, np.ndarray]:
+        points2 = np.asarray(points2, dtype=np.float64).reshape(-1, 2)
+        points2 = points2[np.isfinite(points2).all(axis=1)]
+        if len(points2) == 0:
+            points2 = np.asarray(fallback if fallback is not None else [[-0.05, -0.05], [0.05, 0.05]], dtype=np.float64)
+        lo = np.nanmin(points2, axis=0)
+        hi = np.nanmax(points2, axis=0)
+        span = np.maximum(hi - lo, 1e-4)
+        return lo - 0.10 * span, hi + 0.10 * span
+
+    @staticmethod
+    def debug_project(point2, panel, lo, hi, margin=42) -> tuple[int, int]:
+        x0, y0, w, h = panel
+        point = np.asarray(point2, dtype=np.float64)[:2]
+        span = np.maximum(hi - lo, 1e-6)
+        x = x0 + margin + (float(point[0]) - lo[0]) / span[0] * (w - 2 * margin)
+        y = y0 + margin + (hi[1] - float(point[1])) / span[1] * (h - 2 * margin)
+        return int(round(x)), int(round(y))
+
+    @staticmethod
+    def debug_point_colors(points: np.ndarray) -> np.ndarray:
+        if len(points) == 0:
+            return np.empty((0, 3), dtype=np.uint8)
+        z = points[:, 2]
+        z_norm = (z - np.nanmin(z)) / max(float(np.nanmax(z) - np.nanmin(z)), 1e-6)
+        return cv2.applyColorMap((z_norm * 255).astype(np.uint8), cv2.COLORMAP_VIRIDIS).reshape(-1, 3)
+
+    def draw_debug_points(self, image, panel, points2, lo, hi, colors, radius=1):
+        for point, color in zip(points2, colors):
+            cv2.circle(image, self.debug_project(point, panel, lo, hi), radius, tuple(int(c) for c in color), -1, cv2.LINE_AA)
+
+    def draw_debug_marker(self, image, panel, point2, lo, hi, color, marker):
+        if point2 is None:
+            return
+        px, py = self.debug_project(point2, panel, lo, hi)
+        if marker == "circle":
+            cv2.circle(image, (px, py), 8, color, -1, cv2.LINE_AA)
+            cv2.circle(image, (px, py), 9, (0, 0, 0), 1, cv2.LINE_AA)
+        elif marker == "ring":
+            cv2.circle(image, (px, py), 15, color, 3, cv2.LINE_AA)
+            cv2.circle(image, (px, py), 5, color, -1, cv2.LINE_AA)
+        elif marker == "x":
+            cv2.line(image, (px - 9, py - 9), (px + 9, py + 9), color, 2, cv2.LINE_AA)
+            cv2.line(image, (px - 9, py + 9), (px + 9, py - 9), color, 2, cv2.LINE_AA)
+        else:
+            cv2.drawMarker(image, (px, py), color, markerType=cv2.MARKER_STAR, markerSize=18, thickness=2)
+
+    def draw_debug_axis(self, image, panel, origin, axis, lo, hi, color, length):
+        if origin is None or axis is None:
+            return
+        norm = float(np.linalg.norm(axis))
+        if norm < 1e-9:
+            return
+        start = self.debug_project(origin, panel, lo, hi)
+        end = self.debug_project(origin + axis / norm * length, panel, lo, hi)
+        cv2.arrowedLine(image, start, end, color, 2, cv2.LINE_AA, tipLength=0.25)
+
+    def draw_source_xy_panel(self, image, panel, points, selected_mask, raw, target, grasp_ref, center_xy, major, minor, obj_name, source_frame):
+        x0, y0, w, _ = panel
+        cv2.putText(image, f"{obj_name} pointcloud XY ({source_frame})", (x0 + 18, y0 + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.62, (25, 25, 25), 2, cv2.LINE_AA)
+        if len(points) == 0:
+            cv2.putText(image, "foreground pointcloud unavailable", (x0 + 24, y0 + 80), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (80, 80, 80), 1, cv2.LINE_AA)
+            return
+        sampled = points[::max(1, int(math.ceil(len(points) / 7000.0)))]
+        colors = self.debug_point_colors(sampled)
+        extras = [sampled[:, :2]]
+        extras.extend([p[:2].reshape(1, 2) for p in (raw, target, grasp_ref) if p is not None])
+        lo, hi = self.debug_panel_bounds(np.vstack(extras))
+        self.draw_debug_points(image, panel, sampled[:, :2], lo, hi, colors)
+        if np.any(selected_mask):
+            selected = points[selected_mask]
+            selected = selected[::max(1, int(math.ceil(len(selected) / 2500.0)))]
+            orange = np.repeat(np.asarray([[0, 140, 255]], dtype=np.uint8), len(selected), axis=0)
+            self.draw_debug_points(image, panel, selected[:, :2], lo, hi, orange, radius=2)
+        axis_len = max(float(np.linalg.norm(hi - lo)) * 0.18, 0.03)
+        self.draw_debug_axis(image, panel, center_xy, major, lo, hi, (214, 166, 0), axis_len)
+        self.draw_debug_axis(image, panel, center_xy, minor, lo, hi, (255, 60, 122), axis_len * 0.7)
+        self.draw_debug_marker(image, panel, raw[:2] if raw is not None else None, lo, hi, (0, 212, 255), "circle")
+        self.draw_debug_marker(image, panel, target[:2] if target is not None else None, lo, hi, (0, 0, 255), "x")
+        self.draw_debug_marker(image, panel, grasp_ref[:2] if grasp_ref is not None else None, lo, hi, (210, 77, 255), "star")
+        cv2.putText(image, "yellow=raw centroid, red=selected target, magenta=pose reference, orange=selected band", (x0 + 18, y0 + 525), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (40, 40, 40), 1, cv2.LINE_AA)
+
+    def draw_source_pca_panel(self, image, panel, points, selected_mask, raw, target, grasp_ref, center_xy, major, minor, selection):
+        x0, y0, _, h = panel
+        cv2.putText(image, "PCA band coordinates", (x0 + 18, y0 + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.62, (25, 25, 25), 2, cv2.LINE_AA)
+        if len(points) == 0 or center_xy is None or major is None or minor is None:
+            cv2.putText(image, "PCA axes unavailable", (x0 + 24, y0 + 80), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (80, 80, 80), 1, cv2.LINE_AA)
+            return
+        major = major / max(float(np.linalg.norm(major)), 1e-9)
+        minor = minor / max(float(np.linalg.norm(minor)), 1e-9)
+        sampled = points[::max(1, int(math.ceil(len(points) / 7000.0)))]
+        pca_points = np.column_stack([(sampled[:, :2] - center_xy) @ major, (sampled[:, :2] - center_xy) @ minor])
+        markers = []
+        for point in (raw, target, grasp_ref):
+            if point is not None:
+                markers.append(np.asarray([(point[:2] - center_xy) @ major, (point[:2] - center_xy) @ minor], dtype=np.float64))
+        bounds_input = np.vstack([pca_points, *[m.reshape(1, 2) for m in markers]]) if markers else pca_points
+        lo, hi = self.debug_panel_bounds(bounds_input)
+        band = selection.get("selected_band") or {}
+        if "along_min_m" in band and "along_max_m" in band:
+            x1, _ = self.debug_project([float(band["along_min_m"]), lo[1]], panel, lo, hi)
+            x2, _ = self.debug_project([float(band["along_max_m"]), hi[1]], panel, lo, hi)
+            cv2.rectangle(image, (x1, y0 + 42), (x2, y0 + h - 42), (230, 245, 255), -1)
+        self.draw_debug_points(image, panel, pca_points, lo, hi, self.debug_point_colors(sampled))
+        if np.any(selected_mask):
+            selected = points[selected_mask]
+            selected = selected[::max(1, int(math.ceil(len(selected) / 2500.0)))]
+            selected_pca = np.column_stack([(selected[:, :2] - center_xy) @ major, (selected[:, :2] - center_xy) @ minor])
+            orange = np.repeat(np.asarray([[0, 140, 255]], dtype=np.uint8), len(selected_pca), axis=0)
+            self.draw_debug_points(image, panel, selected_pca, lo, hi, orange, radius=2)
+        if raw is not None:
+            self.draw_debug_marker(image, panel, [(raw[:2] - center_xy) @ major, (raw[:2] - center_xy) @ minor], lo, hi, (0, 212, 255), "circle")
+        if target is not None:
+            self.draw_debug_marker(image, panel, [(target[:2] - center_xy) @ major, (target[:2] - center_xy) @ minor], lo, hi, (0, 0, 255), "x")
+        if grasp_ref is not None:
+            self.draw_debug_marker(image, panel, [(grasp_ref[:2] - center_xy) @ major, (grasp_ref[:2] - center_xy) @ minor], lo, hi, (210, 77, 255), "star")
+
+    def draw_source_xz_panel(self, image, panel, points, selected_mask, raw, target, grasp_ref):
+        x0, y0, _, _ = panel
+        cv2.putText(image, "Pointcloud XZ side view", (x0 + 18, y0 + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.62, (25, 25, 25), 2, cv2.LINE_AA)
+        if len(points) == 0:
+            cv2.putText(image, "foreground pointcloud unavailable", (x0 + 24, y0 + 80), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (80, 80, 80), 1, cv2.LINE_AA)
+            return
+        sampled = points[::max(1, int(math.ceil(len(points) / 7000.0)))]
+        extras = [sampled[:, [0, 2]]]
+        extras.extend([p[[0, 2]].reshape(1, 2) for p in (raw, target, grasp_ref) if p is not None])
+        lo, hi = self.debug_panel_bounds(np.vstack(extras))
+        gray = np.repeat(np.asarray([[120, 120, 120]], dtype=np.uint8), len(sampled), axis=0)
+        self.draw_debug_points(image, panel, sampled[:, [0, 2]], lo, hi, gray)
+        if np.any(selected_mask):
+            selected = points[selected_mask]
+            selected = selected[::max(1, int(math.ceil(len(selected) / 2500.0)))]
+            orange = np.repeat(np.asarray([[0, 140, 255]], dtype=np.uint8), len(selected), axis=0)
+            self.draw_debug_points(image, panel, selected[:, [0, 2]], lo, hi, orange, radius=2)
+        self.draw_debug_marker(image, panel, raw[[0, 2]] if raw is not None else None, lo, hi, (0, 212, 255), "circle")
+        self.draw_debug_marker(image, panel, target[[0, 2]] if target is not None else None, lo, hi, (0, 0, 255), "x")
+        self.draw_debug_marker(image, panel, grasp_ref[[0, 2]] if grasp_ref is not None else None, lo, hi, (210, 77, 255), "star")
+
+    def draw_base_pose_panel(self, image, panel, obj_name, selection, base_pose, target_pose_base, grasp_pose, corrected_grasp_pose, correction):
+        x0, y0, _, _ = panel
+        cv2.putText(image, "Base-link grasp decision", (x0 + 18, y0 + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.62, (25, 25, 25), 2, cv2.LINE_AA)
+        correction_error = selection.get("grasp_database_correction_error")
+        if corrected_grasp_pose is None:
+            cv2.rectangle(image, (x0 + 18, y0 + 48), (x0 + 520, y0 + 92), (235, 235, 255), -1)
+            cv2.rectangle(image, (x0 + 18, y0 + 48), (x0 + 520, y0 + 92), (40, 40, 220), 2)
+            cv2.putText(image, "NO CORRECTED POSE", (x0 + 32, y0 + 78), cv2.FONT_HERSHEY_SIMPLEX, 0.78, (30, 30, 220), 2, cv2.LINE_AA)
+        else:
+            cv2.rectangle(image, (x0 + 18, y0 + 48), (x0 + 570, y0 + 92), (235, 255, 235), -1)
+            cv2.rectangle(image, (x0 + 18, y0 + 48), (x0 + 570, y0 + 92), (0, 145, 0), 2)
+            cv2.putText(image, "CORRECTED POSE = GREEN RING", (x0 + 32, y0 + 78), cv2.FONT_HERSHEY_SIMPLEX, 0.68, (0, 120, 0), 2, cv2.LINE_AA)
+        poses = [
+            ("target", target_pose_base, (0, 0, 255), "x"),
+            ("reference", base_pose, (0, 212, 255), "circle"),
+            ("final", grasp_pose, (210, 77, 255), "star"),
+            ("corrected", corrected_grasp_pose, (0, 145, 0), "ring"),
+        ]
+        points_xy = []
+        for _, pose, _, _ in poses:
+            if pose is not None:
+                points_xy.append([float(pose.position.x), float(pose.position.y)])
+        lo, hi = self.debug_panel_bounds(np.asarray(points_xy, dtype=np.float64) if points_xy else np.empty((0, 2)))
+
+        if corrected_grasp_pose is not None:
+            final_xy = np.asarray([grasp_pose.position.x, grasp_pose.position.y], dtype=np.float64)
+            corrected_xy = np.asarray([corrected_grasp_pose.position.x, corrected_grasp_pose.position.y], dtype=np.float64)
+            cv2.arrowedLine(
+                image,
+                self.debug_project(final_xy, panel, lo, hi),
+                self.debug_project(corrected_xy, panel, lo, hi),
+                (0, 145, 0),
+                2,
+                cv2.LINE_AA,
+                tipLength=0.25,
+            )
+
+        for label, pose, color, marker in poses:
+            if pose is None:
+                continue
+            point = np.asarray([pose.position.x, pose.position.y], dtype=np.float64)
+            self.draw_debug_marker(image, panel, point, lo, hi, color, marker)
+            px, py = self.debug_project(point, panel, lo, hi)
+            cv2.putText(image, label, (px + 10, py - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 1, cv2.LINE_AA)
+
+        lines = [
+            f"object: {obj_name}",
+            f"method: {selection.get('method')}",
+            f"grasp_pose_source: {selection.get('grasp_pose_source')}",
+            f"gripper_axis_rule: {selection.get('gripper_axis_rule')}",
+        ]
+        selected_band = selection.get("selected_band") or {}
+        if selected_band:
+            along_min = selected_band.get("along_min_m")
+            along_max = selected_band.get("along_max_m")
+            along_text = (
+                f"{float(along_min):.4f}..{float(along_max):.4f} m"
+                if along_min is not None and along_max is not None
+                else "<unavailable>"
+            )
+            lines.append(
+                "selected_band: "
+                f"{along_text}, "
+                f"n={selected_band.get('point_count')}"
+            )
+        db = correction or selection.get("grasp_database_correction") or {}
+        if db:
+            lines.extend([
+                f"db_match/state: {db.get('matched_name')} / {db.get('selected_state')}",
+                f"db_area: {db.get('measured_area_m2')} ({db.get('measured_area_source')})",
+                f"grasp_value_deg: {db.get('grasp_value_deg')}",
+                f"transform: {db.get('transform')}",
+        ])
+        if corrected_grasp_pose is None:
+            lines.append("corrected: unavailable; grasp_database correction failed or was skipped")
+            if correction_error:
+                lines.append(f"correction_error: {correction_error}")
+        else:
+            dx = float(corrected_grasp_pose.position.x - grasp_pose.position.x)
+            dy = float(corrected_grasp_pose.position.y - grasp_pose.position.y)
+            dz = float(corrected_grasp_pose.position.z - grasp_pose.position.z)
+            distance = math.sqrt(dx * dx + dy * dy + dz * dz)
+            lines.append(f"final_to_corrected_delta: dx={dx:.4f}, dy={dy:.4f}, dz={dz:.4f}, norm={distance:.4f}")
+            if distance < 1e-4:
+                lines.append("corrected overlaps final; green ring is drawn at the same point")
+        pose_lines = [
+            ("target_base", target_pose_base),
+            ("reference_base", base_pose),
+            ("final_base", grasp_pose),
+            ("corrected_base", corrected_grasp_pose),
+        ]
+        for name, pose in pose_lines:
+            if pose is not None:
+                lines.append(f"{name}: x={pose.position.x:.4f}, y={pose.position.y:.4f}, z={pose.position.z:.4f}")
+
+        ty = y0 + 120
+        for line in lines:
+            for chunk in self.wrap_debug_line(line, 82):
+                cv2.putText(image, chunk, (x0 + 18, ty), cv2.FONT_HERSHEY_SIMPLEX, 0.43, (35, 35, 35), 1, cv2.LINE_AA)
+                ty += 20
 
     @staticmethod
     def safe_debug_filename(text: str) -> str:
@@ -2004,17 +2450,18 @@ class PddlTampServer(Node):
         selection["points_path"] = points_path
         # Removed adjust_target_depth_from_rgbd per user request; use exact centroid height.
         store_grasp_pose_reference(selection)
-        output_dir = detection.get("save_dir")
-        if not output_dir and points_path:
-            output_dir = str(Path(points_path).expanduser().parent)
-        if output_dir:
-            try:
-                visualization = save_grasp_selection_visualization(points, selection, output_dir, label)
-            except Exception as exc:
-                visualization = None
-                selection["visualization_error"] = str(exc)
-            if visualization:
-                selection["visualization"] = visualization
+        if self.args.debug:
+            output_dir = detection.get("save_dir")
+            if not output_dir and points_path:
+                output_dir = str(Path(points_path).expanduser().parent)
+            if output_dir:
+                try:
+                    visualization = save_grasp_selection_visualization(points, selection, output_dir, label)
+                except Exception as exc:
+                    visualization = None
+                    selection["visualization_error"] = str(exc)
+                if visualization:
+                    selection["visualization"] = visualization
         raw = np.asarray(selection.get("raw_centroid_xyz_m", detection["location_xyz_m"]), dtype=float)
         target = np.asarray(selection["target_xyz_m"], dtype=float)
         selection["delta_from_raw_centroid_m"] = (target - raw).astype(float).tolist()
@@ -2160,44 +2607,64 @@ class PddlTampServer(Node):
         pose_msg.header.stamp = self.get_clock().now().to_msg()
         pose_msg.pose = grasp_pose
         self.grasp_pose_publisher.publish(pose_msg)
+        if self.args.debug:
+            print(
+                f"[grasp] server final pose before database correction for {obj_name}: "
+                f"source={selection.get('grasp_pose_source')}, "
+                f"rule={selection.get('gripper_axis_rule')}, "
+                f"pos=({grasp_pose.position.x:.4f}, {grasp_pose.position.y:.4f}, {grasp_pose.position.z:.4f}) "
+                f"quat=({grasp_pose.orientation.x:.4f}, {grasp_pose.orientation.y:.4f}, "
+                f"{grasp_pose.orientation.z:.4f}, {grasp_pose.orientation.w:.4f}) ready!",
+                flush=True,
+            )
         
         # PREVIEW CORRECTED POSE (from grasp_database.json)
         corrected_grasp_pose = None
         grasp_correction = None
-        try:
-            perception_features = extract_perception_features(detection)
-            measured_area, measured_area_source = _measured_object_area_from_features(perception_features)
+        if self.args.debug:
+            try:
+                perception_features = extract_perception_features(detection)
+                measured_area, measured_area_source = _measured_object_area_from_features(perception_features)
+                    
+                database = _load_grasp_database()
+                matched_name, object_configs = _lookup_object_grasp_configs(database, obj_name)
+                item_state, grasp_config, _ = _select_state_config(object_configs, measured_area)
+                grasp_transform = _extract_grasp_transform(grasp_config)
                 
-            database = _load_grasp_database()
-            matched_name, object_configs = _lookup_object_grasp_configs(database, obj_name)
-            item_state, grasp_config, _ = _select_state_config(object_configs, measured_area)
-            grasp_transform = _extract_grasp_transform(grasp_config)
-            
-            corrected_grasp_pose = apply_grasp_transform(grasp_pose, grasp_transform)
-            grasp_value = grasp_config.get("grasp_value")
-            grasp_correction = {
-                "matched_name": matched_name,
-                "selected_state": item_state,
-                "measured_area_m2": measured_area,
-                "measured_area_source": measured_area_source,
-                "transform": grasp_transform,
-                "grasp_value_deg": float(grasp_value) if grasp_value is not None else None,
-            }
-            selection["grasp_database_correction"] = grasp_correction
-            selection["corrected_grasp_pose_base"] = pose_to_dict(corrected_grasp_pose)
-            
-            corrected_msg = PoseStamped()
-            corrected_msg.header = pose_msg.header
-            corrected_msg.pose = corrected_grasp_pose
-            self.corrected_grasp_pose_publisher.publish(corrected_msg)
-            
-            self.get_logger().info(
-                f"Published preview of corrected grasp pose for '{obj_name}' "
-                f"(state={item_state}, area={measured_area}, source={measured_area_source})"
-            )
-        except Exception as e:
-            selection["grasp_database_correction_error"] = str(e)
-            self.get_logger().warn(f"Failed to publish preview of corrected grasp pose: {e}")
+                corrected_grasp_pose = apply_grasp_transform(grasp_pose, grasp_transform)
+                grasp_value = grasp_config.get("grasp_value")
+                grasp_correction = {
+                    "matched_name": matched_name,
+                    "selected_state": item_state,
+                    "measured_area_m2": measured_area,
+                    "measured_area_source": measured_area_source,
+                    "transform": grasp_transform,
+                    "grasp_value_deg": float(grasp_value) if grasp_value is not None else None,
+                }
+                selection["grasp_database_correction"] = grasp_correction
+                selection["corrected_grasp_pose_base"] = pose_to_dict(corrected_grasp_pose)
+                print(
+                    f"[grasp] server preview corrected pose for {obj_name}: "
+                    f"matched={matched_name}, state={item_state}, transform={grasp_transform}, "
+                    f"grasp_value_deg={grasp_value}, "
+                    f"pos=({corrected_grasp_pose.position.x:.4f}, {corrected_grasp_pose.position.y:.4f}, "
+                    f"{corrected_grasp_pose.position.z:.4f}) ready!",
+                    flush=True,
+                )
+                
+                corrected_msg = PoseStamped()
+                corrected_msg.header = pose_msg.header
+                corrected_msg.pose = corrected_grasp_pose
+                self.corrected_grasp_pose_publisher.publish(corrected_msg)
+                
+                self.get_logger().info(
+                    f"Published preview of corrected grasp pose for '{obj_name}' "
+                    f"(state={item_state}, area={measured_area}, source={measured_area_source})"
+                )
+            except Exception as e:
+                selection["grasp_database_correction_error"] = str(e)
+                print(f"[grasp] server preview corrected pose for {obj_name} failed: {e} ready!", flush=True)
+                self.get_logger().warn(f"Failed to publish preview of corrected grasp pose: {e}")
 
         self.save_grasp_pose_debug(
             obj_name,
@@ -2211,6 +2678,9 @@ class PddlTampServer(Node):
             grasp_correction,
         )
         
+        if not self.args.debug:
+            return grasp_pose, selection
+
         # Visualize actual PCA and centroid
         marker_array = MarkerArray()
         
@@ -2500,7 +2970,7 @@ def parse_args(argv=None):
     parser.add_argument("--one-step", action="store_true", help="Execute only the first selected physical action.")
     parser.add_argument("--scan-goals-only", action="store_true", help="Only scan requested targets instead of all five fixed targets.")
     parser.add_argument("--no-gemini", action="store_true", help="Disable Gemini parsing and use the rule-based parser.")
-    parser.add_argument("--debug", action="store_true", help="Show and save a perception+predicate debug view each planning step.")
+    parser.add_argument("--debug", action="store_true", help="Enable detailed debug logs, artifacts, views, and grasp confirmation pauses.")
     parser.add_argument("--debug-window", action="store_true", help="With --debug, also open an OpenCV window when a GUI display is usable.")
     parser.add_argument("--debug-wait", action="store_true", help="With --debug-window, wait for a key press at each planning step.")
     parser.add_argument("--external-perception", action="store_true", help="Use an already running top-view perception service.")
@@ -2525,7 +2995,10 @@ def parse_args(argv=None):
 def main(argv=None):
     load_dotenv()
     args = parse_args(argv)
-    logging.basicConfig(level=logging.DEBUG, format="%(name)s %(levelname)s %(message)s")
+    logging.basicConfig(
+        level=logging.DEBUG if args.debug else logging.INFO,
+        format="%(name)s %(levelname)s %(message)s",
+    )
     top_view_module = None if args.external_perception else load_top_view_perception_module()
     ros_argv = argv
     rclpy.init(args=ros_argv)

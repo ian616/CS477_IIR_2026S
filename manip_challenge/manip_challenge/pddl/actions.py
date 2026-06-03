@@ -79,6 +79,14 @@ def pose_from_xyz(xyz) -> Pose:
     return pose
 
 
+def _pose_debug_text(pose: Pose) -> str:
+    return (
+        f"pos=({pose.position.x:.4f}, {pose.position.y:.4f}, {pose.position.z:.4f}) "
+        f"quat=({pose.orientation.x:.4f}, {pose.orientation.y:.4f}, "
+        f"{pose.orientation.z:.4f}, {pose.orientation.w:.4f})"
+    )
+
+
 def _finite_xyz(values) -> list[float] | None:
     if values is None:
         return None
@@ -374,6 +382,14 @@ def _prepare_grasp(server, object_name: str, fact=None) -> dict[str, Any]:
     if not detection or not detection.get("ok"):
         raise RuntimeError(f"No usable detection for {object_name}: {(detection or {}).get('error')}")
     grasp_pose, selection = server._compute_grasp_pose(detection, object_name)
+    if server.args.debug:
+        print(
+            f"[grasp] _prepare_grasp for {object_name}: "
+            f"source={selection.get('grasp_pose_source')}, "
+            f"method={selection.get('method')}, "
+            f"grasp_pose={_pose_debug_text(grasp_pose)} ready!",
+            flush=True,
+        )
     approach_pose = copy.deepcopy(grasp_pose)
     approach_pose.position.z += server.args.approach_height
     source_frame = detection.get("frame_id") or server.args.camera_frame
@@ -423,6 +439,13 @@ def move_target_to_goal(context: ActionContext, action: PlanAction, state) -> di
         # 여기다 바뀐 grasp 로직 추가하시면 됩니다!!!
         # You can add the changed grasp logic here!!!
         # if object_name == "banana" 뭐 이런 느낌으로
+        if context.server.args.debug:
+            print(
+                f"[grasp] move_target_to_goal passes pose to motion for {class_name}: "
+                f"{_pose_debug_text(prepared['grasp_pose'])}; "
+                f"database correction will be applied inside grasping_item ready!",
+                flush=True,
+            )
         execute_pick_place_sequence(
             context.server, context.server.arm, prepared["grasp_pose"], destination, class_name,
             on_before_idle=context.on_before_idle,
@@ -490,6 +513,13 @@ def move_obstacle_to_buffer(context: ActionContext, action: PlanAction, state) -
     motion_module.PLACE_CONFIGS[buffer_name] = buffer_config
     if not context.server.args.dry_run:
         # Low-level implementation reused from custom/motion/motion.py.
+        if context.server.args.debug:
+            print(
+                f"[grasp] move_obstacle_to_buffer passes pose to motion for {class_name}: "
+                f"{_pose_debug_text(prepared['grasp_pose'])}; "
+                f"database correction will be applied inside grasping_item ready!",
+                flush=True,
+            )
         execute_pick_place_sequence(
             context.server, context.server.arm, prepared["grasp_pose"], buffer_name, class_name,
             on_before_idle=context.on_before_idle,

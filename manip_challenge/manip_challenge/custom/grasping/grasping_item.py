@@ -20,10 +20,18 @@ STATE_NAMES = ("standing", "lying")
 
 
 def _database_path():
+    source_path = Path(__file__).resolve().parents[3] / "config" / GRASP_DATABASE_FILE
     try:
-        return Path(get_package_share_directory("manip_challenge")) / "config" / GRASP_DATABASE_FILE
+        ament_path = Path(get_package_share_directory("manip_challenge")) / "config" / GRASP_DATABASE_FILE
+        if ament_path.exists():
+            return ament_path
+        print(
+            f"[grasp] grasp database missing at ament path {ament_path}; "
+            f"using source path {source_path} ready!"
+        )
     except PackageNotFoundError:
-        return Path(__file__).resolve().parents[3] / "config" / GRASP_DATABASE_FILE
+        pass
+    return source_path
 
 
 def _normalize_obj_name(obj_name):
@@ -146,11 +154,37 @@ def _extract_grasp_transform(config):
     return {field: float(config.get(field, 0.0)) for field in TRANSFORM_FIELDS}
 
 
+def _pose_debug_text(pose):
+    return (
+        f"pos=({pose.position.x:.4f}, {pose.position.y:.4f}, {pose.position.z:.4f}) "
+        f"quat=({pose.orientation.x:.4f}, {pose.orientation.y:.4f}, "
+        f"{pose.orientation.z:.4f}, {pose.orientation.w:.4f})"
+    )
+
+
+def _debug_enabled(node):
+    return bool(getattr(getattr(node, "args", None), "debug", False))
+
+
+def _debug_print(node, *args, **kwargs):
+    if _debug_enabled(node):
+        print(*args, **kwargs)
+
+
+def _debug_pause(node, prompt):
+    if _debug_enabled(node):
+        input(prompt)
+
+
 def grasping_item(node, arm, grasp_pose, obj_name, perception_info=None,
                   grasp_duration=1.0, timeout=3):
     """Move from approach pose to grasp pose, then close the gripper."""
     gripper_close_pos = DEFAULT_GRIPPER_CLOSE_POS
     corrected_grasp_pose = copy.deepcopy(grasp_pose)
+    correction_applied = False
+    correction_error = None
+
+    _debug_print(node, f"[grasp] grasping_item input pose for {obj_name}: {_pose_debug_text(grasp_pose)} ready!", flush=True)
 
     if perception_info and "grasp_selection" not in perception_info and "target_xyz_m" in perception_info:
         perception_features = extract_perception_features({"grasp_selection": perception_info})
@@ -167,6 +201,13 @@ def grasping_item(node, arm, grasp_pose, obj_name, perception_info=None,
     pca_bbox_area = perception_features.get("pca_bbox_area_m2")
     if pca_bbox_area is None and pca_bbox_width is not None and pca_bbox_length is not None:
         pca_bbox_area = float(pca_bbox_width) * float(pca_bbox_length)
+    _debug_print(
+        node,
+        f"[grasp] perception features for {obj_name}: "
+        f"target={target_position}, pca_bbox_area={pca_bbox_area}, "
+        f"major={pca_major_axis}, minor={pca_minor_axis} ready!",
+        flush=True,
+    )
 
     try:
         database = _load_grasp_database()
@@ -175,10 +216,18 @@ def grasping_item(node, arm, grasp_pose, obj_name, perception_info=None,
         node.last_grasped_state = item_state
         grasp_transform = _extract_grasp_transform(grasp_config)
         corrected_grasp_pose = apply_grasp_transform(grasp_pose, grasp_transform)
+        correction_applied = True
 
         grasp_value = grasp_config.get("grasp_value")
         if grasp_value is not None:
             gripper_close_pos = math.radians(float(grasp_value))
+        _debug_print(
+            node,
+            f"[grasp] database correction for {obj_name}: matched={matched_name}, "
+            f"state={item_state}, transform={grasp_transform}, "
+            f"grasp_value_deg={grasp_value}, bbox_area_by_state={bbox_area_by_state} ready!",
+            flush=True,
+        )
 
         # Log
         node.get_logger().info(
@@ -192,6 +241,13 @@ def grasping_item(node, arm, grasp_pose, obj_name, perception_info=None,
             f"yaw={grasp_transform['yaw']:.4f}, "
             f"grasp_value={grasp_value} deg")
     except (FileNotFoundError, KeyError, TypeError, ValueError) as e:
+        correction_error = e
+        _debug_print(
+            node,
+            f"[grasp] database correction for {obj_name} failed: {e}; "
+            f"using original pose ready!",
+            flush=True,
+        )
         # Log
         node.get_logger().warn(
             f"<Grasping> Failed to load grasp transform for '{obj_name}' ({e}); "
@@ -204,6 +260,13 @@ def grasping_item(node, arm, grasp_pose, obj_name, perception_info=None,
         f"x={corrected_grasp_pose.position.x:.4f}, "
         f"y={corrected_grasp_pose.position.y:.4f}, "
         f"z={corrected_grasp_pose.position.z:.4f}")
+    _debug_print(
+        node,
+        f"[grasp] corrected pose selected for {obj_name}: "
+        f"correction_applied={correction_applied}, "
+        f"error={correction_error}, {_pose_debug_text(corrected_grasp_pose)} ready!",
+        flush=True,
+    )
 
 
 
@@ -214,15 +277,16 @@ def grasping_item(node, arm, grasp_pose, obj_name, perception_info=None,
 
 
     # Move the robot arm to the corrected grasp pose
+    _debug_print(node, f"[grasp] executing arm trajectory to corrected pose for {obj_name} ready!", flush=True)
     arm.execute_trajectory([corrected_grasp_pose], durations=[grasp_duration])
+    _debug_print(node, f"[grasp] arm trajectory to corrected pose for {obj_name} finished ready!", flush=True)
 
     # Log
     node.get_logger().info(
         f"<Grasping> Closing gripper for '{obj_name}' "
         f"with gripper_close_pos={gripper_close_pos}\n")
     
-    # [Test] Wait for user confirmation before grasping
-    input("Press Enter to Close Gripper...") 
+    _debug_pause(node, "Press Enter to Close Gripper...")
 
     # Close the gripper to grasp the item
     return move_gripper.gripper_close(

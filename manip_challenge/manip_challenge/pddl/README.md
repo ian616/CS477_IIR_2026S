@@ -45,7 +45,7 @@ ros2 topic pub --once /task_commands std_msgs/msg/String "{data: 'Move the banan
 The legacy service path is still available:
 
 ```bash
-python client.py --service "Move the hammer to the left storage."
+python client.py "Move the hammer to the left storage."
 ```
 
 Dry-run planning:

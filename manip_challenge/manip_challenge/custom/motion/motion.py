@@ -37,6 +37,28 @@ def _needs_wrist_flip(obj_name):
     return base in _BOOKSHELF_WRIST_FLIP_OBJECTS
 
 
+def _pose_debug_text(pose):
+    return (
+        f"pos=({pose.position.x:.4f}, {pose.position.y:.4f}, {pose.position.z:.4f}) "
+        f"quat=({pose.orientation.x:.4f}, {pose.orientation.y:.4f}, "
+        f"{pose.orientation.z:.4f}, {pose.orientation.w:.4f})"
+    )
+
+
+def _debug_enabled(node):
+    return bool(getattr(getattr(node, "args", None), "debug", False))
+
+
+def _debug_print(node, *args, **kwargs):
+    if _debug_enabled(node):
+        print(*args, **kwargs)
+
+
+def _debug_pause(node, prompt):
+    if _debug_enabled(node):
+        input(prompt)
+
+
 PLACE_CONFIGS = {
     "left storage": {
         "range_x": [-0.124, 0.117],
@@ -174,10 +196,15 @@ def pick_place_storage(node, arm, grasp_pose, destination, obj_name,
                 durations=[rot_time_pick, 1.5],
             )
 
-        # [Test] Wait for user confirmation before grasping
-        input("Press Enter to GRASP...") 
+        _debug_pause(node, "Press Enter to GRASP...")
 
         # Move to Grasping part
+        _debug_print(
+            node,
+            f"[grasp] motion storage calling grasping_item for {obj_name}: "
+            f"{_pose_debug_text(grasp_pose)} ready!",
+            flush=True,
+        )
         grasping_item(node, arm, grasp_pose, obj_name, perception_info=perception_info)
 
     # 2. [Place Phase]
@@ -265,10 +292,15 @@ def pick_place_storage(node, arm, grasp_pose, destination, obj_name,
             durations=[1.0, rot_time_next, 1.5],
         )
 
-        # [Test] Wait for user confirmation before grasping
-        input("Press Enter to GRASP...") 
+        _debug_pause(node, "Press Enter to GRASP...")
 
         # Move to Grasping part
+        _debug_print(
+            node,
+            f"[grasp] motion storage calling next grasping_item for {next_data.get('obj_name')}: "
+            f"{_pose_debug_text(next_grasp)} ready!",
+            flush=True,
+        )
         grasping_item(
             node,
             arm,
@@ -314,10 +346,15 @@ def pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name,
                 durations=[rot_time_pick, 1.5],
             )
 
-        # [Test] Wait for user confirmation before grasping
-        input("Press Enter to GRASP...") 
+        _debug_pause(node, "Press Enter to GRASP...")
         
         # Move to Grasping part
+        _debug_print(
+            node,
+            f"[grasp] motion bookshelf calling grasping_item for {obj_name}: "
+            f"{_pose_debug_text(grasp_pose)} ready!",
+            flush=True,
+        )
         grasping_item(node, arm, grasp_pose, obj_name, perception_info=perception_info)
 
     # 2. [Place Phase]
@@ -354,13 +391,13 @@ def pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name,
         t = _extract_grasp_transform(grasp_config)
         db_offset = np.array([t["x"], t["y"], t["z"]], dtype=float)
     except Exception as e:
-        print(f"[bookshelf] db_offset lookup failed: {e}", flush=True)
-    print(f"[bookshelf] db_offset={db_offset}", flush=True)
+        _debug_print(node, f"[bookshelf] db_offset lookup failed: {e}", flush=True)
+    _debug_print(node, f"[bookshelf] db_offset={db_offset}", flush=True)
 
     if _needs_wrist_flip(obj_name):
         place_q = np.array([0.0, 0.7071, 0.0, 0.7071])  # (x,y,z,w)
         rotated = rotate_vector(place_q, db_offset)
-        print(f"[bookshelf] wrist_flip rotated={rotated}  -rotated[1]={-rotated[1]:.4f}", flush=True)
+        _debug_print(node, f"[bookshelf] wrist_flip rotated={rotated}  -rotated[1]={-rotated[1]:.4f}", flush=True)
         place_pose.position.z = config["base_z"] + 0.16
         place_pose.position.y += float(rotated[1])
         place_pose.orientation.x = 0.0
@@ -371,7 +408,7 @@ def pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name,
         place_q = np.array([0.5, 0.5, 0.5, 0.5])  # (x,y,z,w)
         rotated = rotate_vector(place_q, db_offset)
         delta_z = float(rotated[2])
-        print(f"[bookshelf] normal rotated={rotated}  delta_z={delta_z:.4f}", flush=True)
+        _debug_print(node, f"[bookshelf] normal rotated={rotated}  delta_z={delta_z:.4f}", flush=True)
         place_pose.position.z = config["base_z"] + 0.18 + delta_z
         place_pose.orientation.x = 0.5
         place_pose.orientation.y = 0.5
@@ -411,10 +448,15 @@ def pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name,
             durations=[1.5, 1.5, 1.5],
         )
 
-        # [Test] Wait for user confirmation before grasping
-        input("Press Enter to GRASP...") 
+        _debug_pause(node, "Press Enter to GRASP...")
 
         # Move to Grasping part
+        _debug_print(
+            node,
+            f"[grasp] motion bookshelf calling next grasping_item for {next_data.get('obj_name')}: "
+            f"{_pose_debug_text(next_grasp)} ready!",
+            flush=True,
+        )
         grasping_item(
             node,
             arm,

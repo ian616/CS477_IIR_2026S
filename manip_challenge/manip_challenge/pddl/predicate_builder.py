@@ -416,7 +416,7 @@ def _merge_all_detections(objects: dict[str, ObjectState], detection: dict) -> N
         objects[obstacle.name] = obstacle
 
 
-def _annotate_relations(objects: dict[str, ObjectState]) -> None:
+def _annotate_relations(objects: dict[str, ObjectState], debug: bool = False) -> None:
     # Computes relational predicates from object facts.
     #
     # CHANGE RELATIONAL PREDICATES HERE:
@@ -479,17 +479,18 @@ def _annotate_relations(objects: dict[str, ObjectState]) -> None:
             target, obstacle = (a, b) if a.is_target else (b, a)
             d = _grasp_to_obstacle_dist(target, obstacle)
             is_near = d is not None and d < SAFE_PIXEL_DISTANCE
-            print(
-                f"[near] {target.name}(T) ↔ {obstacle.name}(O)  "
-                f"d={f'{d:.1f}' if d is not None else 'None'}  "
-                f"thr={SAFE_PIXEL_DISTANCE:.1f}  near={is_near}",
-                flush=True,
-            )
+            if debug:
+                print(
+                    f"[near] {target.name}(T) <-> {obstacle.name}(O)  "
+                    f"d={f'{d:.1f}' if d is not None else 'None'}  "
+                    f"thr={SAFE_PIXEL_DISTANCE:.1f}  near={is_near}",
+                    flush=True,
+                )
             if is_near:
                 a.near.add(b.name)
                 b.near.add(a.name)
 
-    # safe: derived solely from near — target is unsafe if any near neighbor is a non-target.
+    # safe: derived solely from near. A target is unsafe if any near neighbor is a non-target.
     name_to_obj = {obj.name: obj for obj in objects.values()}
     for obj in objects.values():
         if obj.is_target:
@@ -500,12 +501,14 @@ def _annotate_relations(objects: dict[str, ObjectState]) -> None:
                 if neighbor and not neighbor.is_target:
                     obj.safe = False
                     break
-            print(
-                f"[safe] {obj.name}  xyz={xyz_str}  near={sorted(obj.near)}  safe={obj.safe}",
-                flush=True,
-            )
+            if debug:
+                print(
+                    f"[safe] {obj.name}  xyz={xyz_str}  near={sorted(obj.near)}  safe={obj.safe}",
+                    flush=True,
+                )
 
-    _visualize_safe_check(objects)
+    if debug:
+        _visualize_safe_check(objects)
 
 
 def _build_predicates(state: PredicateState) -> set[str]:
@@ -617,6 +620,7 @@ def build_predicate_state(
     completed: set[str] | None = None,
     occupied_buffers: set[str] | None = None,
     scan_all_targets: bool = True,
+    debug: bool = False,
 ) -> PredicateState:
     # Top-level predicate pipeline called by server.py every planning step:
     #   perception service -> ObjectState -> relations -> PDDL predicates.
@@ -640,7 +644,7 @@ def build_predicate_state(
             fact = object_from_detection(name, None, is_target=name in goal_names, class_name=name, error=str(exc))
             objects[fact.name] = fact
 
-    _annotate_relations(objects)
+    _annotate_relations(objects, debug=debug)
     bound_goals = _bind_goals_to_instances(goals, objects, completed)
     state = PredicateState(goals=bound_goals, objects=objects, completed=completed, occupied_buffers=occupied_buffers)
     state.relation_input_objects = sorted(obj.name for obj in objects.values() if obj.relation_candidate)
