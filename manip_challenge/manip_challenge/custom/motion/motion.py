@@ -5,13 +5,23 @@ import math
 import random
 import threading
 
+import numpy as np
+
 import rclpy
 import tf2_geometry_msgs
 from geometry_msgs.msg import Pose, PoseStamped
 from tf2_ros import Buffer, ConnectivityException, ExtrapolationException, LookupException
 
 from manip_challenge import move_gripper
-from ..grasping.grasping_item import grasping_item
+from ..grasping.grasping_item import (
+    grasping_item,
+    _load_grasp_database,
+    _lookup_object_grasp_configs,
+    _select_state_config,
+    _extract_grasp_transform,
+)
+from ..grasping.pose_math import rotate_vector
+from ..grasping.perception_features import extract_perception_features
 
 
 DEFAULT_OBSERVE_JOINTS = [0., -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., 0.]
@@ -153,9 +163,10 @@ def pick_place_storage(node, arm, grasp_pose, destination, obj_name,
     lift_pose = copy.deepcopy(grasp_pose)
     lift_pose.position.z += 0.20
 
+    slot_count = 1 if obj_name == 'hammer' else count
     place_pose = Pose()
-    place_pose.position.x = x_slots[(count // 4) % 2]
-    place_pose.position.y = y_slots[count % 4]
+    place_pose.position.x = x_slots[(slot_count // 4) % 2]
+    place_pose.position.y = y_slots[slot_count % 4]
     place_pose.position.z = config["base_z"] + grasp_pose.position.z + 0.15
     place_pose.orientation = lift_pose.orientation
 
@@ -268,15 +279,42 @@ def pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name,
     y_slots = [-0.215, -0.30, -0.385]
     place_pose.position.y = y_slots[node.bookshelf_count % len(y_slots)]
 
-    # Force all objects to the 2nd floor of the bookshelf
-    place_pose.position.z = config["base_z"] + 0.15
+    # Get database offset (grasp local frame) to correctly adjust place z/y.
+    # rotate_vector(place_q, db_offset) converts the grasp-frame offset into
+    # world-frame displacement at place time, without relying on grasp_pose ≈ centroid.
+    db_offset = np.zeros(3)
+    try:
+        perception_features = extract_perception_features(perception_info)
+        pca_bbox_area = perception_features.get("pca_bbox_area_m2")
+        w = perception_features.get("pca_bbox_width_m")
+        l = perception_features.get("pca_bbox_length_m")
+        if pca_bbox_area is None and w is not None and l is not None:
+            pca_bbox_area = float(w) * float(l)
+        database = _load_grasp_database()
+        _, object_configs = _lookup_object_grasp_configs(database, obj_name)
+        _, grasp_config, _ = _select_state_config(object_configs, pca_bbox_area)
+        t = _extract_grasp_transform(grasp_config)
+        db_offset = np.array([t["x"], t["y"], t["z"]], dtype=float)
+    except Exception as e:
+        print(f"[bookshelf] db_offset lookup failed: {e}", flush=True)
+    print(f"[bookshelf] db_offset={db_offset}", flush=True)
+
     if _needs_wrist_flip(obj_name):
-        # 90° wrist rotation for long objects (banana, hammer)
+        place_q = np.array([0.0, 0.7071, 0.0, 0.7071])  # (x,y,z,w)
+        rotated = rotate_vector(place_q, db_offset)
+        print(f"[bookshelf] wrist_flip rotated={rotated}  -rotated[1]={-rotated[1]:.4f}", flush=True)
+        place_pose.position.z = config["base_z"] + 0.16
+        place_pose.position.y += float(rotated[1])
         place_pose.orientation.x = 0.0
         place_pose.orientation.y = 0.7071
         place_pose.orientation.z = 0.0
         place_pose.orientation.w = 0.7071
     else:
+        place_q = np.array([0.5, 0.5, 0.5, 0.5])  # (x,y,z,w)
+        rotated = rotate_vector(place_q, db_offset)
+        delta_z = float(rotated[2])
+        print(f"[bookshelf] normal rotated={rotated}  delta_z={delta_z:.4f}", flush=True)
+        place_pose.position.z = config["base_z"] + 0.18 + delta_z
         place_pose.orientation.x = 0.5
         place_pose.orientation.y = 0.5
         place_pose.orientation.z = 0.5

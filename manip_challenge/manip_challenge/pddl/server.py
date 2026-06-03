@@ -1503,6 +1503,7 @@ class PddlTampServer(Node):
         grasp_xyz, _ = store_grasp_pose_reference(selection)
         detected_pose = pose_from_xyz(grasp_xyz)
         base_pose = self.transform_pose(detected_pose, source_frame, "base_link")
+        selection["centroid_xyz_base"] = [float(base_pose.position.x), float(base_pose.position.y), float(base_pose.position.z)]
         
         xyz_major_axis = selection.get("xyz_major_axis")
         major_axis_base_3d = None

@@ -1,15 +1,15 @@
 {
   "action": {
     "args": [
-      "hammer_0",
+      "banana_0",
       "table",
-      "right_storage"
+      "bookshelf"
     ],
     "name": "move-target-to-goal",
-    "pddl": "(move-target-to-goal hammer_0 table right_storage)",
-    "source": "fallback"
+    "pddl": "(move-target-to-goal banana_0 table bookshelf)",
+    "source": "external"
   },
   "event": "selected_action",
-  "stamp_sec": 1780365963.1790555,
+  "stamp_sec": 1780447637.380291,
   "step": 1
 }

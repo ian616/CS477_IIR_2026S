@@ -9,6 +9,11 @@ from typing import Callable
 import numpy as np
 
 logger = logging.getLogger(__name__)
+if not logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("[%(name)s] %(message)s"))
+    logger.addHandler(_handler)
+    logger.setLevel(logging.INFO)
 
 from .pddl_types import BUFFER_LOCATIONS, Goal, ObjectState, PredicateState, KNOWN_OBJECTS
 from .utils import pddl_name
@@ -264,12 +269,11 @@ def _annotate_relations(objects: dict[str, ObjectState]) -> None:
             target, obstacle = (a, b) if a.is_target else (b, a)
             d = _grasp_to_obstacle_dist(target, obstacle)
             is_near = d is not None and d < SAFE_PIXEL_DISTANCE
-            logger.info(
-                "[near] %s(T) ↔ %s(O)  d=%s  thr=%.1f  near=%s",
-                target.name, obstacle.name,
-                f"{d:.1f}" if d is not None else "None",
-                SAFE_PIXEL_DISTANCE,
-                is_near,
+            print(
+                f"[near] {target.name}(T) ↔ {obstacle.name}(O)  "
+                f"d={f'{d:.1f}' if d is not None else 'None'}  "
+                f"thr={SAFE_PIXEL_DISTANCE:.1f}  near={is_near}",
+                flush=True,
             )
             if is_near:
                 a.near.add(b.name)
@@ -286,9 +290,9 @@ def _annotate_relations(objects: dict[str, ObjectState]) -> None:
                 if neighbor and not neighbor.is_target:
                     obj.safe = False
                     break
-            logger.info(
-                "[safe] %s  xyz=%s  near=%s  safe=%s",
-                obj.name, xyz_str, sorted(obj.near), obj.safe,
+            print(
+                f"[safe] {obj.name}  xyz={xyz_str}  near={sorted(obj.near)}  safe={obj.safe}",
+                flush=True,
             )
 
 

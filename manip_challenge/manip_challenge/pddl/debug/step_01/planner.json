@@ -3,17 +3,17 @@
   "plan": [
     {
       "args": [
-        "hammer_0",
+        "banana_0",
         "table",
-        "right_storage"
+        "bookshelf"
       ],
       "name": "move-target-to-goal",
-      "pddl": "(move-target-to-goal hammer_0 table right_storage)",
-      "source": "fallback"
+      "pddl": "(move-target-to-goal banana_0 table bookshelf)",
+      "source": "external"
     }
   ],
   "problem": "/home/ubuntu/cs477_ws/src/cs477_IIR/manip_challenge/manip_challenge/pddl/problem.pddl",
-  "raw_output": "PDDL_PLANNER_CMD is not set; using fallback planner.\nFallback planner selected:\n(move-target-to-goal hammer_0 table right_storage)",
-  "stamp_sec": 1780365963.1786833,
+  "raw_output": "(move-target-to-goal banana_0 table bookshelf)\n; cost = 1 (unit cost)\n\n",
+  "stamp_sec": 1780447637.3795354,
   "step": 1
 }
