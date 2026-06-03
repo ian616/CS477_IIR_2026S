@@ -274,7 +274,7 @@ def pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name,
 
     # Generate target pose
     place_pose = Pose()
-    place_pose.position.x = 0.925
+    place_pose.position.x = 0.970
 
     y_slots = [-0.215, -0.30, -0.385]
     place_pose.position.y = y_slots[node.bookshelf_count % len(y_slots)]

@@ -3,17 +3,36 @@
   "plan": [
     {
       "args": [
-        "banana_0",
+        "meat_can_0",
+        "table",
+        "buffer2"
+      ],
+      "name": "move-obstacle-to-buffer",
+      "pddl": "(move-obstacle-to-buffer meat_can_0 table buffer2)",
+      "source": "external"
+    },
+    {
+      "args": [
+        "meat_can_0",
+        "coke_can_0"
+      ],
+      "name": "clear-near-relation",
+      "pddl": "(clear-near-relation meat_can_0 coke_can_0)",
+      "source": "external"
+    },
+    {
+      "args": [
+        "coke_can_0",
         "table",
         "bookshelf"
       ],
       "name": "move-target-to-goal",
-      "pddl": "(move-target-to-goal banana_0 table bookshelf)",
+      "pddl": "(move-target-to-goal coke_can_0 table bookshelf)",
       "source": "external"
     }
   ],
   "problem": "/home/ubuntu/cs477_ws/src/cs477_IIR/manip_challenge/manip_challenge/pddl/problem.pddl",
-  "raw_output": "(move-target-to-goal banana_0 table bookshelf)\n; cost = 1 (unit cost)\n\n",
-  "stamp_sec": 1780447637.3795354,
+  "raw_output": "(move-obstacle-to-buffer meat_can_0 table buffer2)\n(clear-near-relation meat_can_0 coke_can_0)\n(move-target-to-goal coke_can_0 table bookshelf)\n; cost = 3 (unit cost)\n\n",
+  "stamp_sec": 1780447969.7224448,
   "step": 1
 }
