@@ -1,48 +1,13 @@
 {
-<<<<<<< HEAD
-  "command": "Move the hammer to the left storage.",
-=======
-  "command": "Move the hammer to the right storage. Move the strawberry to the left storage. Move the banana to the left storage. Move the meat can to the left storage. Move the coke can to the right storage.",
->>>>>>> feature/grasping2
+  "command": "Move the meat can to the right storage.",
   "completed": [],
   "event": "planning_step_start",
   "goals": [
     {
-<<<<<<< HEAD
-      "bound_object_name": "hammer_0",
-      "location": "left_storage",
-      "object_name": "hammer",
-      "target_name": "hammer_0"
-=======
-      "bound_object_name": null,
-      "location": "right_storage",
-      "object_name": "hammer",
-      "target_name": "hammer"
-    },
-    {
-      "bound_object_name": "strawberry_0",
-      "location": "left_storage",
-      "object_name": "strawberry",
-      "target_name": "strawberry_0"
-    },
-    {
-      "bound_object_name": "banana_0",
-      "location": "left_storage",
-      "object_name": "banana",
-      "target_name": "banana_0"
-    },
-    {
       "bound_object_name": "meat_can_0",
-      "location": "left_storage",
+      "location": "right_storage",
       "object_name": "meat_can",
       "target_name": "meat_can_0"
-    },
-    {
-      "bound_object_name": "coke_can_0",
-      "location": "right_storage",
-      "object_name": "coke_can",
-      "target_name": "coke_can_0"
->>>>>>> feature/grasping2
     }
   ],
   "images": [
@@ -51,1237 +16,555 @@
       "instance_index": 0,
       "kind": "annotated",
       "object": "banana_0",
-<<<<<<< HEAD
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/banana_0_annotated.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123433_216577_banana/banana_0/annotated.png"
-=======
       "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/banana_0_annotated.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171048_696030_banana/banana_0/annotated.png"
->>>>>>> feature/grasping2
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180358_814157_banana/banana_0/annotated.png"
     },
     {
       "class_name": "banana",
       "instance_index": 0,
       "kind": "depth_png",
       "object": "banana_0",
-<<<<<<< HEAD
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/banana_0_depth_png.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123433_216577_banana/banana_0/depth.png"
-=======
       "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/banana_0_depth_png.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171048_696030_banana/banana_0/depth.png"
->>>>>>> feature/grasping2
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180358_814157_banana/banana_0/depth.png"
     },
     {
       "class_name": "banana",
       "instance_index": 0,
       "kind": "depth_visualization",
       "object": "banana_0",
-<<<<<<< HEAD
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/banana_0_depth_visualization.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123433_216577_banana/banana_0/depth_vis.png"
-=======
       "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/banana_0_depth_visualization.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171048_696030_banana/banana_0/depth_vis.png"
->>>>>>> feature/grasping2
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180358_814157_banana/banana_0/depth_vis.png"
     },
     {
       "class_name": "banana",
       "instance_index": 0,
       "kind": "mask",
       "object": "banana_0",
-<<<<<<< HEAD
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/banana_0_mask.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123433_216577_banana/banana_0/mask.png"
-=======
       "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/banana_0_mask.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171048_696030_banana/banana_0/mask.png"
->>>>>>> feature/grasping2
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180358_814157_banana/banana_0/mask.png"
     },
     {
       "class_name": "banana",
       "instance_index": 0,
       "kind": "mask_full",
       "object": "banana_0",
-<<<<<<< HEAD
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/banana_0_mask_full.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123433_216577_banana/banana_0/mask_full.png"
-=======
       "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/banana_0_mask_full.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171048_696030_banana/banana_0/mask_full.png"
->>>>>>> feature/grasping2
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180358_814157_banana/banana_0/mask_full.png"
     },
     {
       "class_name": "banana",
       "instance_index": 0,
       "kind": "mask_overlay",
       "object": "banana_0",
-<<<<<<< HEAD
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/banana_0_mask_overlay.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123433_216577_banana/banana_0/mask_overlay.png"
-=======
       "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/banana_0_mask_overlay.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171048_696030_banana/banana_0/mask_overlay.png"
->>>>>>> feature/grasping2
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180358_814157_banana/banana_0/mask_overlay.png"
     },
     {
       "class_name": "banana",
       "instance_index": 0,
       "kind": "mask_raw",
       "object": "banana_0",
-<<<<<<< HEAD
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/banana_0_mask_raw.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123433_216577_banana/banana_0/mask_raw.png"
-=======
       "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/banana_0_mask_raw.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171048_696030_banana/banana_0/mask_raw.png"
->>>>>>> feature/grasping2
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180358_814157_banana/banana_0/mask_raw.png"
     },
     {
       "class_name": "banana",
       "instance_index": 0,
       "kind": "rgb",
       "object": "banana_0",
-<<<<<<< HEAD
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/banana_0_rgb.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123433_216577_banana/banana_0/rgb.png"
-=======
       "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/banana_0_rgb.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171048_696030_banana/banana_0/rgb.png"
->>>>>>> feature/grasping2
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180358_814157_banana/banana_0/rgb.png"
     },
     {
       "class_name": "banana",
       "instance_index": 0,
       "kind": "rgb_masked",
       "object": "banana_0",
-<<<<<<< HEAD
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/banana_0_rgb_masked.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123433_216577_banana/banana_0/rgb_masked.png"
-=======
       "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/banana_0_rgb_masked.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171048_696030_banana/banana_0/rgb_masked.png"
->>>>>>> feature/grasping2
-    },
-    {
-      "class_name": "coke_can",
-      "instance_index": 0,
-      "kind": "annotated",
-      "object": "coke_can_0",
-<<<<<<< HEAD
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/coke_can_0_annotated.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123434_909363_coke_can/coke_can_0/annotated.png"
-=======
-      "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/coke_can_0_annotated.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171048_840472_coke_can/coke_can_0/annotated.png"
->>>>>>> feature/grasping2
-    },
-    {
-      "class_name": "coke_can",
-      "instance_index": 0,
-      "kind": "depth_png",
-      "object": "coke_can_0",
-<<<<<<< HEAD
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/coke_can_0_depth_png.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123434_909363_coke_can/coke_can_0/depth.png"
-=======
-      "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/coke_can_0_depth_png.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171048_840472_coke_can/coke_can_0/depth.png"
->>>>>>> feature/grasping2
-    },
-    {
-      "class_name": "coke_can",
-      "instance_index": 0,
-      "kind": "depth_visualization",
-      "object": "coke_can_0",
-<<<<<<< HEAD
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/coke_can_0_depth_visualization.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123434_909363_coke_can/coke_can_0/depth_vis.png"
-=======
-      "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/coke_can_0_depth_visualization.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171048_840472_coke_can/coke_can_0/depth_vis.png"
->>>>>>> feature/grasping2
-    },
-    {
-      "class_name": "coke_can",
-      "instance_index": 0,
-      "kind": "mask",
-      "object": "coke_can_0",
-<<<<<<< HEAD
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/coke_can_0_mask.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123434_909363_coke_can/coke_can_0/mask.png"
-=======
-      "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/coke_can_0_mask.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171048_840472_coke_can/coke_can_0/mask.png"
->>>>>>> feature/grasping2
-    },
-    {
-      "class_name": "coke_can",
-      "instance_index": 0,
-      "kind": "mask_full",
-      "object": "coke_can_0",
-<<<<<<< HEAD
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/coke_can_0_mask_full.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123434_909363_coke_can/coke_can_0/mask_full.png"
-=======
-      "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/coke_can_0_mask_full.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171048_840472_coke_can/coke_can_0/mask_full.png"
->>>>>>> feature/grasping2
-    },
-    {
-      "class_name": "coke_can",
-      "instance_index": 0,
-      "kind": "mask_overlay",
-      "object": "coke_can_0",
-<<<<<<< HEAD
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/coke_can_0_mask_overlay.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123434_909363_coke_can/coke_can_0/mask_overlay.png"
-=======
-      "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/coke_can_0_mask_overlay.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171048_840472_coke_can/coke_can_0/mask_overlay.png"
->>>>>>> feature/grasping2
-    },
-    {
-      "class_name": "coke_can",
-      "instance_index": 0,
-      "kind": "mask_raw",
-      "object": "coke_can_0",
-<<<<<<< HEAD
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/coke_can_0_mask_raw.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123434_909363_coke_can/coke_can_0/mask_raw.png"
-=======
-      "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/coke_can_0_mask_raw.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171048_840472_coke_can/coke_can_0/mask_raw.png"
->>>>>>> feature/grasping2
-    },
-    {
-      "class_name": "coke_can",
-      "instance_index": 0,
-      "kind": "rgb",
-      "object": "coke_can_0",
-<<<<<<< HEAD
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/coke_can_0_rgb.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123434_909363_coke_can/coke_can_0/rgb.png"
-=======
-      "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/coke_can_0_rgb.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171048_840472_coke_can/coke_can_0/rgb.png"
->>>>>>> feature/grasping2
-    },
-    {
-      "class_name": "coke_can",
-      "instance_index": 0,
-      "kind": "rgb_masked",
-      "object": "coke_can_0",
-<<<<<<< HEAD
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/coke_can_0_rgb_masked.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123434_909363_coke_can/coke_can_0/rgb_masked.png"
-    },
-    {
-      "class_name": "coke_can",
-      "instance_index": 1,
-      "kind": "annotated",
-      "object": "coke_can_1",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/coke_can_1_annotated.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123434_909363_coke_can/coke_can_1/annotated.png"
-    },
-    {
-      "class_name": "coke_can",
-      "instance_index": 1,
-      "kind": "depth_png",
-      "object": "coke_can_1",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/coke_can_1_depth_png.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123434_909363_coke_can/coke_can_1/depth.png"
-    },
-    {
-      "class_name": "coke_can",
-      "instance_index": 1,
-      "kind": "depth_visualization",
-      "object": "coke_can_1",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/coke_can_1_depth_visualization.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123434_909363_coke_can/coke_can_1/depth_vis.png"
-    },
-    {
-      "class_name": "coke_can",
-      "instance_index": 1,
-      "kind": "mask",
-      "object": "coke_can_1",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/coke_can_1_mask.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123434_909363_coke_can/coke_can_1/mask.png"
-    },
-    {
-      "class_name": "coke_can",
-      "instance_index": 1,
-      "kind": "mask_full",
-      "object": "coke_can_1",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/coke_can_1_mask_full.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123434_909363_coke_can/coke_can_1/mask_full.png"
-    },
-    {
-      "class_name": "coke_can",
-      "instance_index": 1,
-      "kind": "mask_overlay",
-      "object": "coke_can_1",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/coke_can_1_mask_overlay.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123434_909363_coke_can/coke_can_1/mask_overlay.png"
-    },
-    {
-      "class_name": "coke_can",
-      "instance_index": 1,
-      "kind": "mask_raw",
-      "object": "coke_can_1",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/coke_can_1_mask_raw.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123434_909363_coke_can/coke_can_1/mask_raw.png"
-    },
-    {
-      "class_name": "coke_can",
-      "instance_index": 1,
-      "kind": "rgb",
-      "object": "coke_can_1",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/coke_can_1_rgb.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123434_909363_coke_can/coke_can_1/rgb.png"
-    },
-    {
-      "class_name": "coke_can",
-      "instance_index": 1,
-      "kind": "rgb_masked",
-      "object": "coke_can_1",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/coke_can_1_rgb_masked.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123434_909363_coke_can/coke_can_1/rgb_masked.png"
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180358_814157_banana/banana_0/rgb_masked.png"
     },
     {
       "class_name": "hammer",
       "instance_index": 0,
       "kind": "annotated",
       "object": "hammer_0",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/hammer_0_annotated.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123436_687020_hammer/hammer_0/annotated.png"
+      "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/hammer_0_annotated.png",
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_055487_hammer/hammer_0/annotated.png"
     },
     {
       "class_name": "hammer",
       "instance_index": 0,
       "kind": "depth_png",
       "object": "hammer_0",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/hammer_0_depth_png.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123436_687020_hammer/hammer_0/depth.png"
+      "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/hammer_0_depth_png.png",
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_055487_hammer/hammer_0/depth.png"
     },
     {
       "class_name": "hammer",
       "instance_index": 0,
       "kind": "depth_visualization",
       "object": "hammer_0",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/hammer_0_depth_visualization.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123436_687020_hammer/hammer_0/depth_vis.png"
+      "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/hammer_0_depth_visualization.png",
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_055487_hammer/hammer_0/depth_vis.png"
     },
     {
       "class_name": "hammer",
       "instance_index": 0,
       "kind": "mask",
       "object": "hammer_0",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/hammer_0_mask.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123436_687020_hammer/hammer_0/mask.png"
+      "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/hammer_0_mask.png",
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_055487_hammer/hammer_0/mask.png"
     },
     {
       "class_name": "hammer",
       "instance_index": 0,
       "kind": "mask_full",
       "object": "hammer_0",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/hammer_0_mask_full.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123436_687020_hammer/hammer_0/mask_full.png"
+      "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/hammer_0_mask_full.png",
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_055487_hammer/hammer_0/mask_full.png"
     },
     {
       "class_name": "hammer",
       "instance_index": 0,
       "kind": "mask_overlay",
       "object": "hammer_0",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/hammer_0_mask_overlay.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123436_687020_hammer/hammer_0/mask_overlay.png"
+      "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/hammer_0_mask_overlay.png",
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_055487_hammer/hammer_0/mask_overlay.png"
     },
     {
       "class_name": "hammer",
       "instance_index": 0,
       "kind": "mask_raw",
       "object": "hammer_0",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/hammer_0_mask_raw.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123436_687020_hammer/hammer_0/mask_raw.png"
+      "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/hammer_0_mask_raw.png",
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_055487_hammer/hammer_0/mask_raw.png"
     },
     {
       "class_name": "hammer",
       "instance_index": 0,
       "kind": "rgb",
       "object": "hammer_0",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/hammer_0_rgb.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123436_687020_hammer/hammer_0/rgb.png"
+      "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/hammer_0_rgb.png",
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_055487_hammer/hammer_0/rgb.png"
     },
     {
       "class_name": "hammer",
       "instance_index": 0,
       "kind": "rgb_masked",
       "object": "hammer_0",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/hammer_0_rgb_masked.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123436_687020_hammer/hammer_0/rgb_masked.png"
-=======
-      "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/coke_can_0_rgb_masked.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171048_840472_coke_can/coke_can_0/rgb_masked.png"
->>>>>>> feature/grasping2
+      "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/hammer_0_rgb_masked.png",
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_055487_hammer/hammer_0/rgb_masked.png"
     },
     {
       "class_name": "meat_can",
       "instance_index": 0,
       "kind": "annotated",
       "object": "meat_can_0",
-<<<<<<< HEAD
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/meat_can_0_annotated.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123438_430990_meat_can/meat_can_0/annotated.png"
-=======
       "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/meat_can_0_annotated.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171049_083314_meat_can/meat_can_0/annotated.png"
->>>>>>> feature/grasping2
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_224167_meat_can/meat_can_0/annotated.png"
     },
     {
       "class_name": "meat_can",
       "instance_index": 0,
       "kind": "depth_png",
       "object": "meat_can_0",
-<<<<<<< HEAD
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/meat_can_0_depth_png.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123438_430990_meat_can/meat_can_0/depth.png"
-=======
       "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/meat_can_0_depth_png.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171049_083314_meat_can/meat_can_0/depth.png"
->>>>>>> feature/grasping2
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_224167_meat_can/meat_can_0/depth.png"
     },
     {
       "class_name": "meat_can",
       "instance_index": 0,
       "kind": "depth_visualization",
       "object": "meat_can_0",
-<<<<<<< HEAD
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/meat_can_0_depth_visualization.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123438_430990_meat_can/meat_can_0/depth_vis.png"
-=======
       "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/meat_can_0_depth_visualization.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171049_083314_meat_can/meat_can_0/depth_vis.png"
->>>>>>> feature/grasping2
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_224167_meat_can/meat_can_0/depth_vis.png"
     },
     {
       "class_name": "meat_can",
       "instance_index": 0,
       "kind": "mask",
       "object": "meat_can_0",
-<<<<<<< HEAD
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/meat_can_0_mask.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123438_430990_meat_can/meat_can_0/mask.png"
-=======
       "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/meat_can_0_mask.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171049_083314_meat_can/meat_can_0/mask.png"
->>>>>>> feature/grasping2
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_224167_meat_can/meat_can_0/mask.png"
     },
     {
       "class_name": "meat_can",
       "instance_index": 0,
       "kind": "mask_full",
       "object": "meat_can_0",
-<<<<<<< HEAD
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/meat_can_0_mask_full.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123438_430990_meat_can/meat_can_0/mask_full.png"
-=======
       "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/meat_can_0_mask_full.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171049_083314_meat_can/meat_can_0/mask_full.png"
->>>>>>> feature/grasping2
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_224167_meat_can/meat_can_0/mask_full.png"
     },
     {
       "class_name": "meat_can",
       "instance_index": 0,
       "kind": "mask_overlay",
       "object": "meat_can_0",
-<<<<<<< HEAD
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/meat_can_0_mask_overlay.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123438_430990_meat_can/meat_can_0/mask_overlay.png"
-=======
       "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/meat_can_0_mask_overlay.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171049_083314_meat_can/meat_can_0/mask_overlay.png"
->>>>>>> feature/grasping2
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_224167_meat_can/meat_can_0/mask_overlay.png"
     },
     {
       "class_name": "meat_can",
       "instance_index": 0,
       "kind": "mask_raw",
       "object": "meat_can_0",
-<<<<<<< HEAD
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/meat_can_0_mask_raw.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123438_430990_meat_can/meat_can_0/mask_raw.png"
-=======
       "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/meat_can_0_mask_raw.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171049_083314_meat_can/meat_can_0/mask_raw.png"
->>>>>>> feature/grasping2
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_224167_meat_can/meat_can_0/mask_raw.png"
     },
     {
       "class_name": "meat_can",
       "instance_index": 0,
       "kind": "rgb",
       "object": "meat_can_0",
-<<<<<<< HEAD
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/meat_can_0_rgb.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123438_430990_meat_can/meat_can_0/rgb.png"
-=======
       "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/meat_can_0_rgb.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171049_083314_meat_can/meat_can_0/rgb.png"
->>>>>>> feature/grasping2
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_224167_meat_can/meat_can_0/rgb.png"
     },
     {
       "class_name": "meat_can",
       "instance_index": 0,
       "kind": "rgb_masked",
       "object": "meat_can_0",
-<<<<<<< HEAD
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/meat_can_0_rgb_masked.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123438_430990_meat_can/meat_can_0/rgb_masked.png"
-    },
-    {
-      "class_name": "meat_can",
-      "instance_index": 1,
-      "kind": "annotated",
-      "object": "meat_can_1",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/meat_can_1_annotated.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123438_430990_meat_can/meat_can_1/annotated.png"
-    },
-    {
-      "class_name": "meat_can",
-      "instance_index": 1,
-      "kind": "depth_png",
-      "object": "meat_can_1",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/meat_can_1_depth_png.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123438_430990_meat_can/meat_can_1/depth.png"
-    },
-    {
-      "class_name": "meat_can",
-      "instance_index": 1,
-      "kind": "depth_visualization",
-      "object": "meat_can_1",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/meat_can_1_depth_visualization.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123438_430990_meat_can/meat_can_1/depth_vis.png"
-    },
-    {
-      "class_name": "meat_can",
-      "instance_index": 1,
-      "kind": "mask",
-      "object": "meat_can_1",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/meat_can_1_mask.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123438_430990_meat_can/meat_can_1/mask.png"
-    },
-    {
-      "class_name": "meat_can",
-      "instance_index": 1,
-      "kind": "mask_full",
-      "object": "meat_can_1",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/meat_can_1_mask_full.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123438_430990_meat_can/meat_can_1/mask_full.png"
-    },
-    {
-      "class_name": "meat_can",
-      "instance_index": 1,
-      "kind": "mask_overlay",
-      "object": "meat_can_1",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/meat_can_1_mask_overlay.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123438_430990_meat_can/meat_can_1/mask_overlay.png"
-    },
-    {
-      "class_name": "meat_can",
-      "instance_index": 1,
-      "kind": "mask_raw",
-      "object": "meat_can_1",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/meat_can_1_mask_raw.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123438_430990_meat_can/meat_can_1/mask_raw.png"
-    },
-    {
-      "class_name": "meat_can",
-      "instance_index": 1,
-      "kind": "rgb",
-      "object": "meat_can_1",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/meat_can_1_rgb.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123438_430990_meat_can/meat_can_1/rgb.png"
-    },
-    {
-      "class_name": "meat_can",
-      "instance_index": 1,
-      "kind": "rgb_masked",
-      "object": "meat_can_1",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/meat_can_1_rgb_masked.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123438_430990_meat_can/meat_can_1/rgb_masked.png"
-=======
       "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/meat_can_0_rgb_masked.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171049_083314_meat_can/meat_can_0/rgb_masked.png"
->>>>>>> feature/grasping2
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_224167_meat_can/meat_can_0/rgb_masked.png"
     },
     {
       "class_name": "strawberry",
       "instance_index": 0,
       "kind": "annotated",
       "object": "strawberry_0",
-<<<<<<< HEAD
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/strawberry_0_annotated.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123440_142548_strawberry/strawberry_0/annotated.png"
-=======
       "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/strawberry_0_annotated.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171049_201078_strawberry/strawberry_0/annotated.png"
->>>>>>> feature/grasping2
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_372003_strawberry/strawberry_0/annotated.png"
     },
     {
       "class_name": "strawberry",
       "instance_index": 0,
       "kind": "depth_png",
       "object": "strawberry_0",
-<<<<<<< HEAD
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/strawberry_0_depth_png.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123440_142548_strawberry/strawberry_0/depth.png"
-=======
       "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/strawberry_0_depth_png.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171049_201078_strawberry/strawberry_0/depth.png"
->>>>>>> feature/grasping2
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_372003_strawberry/strawberry_0/depth.png"
     },
     {
       "class_name": "strawberry",
       "instance_index": 0,
       "kind": "depth_visualization",
       "object": "strawberry_0",
-<<<<<<< HEAD
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/strawberry_0_depth_visualization.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123440_142548_strawberry/strawberry_0/depth_vis.png"
-=======
       "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/strawberry_0_depth_visualization.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171049_201078_strawberry/strawberry_0/depth_vis.png"
->>>>>>> feature/grasping2
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_372003_strawberry/strawberry_0/depth_vis.png"
     },
     {
       "class_name": "strawberry",
       "instance_index": 0,
       "kind": "mask",
       "object": "strawberry_0",
-<<<<<<< HEAD
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/strawberry_0_mask.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123440_142548_strawberry/strawberry_0/mask.png"
-=======
       "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/strawberry_0_mask.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171049_201078_strawberry/strawberry_0/mask.png"
->>>>>>> feature/grasping2
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_372003_strawberry/strawberry_0/mask.png"
     },
     {
       "class_name": "strawberry",
       "instance_index": 0,
       "kind": "mask_full",
       "object": "strawberry_0",
-<<<<<<< HEAD
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/strawberry_0_mask_full.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123440_142548_strawberry/strawberry_0/mask_full.png"
-=======
       "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/strawberry_0_mask_full.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171049_201078_strawberry/strawberry_0/mask_full.png"
->>>>>>> feature/grasping2
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_372003_strawberry/strawberry_0/mask_full.png"
     },
     {
       "class_name": "strawberry",
       "instance_index": 0,
       "kind": "mask_overlay",
       "object": "strawberry_0",
-<<<<<<< HEAD
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/strawberry_0_mask_overlay.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123440_142548_strawberry/strawberry_0/mask_overlay.png"
-=======
       "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/strawberry_0_mask_overlay.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171049_201078_strawberry/strawberry_0/mask_overlay.png"
->>>>>>> feature/grasping2
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_372003_strawberry/strawberry_0/mask_overlay.png"
     },
     {
       "class_name": "strawberry",
       "instance_index": 0,
       "kind": "mask_raw",
       "object": "strawberry_0",
-<<<<<<< HEAD
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/strawberry_0_mask_raw.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123440_142548_strawberry/strawberry_0/mask_raw.png"
-=======
       "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/strawberry_0_mask_raw.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171049_201078_strawberry/strawberry_0/mask_raw.png"
->>>>>>> feature/grasping2
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_372003_strawberry/strawberry_0/mask_raw.png"
     },
     {
       "class_name": "strawberry",
       "instance_index": 0,
       "kind": "rgb",
       "object": "strawberry_0",
-<<<<<<< HEAD
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/strawberry_0_rgb.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123440_142548_strawberry/strawberry_0/rgb.png"
-=======
       "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/strawberry_0_rgb.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171049_201078_strawberry/strawberry_0/rgb.png"
->>>>>>> feature/grasping2
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_372003_strawberry/strawberry_0/rgb.png"
     },
     {
       "class_name": "strawberry",
       "instance_index": 0,
       "kind": "rgb_masked",
       "object": "strawberry_0",
-<<<<<<< HEAD
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/strawberry_0_rgb_masked.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123440_142548_strawberry/strawberry_0/rgb_masked.png"
+      "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/strawberry_0_rgb_masked.png",
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_372003_strawberry/strawberry_0/rgb_masked.png"
     },
     {
       "class_name": "strawberry",
       "instance_index": 1,
       "kind": "annotated",
       "object": "strawberry_1",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/strawberry_1_annotated.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123440_142548_strawberry/strawberry_1/annotated.png"
+      "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/strawberry_1_annotated.png",
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_372003_strawberry/strawberry_1/annotated.png"
     },
     {
       "class_name": "strawberry",
       "instance_index": 1,
       "kind": "depth_png",
       "object": "strawberry_1",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/strawberry_1_depth_png.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123440_142548_strawberry/strawberry_1/depth.png"
+      "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/strawberry_1_depth_png.png",
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_372003_strawberry/strawberry_1/depth.png"
     },
     {
       "class_name": "strawberry",
       "instance_index": 1,
       "kind": "depth_visualization",
       "object": "strawberry_1",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/strawberry_1_depth_visualization.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123440_142548_strawberry/strawberry_1/depth_vis.png"
+      "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/strawberry_1_depth_visualization.png",
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_372003_strawberry/strawberry_1/depth_vis.png"
     },
     {
       "class_name": "strawberry",
       "instance_index": 1,
       "kind": "mask",
       "object": "strawberry_1",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/strawberry_1_mask.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123440_142548_strawberry/strawberry_1/mask.png"
+      "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/strawberry_1_mask.png",
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_372003_strawberry/strawberry_1/mask.png"
     },
     {
       "class_name": "strawberry",
       "instance_index": 1,
       "kind": "mask_full",
       "object": "strawberry_1",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/strawberry_1_mask_full.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123440_142548_strawberry/strawberry_1/mask_full.png"
+      "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/strawberry_1_mask_full.png",
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_372003_strawberry/strawberry_1/mask_full.png"
     },
     {
       "class_name": "strawberry",
       "instance_index": 1,
       "kind": "mask_overlay",
       "object": "strawberry_1",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/strawberry_1_mask_overlay.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123440_142548_strawberry/strawberry_1/mask_overlay.png"
+      "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/strawberry_1_mask_overlay.png",
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_372003_strawberry/strawberry_1/mask_overlay.png"
     },
     {
       "class_name": "strawberry",
       "instance_index": 1,
       "kind": "mask_raw",
       "object": "strawberry_1",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/strawberry_1_mask_raw.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123440_142548_strawberry/strawberry_1/mask_raw.png"
+      "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/strawberry_1_mask_raw.png",
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_372003_strawberry/strawberry_1/mask_raw.png"
     },
     {
       "class_name": "strawberry",
       "instance_index": 1,
       "kind": "rgb",
       "object": "strawberry_1",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/strawberry_1_rgb.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123440_142548_strawberry/strawberry_1/rgb.png"
+      "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/strawberry_1_rgb.png",
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_372003_strawberry/strawberry_1/rgb.png"
     },
     {
       "class_name": "strawberry",
       "instance_index": 1,
       "kind": "rgb_masked",
       "object": "strawberry_1",
-      "path": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/strawberry_1_rgb_masked.png",
-      "source": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123440_142548_strawberry/strawberry_1/rgb_masked.png"
+      "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/strawberry_1_rgb_masked.png",
+      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_372003_strawberry/strawberry_1/rgb_masked.png"
     }
   ],
   "notes": [
-    "used warm-start top-view scene captured from observe pose before command"
-=======
-      "path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/debug/step_01/strawberry_0_rgb_masked.png",
-      "source": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171049_201078_strawberry/strawberry_0/rgb_masked.png"
-    }
-  ],
-  "notes": [
-    "hammer: No YOLO segmentation matched target='hammer'. seen=['meat_can', 'coke_can', 'strawberry']. debug_image=/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/_debug_failures/20260602_171049_004026_hammer_detections.png"
->>>>>>> feature/grasping2
+    "coke_can: No YOLO segmentation matched target='coke_can'. seen=['hammer', 'meat_can', 'banana', 'strawberry', 'strawberry']. debug_image=/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/_debug_failures/20260603_180359_012731_coke_can_detections.png"
   ],
   "objects": {
     "banana_0": {
       "bbox_xyxy": [
-<<<<<<< HEAD
-        66,
-        196,
-        134,
-        234
-=======
-        176,
-        112,
-        208,
-        150
->>>>>>> feature/grasping2
+        136,
+        60,
+        172,
+        122
       ],
       "blocked_by": [],
       "blocks": [],
       "centroid_xyz": [
-<<<<<<< HEAD
-        -0.1959632784128189,
-        0.28765004873275757,
-        1.4466742277145386
+        -0.0015187873505055904,
+        -0.0977388545870781,
+        1.4014027118682861
       ],
       "class_name": "banana",
       "clear": true,
-      "confidence": 0.9551755785942078,
+      "confidence": 0.9343050122261047,
       "debug_files": {
-        "annotated": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123433_216577_banana/banana_0/annotated.png",
-        "depth_png": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123433_216577_banana/banana_0/depth.png",
-        "depth_visualization": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123433_216577_banana/banana_0/depth_vis.png",
-        "mask": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123433_216577_banana/banana_0/mask.png",
-        "mask_full": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123433_216577_banana/banana_0/mask_full.png",
-        "mask_overlay": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123433_216577_banana/banana_0/mask_overlay.png",
-        "mask_raw": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123433_216577_banana/banana_0/mask_raw.png",
-        "rgb": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123433_216577_banana/banana_0/rgb.png",
-        "rgb_masked": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123433_216577_banana/banana_0/rgb_masked.png"
+        "annotated": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180358_814157_banana/banana_0/annotated.png",
+        "depth_png": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180358_814157_banana/banana_0/depth.png",
+        "depth_visualization": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180358_814157_banana/banana_0/depth_vis.png",
+        "mask": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180358_814157_banana/banana_0/mask.png",
+        "mask_full": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180358_814157_banana/banana_0/mask_full.png",
+        "mask_overlay": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180358_814157_banana/banana_0/mask_overlay.png",
+        "mask_raw": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180358_814157_banana/banana_0/mask_raw.png",
+        "rgb": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180358_814157_banana/banana_0/rgb.png",
+        "rgb_masked": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180358_814157_banana/banana_0/rgb_masked.png"
       },
-      "depth_median": 1.4466742277145386,
+      "depth_median": 1.4014027118682861,
       "detected": true,
       "error": null,
-      "foreground_points": 1003,
+      "foreground_points": 683,
       "graspable": true,
       "instance_index": 0,
       "location": "table",
-      "mask_pixels": 1003,
-=======
-        0.10272467136383057,
-        0.04884609580039978,
-        1.4487135410308838
-      ],
-      "class_name": "banana",
-      "clear": true,
-      "confidence": 0.7788724303245544,
-      "debug_files": {
-        "annotated": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171048_696030_banana/banana_0/annotated.png",
-        "depth_png": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171048_696030_banana/banana_0/depth.png",
-        "depth_visualization": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171048_696030_banana/banana_0/depth_vis.png",
-        "mask": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171048_696030_banana/banana_0/mask.png",
-        "mask_full": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171048_696030_banana/banana_0/mask_full.png",
-        "mask_overlay": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171048_696030_banana/banana_0/mask_overlay.png",
-        "mask_raw": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171048_696030_banana/banana_0/mask_raw.png",
-        "rgb": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171048_696030_banana/banana_0/rgb.png",
-        "rgb_masked": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171048_696030_banana/banana_0/rgb_masked.png"
-      },
-      "depth_median": 1.4487135410308838,
-      "detected": true,
-      "error": null,
-      "foreground_points": 601,
-      "graspable": true,
-      "instance_index": 0,
-      "location": "table",
-      "mask_pixels": 601,
->>>>>>> feature/grasping2
+      "mask_pixels": 848,
       "near": [],
       "pose_known": true,
       "safe": true,
       "target": false,
       "visible": true
     },
-    "coke_can_0": {
-      "bbox_xyxy": [
-<<<<<<< HEAD
-        121,
-        150,
-        145,
-        178
-=======
-        112,
-        132,
-        140,
-        160
-      ],
-      "blocked_by": [
-        "strawberry_0"
->>>>>>> feature/grasping2
-      ],
-      "blocked_by": [],
-      "blocks": [],
-      "centroid_xyz": [
-<<<<<<< HEAD
-        -0.08080708235502243,
-        0.13490426540374756,
-        1.3576619625091553
-      ],
-      "class_name": "coke_can",
-      "clear": true,
-      "confidence": 0.9410521984100342,
-      "debug_files": {
-        "annotated": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123434_909363_coke_can/coke_can_0/annotated.png",
-        "depth_png": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123434_909363_coke_can/coke_can_0/depth.png",
-        "depth_visualization": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123434_909363_coke_can/coke_can_0/depth_vis.png",
-        "mask": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123434_909363_coke_can/coke_can_0/mask.png",
-        "mask_full": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123434_909363_coke_can/coke_can_0/mask_full.png",
-        "mask_overlay": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123434_909363_coke_can/coke_can_0/mask_overlay.png",
-        "mask_raw": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123434_909363_coke_can/coke_can_0/mask_raw.png",
-        "rgb": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123434_909363_coke_can/coke_can_0/rgb.png",
-        "rgb_masked": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123434_909363_coke_can/coke_can_0/rgb_masked.png"
-      },
-      "depth_median": 1.3576619625091553,
-      "detected": true,
-      "error": null,
-      "foreground_points": 400,
-      "graspable": true,
-      "instance_index": 0,
-      "location": "table",
-      "mask_pixels": 514,
-=======
-        -0.1073446124792099,
-        0.0782788097858429,
-        1.3577344417572021
-      ],
-      "class_name": "coke_can",
-      "clear": false,
-      "confidence": 0.937877893447876,
-      "debug_files": {
-        "annotated": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171048_840472_coke_can/coke_can_0/annotated.png",
-        "depth_png": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171048_840472_coke_can/coke_can_0/depth.png",
-        "depth_visualization": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171048_840472_coke_can/coke_can_0/depth_vis.png",
-        "mask": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171048_840472_coke_can/coke_can_0/mask.png",
-        "mask_full": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171048_840472_coke_can/coke_can_0/mask_full.png",
-        "mask_overlay": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171048_840472_coke_can/coke_can_0/mask_overlay.png",
-        "mask_raw": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171048_840472_coke_can/coke_can_0/mask_raw.png",
-        "rgb": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171048_840472_coke_can/coke_can_0/rgb.png",
-        "rgb_masked": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171048_840472_coke_can/coke_can_0/rgb_masked.png"
-      },
-      "depth_median": 1.3577344417572021,
-      "detected": true,
-      "error": null,
-      "foreground_points": 396,
-      "graspable": true,
-      "instance_index": 0,
-      "location": "table",
-      "mask_pixels": 527,
->>>>>>> feature/grasping2
-      "near": [],
-      "pose_known": true,
-      "safe": true,
-      "target": false,
-      "visible": true
-    },
-    "coke_can_1": {
-      "bbox_xyxy": [
-        220,
-        132,
-        252,
-        160
-      ],
-      "blocked_by": [],
-      "blocks": [
-        "strawberry_1"
-      ],
-      "centroid_xyz": [
-        0.23048444092273712,
-        0.07777765393257141,
-        1.357436180114746
-      ],
-      "class_name": "coke_can",
-      "clear": true,
-      "confidence": 0.9306473731994629,
-      "debug_files": {
-        "annotated": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123434_909363_coke_can/coke_can_1/annotated.png",
-        "depth_png": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123434_909363_coke_can/coke_can_1/depth.png",
-        "depth_visualization": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123434_909363_coke_can/coke_can_1/depth_vis.png",
-        "mask": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123434_909363_coke_can/coke_can_1/mask.png",
-        "mask_full": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123434_909363_coke_can/coke_can_1/mask_full.png",
-        "mask_overlay": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123434_909363_coke_can/coke_can_1/mask_overlay.png",
-        "mask_raw": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123434_909363_coke_can/coke_can_1/mask_raw.png",
-        "rgb": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123434_909363_coke_can/coke_can_1/rgb.png",
-        "rgb_masked": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123434_909363_coke_can/coke_can_1/rgb_masked.png"
-      },
-      "depth_median": 1.357436180114746,
-      "detected": true,
-      "error": null,
-      "foreground_points": 414,
-      "graspable": true,
-      "instance_index": 1,
-      "location": "table",
-      "mask_pixels": 589,
-      "near": [],
-      "pose_known": true,
-      "safe": true,
-      "target": false,
-      "visible": true
-    },
-<<<<<<< HEAD
-    "hammer_0": {
-      "bbox_xyxy": [
-        191,
-        178,
-        305,
-        226
-      ],
-      "blocked_by": [
-        "meat_can_0",
-        "strawberry_0"
-      ],
-      "blocks": [],
-      "centroid_xyz": [
-        0.2758304476737976,
-        0.2624516487121582,
-        1.4590339660644531
-      ],
-      "class_name": "hammer",
-      "clear": false,
-      "confidence": 0.944476842880249,
-      "debug_files": {
-        "annotated": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123436_687020_hammer/hammer_0/annotated.png",
-        "depth_png": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123436_687020_hammer/hammer_0/depth.png",
-        "depth_visualization": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123436_687020_hammer/hammer_0/depth_vis.png",
-        "mask": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123436_687020_hammer/hammer_0/mask.png",
-        "mask_full": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123436_687020_hammer/hammer_0/mask_full.png",
-        "mask_overlay": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123436_687020_hammer/hammer_0/mask_overlay.png",
-        "mask_raw": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123436_687020_hammer/hammer_0/mask_raw.png",
-        "rgb": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123436_687020_hammer/hammer_0/rgb.png",
-        "rgb_masked": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123436_687020_hammer/hammer_0/rgb_masked.png"
-      },
-      "depth_median": 1.4590339660644531,
-      "detected": true,
-      "error": null,
-      "foreground_points": 1584,
-      "graspable": true,
-      "instance_index": 0,
-      "location": "table",
-      "mask_pixels": 1584,
-=======
-    "hammer": {
+    "coke_can": {
       "bbox_xyxy": null,
       "blocked_by": [],
       "blocks": [],
       "centroid_xyz": null,
-      "class_name": "hammer",
+      "class_name": "coke_can",
       "clear": false,
       "confidence": 0.0,
       "debug_files": {},
       "depth_median": null,
       "detected": false,
-      "error": "No YOLO segmentation matched target='hammer'. seen=['meat_can', 'coke_can', 'strawberry']. debug_image=/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/_debug_failures/20260602_171049_004026_hammer_detections.png",
+      "error": "No YOLO segmentation matched target='coke_can'. seen=['hammer', 'meat_can', 'banana', 'strawberry', 'strawberry']. debug_image=/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/_debug_failures/20260603_180359_012731_coke_can_detections.png",
       "foreground_points": 0,
       "graspable": false,
       "instance_index": null,
       "location": "table",
       "mask_pixels": 0,
->>>>>>> feature/grasping2
       "near": [],
       "pose_known": false,
       "safe": true,
-      "target": true,
+      "target": false,
       "visible": false
     },
-    "meat_can_0": {
+    "hammer_0": {
       "bbox_xyxy": [
-<<<<<<< HEAD
-        262,
-        160,
-        304,
-        196
-      ],
-      "blocked_by": [],
-      "blocks": [
-        "hammer_0",
-        "strawberry_0"
-      ],
-      "centroid_xyz": [
-        0.374209463596344,
-        0.17559696733951569,
-        1.3916422128677368
-      ],
-      "class_name": "meat_can",
-      "clear": true,
-      "confidence": 0.9521240592002869,
-      "debug_files": {
-        "annotated": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123438_430990_meat_can/meat_can_0/annotated.png",
-        "depth_png": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123438_430990_meat_can/meat_can_0/depth.png",
-        "depth_visualization": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123438_430990_meat_can/meat_can_0/depth_vis.png",
-        "mask": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123438_430990_meat_can/meat_can_0/mask.png",
-        "mask_full": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123438_430990_meat_can/meat_can_0/mask_full.png",
-        "mask_overlay": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123438_430990_meat_can/meat_can_0/mask_overlay.png",
-        "mask_raw": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123438_430990_meat_can/meat_can_0/mask_raw.png",
-        "rgb": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123438_430990_meat_can/meat_can_0/rgb.png",
-        "rgb_masked": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123438_430990_meat_can/meat_can_0/rgb_masked.png"
-      },
-      "depth_median": 1.3916422128677368,
-      "detected": true,
-      "error": null,
-      "foreground_points": 673,
-      "graspable": true,
-      "instance_index": 0,
-      "location": "table",
-      "mask_pixels": 838,
-=======
-        52,
-        182,
-        86,
-        222
+        219,
+        144,
+        319,
+        189
       ],
       "blocked_by": [],
       "blocks": [],
       "centroid_xyz": [
-        -0.27777621150016785,
-        0.25041714310646057,
-        1.4020886421203613
+        0.34341809153556824,
+        0.12303385138511658,
+        1.4372659921646118
       ],
-      "class_name": "meat_can",
+      "class_name": "hammer",
       "clear": true,
-      "confidence": 0.94419264793396,
+      "confidence": 0.9394360780715942,
       "debug_files": {
-        "annotated": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171049_083314_meat_can/meat_can_0/annotated.png",
-        "depth_png": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171049_083314_meat_can/meat_can_0/depth.png",
-        "depth_visualization": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171049_083314_meat_can/meat_can_0/depth_vis.png",
-        "mask": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171049_083314_meat_can/meat_can_0/mask.png",
-        "mask_full": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171049_083314_meat_can/meat_can_0/mask_full.png",
-        "mask_overlay": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171049_083314_meat_can/meat_can_0/mask_overlay.png",
-        "mask_raw": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171049_083314_meat_can/meat_can_0/mask_raw.png",
-        "rgb": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171049_083314_meat_can/meat_can_0/rgb.png",
-        "rgb_masked": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171049_083314_meat_can/meat_can_0/rgb_masked.png"
+        "annotated": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_055487_hammer/hammer_0/annotated.png",
+        "depth_png": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_055487_hammer/hammer_0/depth.png",
+        "depth_visualization": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_055487_hammer/hammer_0/depth_vis.png",
+        "mask": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_055487_hammer/hammer_0/mask.png",
+        "mask_full": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_055487_hammer/hammer_0/mask_full.png",
+        "mask_overlay": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_055487_hammer/hammer_0/mask_overlay.png",
+        "mask_raw": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_055487_hammer/hammer_0/mask_raw.png",
+        "rgb": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_055487_hammer/hammer_0/rgb.png",
+        "rgb_masked": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_055487_hammer/hammer_0/rgb_masked.png"
       },
-      "depth_median": 1.4020886421203613,
+      "depth_median": 1.4372659921646118,
       "detected": true,
       "error": null,
-      "foreground_points": 625,
+      "foreground_points": 1305,
       "graspable": true,
       "instance_index": 0,
       "location": "table",
-      "mask_pixels": 754,
->>>>>>> feature/grasping2
+      "mask_pixels": 1444,
       "near": [],
       "pose_known": true,
       "safe": true,
       "target": false,
       "visible": true
     },
-    "meat_can_1": {
+    "meat_can_0": {
       "bbox_xyxy": [
-        177,
-        140,
-        199,
-        180
+        144,
+        154,
+        178,
+        190
       ],
       "blocked_by": [],
-      "blocks": [],
+      "blocks": [
+        "strawberry_0"
+      ],
       "centroid_xyz": [
-        0.08645569533109665,
-        0.12284974753856659,
-        1.400961995124817
+        -0.0015370355686172843,
+        0.1615496277809143,
+        1.4243996143341064
       ],
       "class_name": "meat_can",
       "clear": true,
-      "confidence": 0.9386570453643799,
+      "confidence": 0.9423108696937561,
       "debug_files": {
-        "annotated": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123438_430990_meat_can/meat_can_1/annotated.png",
-        "depth_png": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123438_430990_meat_can/meat_can_1/depth.png",
-        "depth_visualization": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123438_430990_meat_can/meat_can_1/depth_vis.png",
-        "mask": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123438_430990_meat_can/meat_can_1/mask.png",
-        "mask_full": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123438_430990_meat_can/meat_can_1/mask_full.png",
-        "mask_overlay": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123438_430990_meat_can/meat_can_1/mask_overlay.png",
-        "mask_raw": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123438_430990_meat_can/meat_can_1/mask_raw.png",
-        "rgb": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123438_430990_meat_can/meat_can_1/rgb.png",
-        "rgb_masked": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123438_430990_meat_can/meat_can_1/rgb_masked.png"
+        "annotated": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_224167_meat_can/meat_can_0/annotated.png",
+        "depth_png": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_224167_meat_can/meat_can_0/depth.png",
+        "depth_visualization": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_224167_meat_can/meat_can_0/depth_vis.png",
+        "mask": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_224167_meat_can/meat_can_0/mask.png",
+        "mask_full": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_224167_meat_can/meat_can_0/mask_full.png",
+        "mask_overlay": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_224167_meat_can/meat_can_0/mask_overlay.png",
+        "mask_raw": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_224167_meat_can/meat_can_0/mask_raw.png",
+        "rgb": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_224167_meat_can/meat_can_0/rgb.png",
+        "rgb_masked": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_224167_meat_can/meat_can_0/rgb_masked.png"
       },
-      "depth_median": 1.400961995124817,
+      "depth_median": 1.4243996143341064,
       "detected": true,
       "error": null,
-      "foreground_points": 605,
+      "foreground_points": 844,
       "graspable": true,
-      "instance_index": 1,
+      "instance_index": 0,
       "location": "table",
-      "mask_pixels": 741,
+      "mask_pixels": 951,
       "near": [],
       "pose_known": true,
       "safe": true,
-      "target": false,
+      "target": true,
       "visible": true
     },
     "strawberry_0": {
       "bbox_xyxy": [
-<<<<<<< HEAD
-        257,
-        179,
-        271,
-        197
+        131,
+        175,
+        147,
+        191
       ],
       "blocked_by": [
         "meat_can_0"
       ],
-      "blocks": [
-        "hammer_0"
-      ],
+      "blocks": [],
       "centroid_xyz": [
-        0.3259158432483673,
-        0.2182604968547821,
-        1.445390224456787
+        -0.06678291410207748,
+        0.19522859156131744,
+        1.4402129650115967
       ],
       "class_name": "strawberry",
       "clear": false,
-      "confidence": 0.8984990119934082,
+      "confidence": 0.9052528738975525,
       "debug_files": {
-        "annotated": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123440_142548_strawberry/strawberry_0/annotated.png",
-        "depth_png": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123440_142548_strawberry/strawberry_0/depth.png",
-        "depth_visualization": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123440_142548_strawberry/strawberry_0/depth_vis.png",
-        "mask": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123440_142548_strawberry/strawberry_0/mask.png",
-        "mask_full": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123440_142548_strawberry/strawberry_0/mask_full.png",
-        "mask_overlay": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123440_142548_strawberry/strawberry_0/mask_overlay.png",
-        "mask_raw": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123440_142548_strawberry/strawberry_0/mask_raw.png",
-        "rgb": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123440_142548_strawberry/strawberry_0/rgb.png",
-        "rgb_masked": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123440_142548_strawberry/strawberry_0/rgb_masked.png"
+        "annotated": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_372003_strawberry/strawberry_0/annotated.png",
+        "depth_png": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_372003_strawberry/strawberry_0/depth.png",
+        "depth_visualization": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_372003_strawberry/strawberry_0/depth_vis.png",
+        "mask": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_372003_strawberry/strawberry_0/mask.png",
+        "mask_full": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_372003_strawberry/strawberry_0/mask_full.png",
+        "mask_overlay": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_372003_strawberry/strawberry_0/mask_overlay.png",
+        "mask_raw": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_372003_strawberry/strawberry_0/mask_raw.png",
+        "rgb": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_372003_strawberry/strawberry_0/rgb.png",
+        "rgb_masked": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_372003_strawberry/strawberry_0/rgb_masked.png"
       },
-      "depth_median": 1.445390224456787,
+      "depth_median": 1.4402129650115967,
       "detected": true,
       "error": null,
-      "foreground_points": 128,
+      "foreground_points": 162,
       "graspable": true,
       "instance_index": 0,
       "location": "table",
-      "mask_pixels": 196,
-=======
-        99,
-        141,
-        115,
-        156
-      ],
-      "blocked_by": [],
-      "blocks": [
-        "coke_can_0"
-      ],
-      "centroid_xyz": [
-        -0.1541457623243332,
-        0.08183459937572479,
-        1.3267621994018555
-      ],
-      "class_name": "strawberry",
-      "clear": true,
-      "confidence": 0.9217712879180908,
-      "debug_files": {
-        "annotated": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171049_201078_strawberry/strawberry_0/annotated.png",
-        "depth_png": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171049_201078_strawberry/strawberry_0/depth.png",
-        "depth_visualization": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171049_201078_strawberry/strawberry_0/depth_vis.png",
-        "mask": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171049_201078_strawberry/strawberry_0/mask.png",
-        "mask_full": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171049_201078_strawberry/strawberry_0/mask_full.png",
-        "mask_overlay": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171049_201078_strawberry/strawberry_0/mask_overlay.png",
-        "mask_raw": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171049_201078_strawberry/strawberry_0/mask_raw.png",
-        "rgb": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171049_201078_strawberry/strawberry_0/rgb.png",
-        "rgb_masked": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171049_201078_strawberry/strawberry_0/rgb_masked.png"
-      },
-      "depth_median": 1.3267621994018555,
-      "detected": true,
-      "error": null,
-      "foreground_points": 190,
-      "graspable": true,
-      "instance_index": 0,
-      "location": "table",
-      "mask_pixels": 218,
->>>>>>> feature/grasping2
+      "mask_pixels": 223,
       "near": [],
       "pose_known": true,
       "safe": true,
@@ -1290,42 +573,40 @@
     },
     "strawberry_1": {
       "bbox_xyxy": [
-        243,
-        145,
-        257,
-        161
+        215,
+        123,
+        233,
+        139
       ],
-      "blocked_by": [
-        "coke_can_1"
-      ],
+      "blocked_by": [],
       "blocks": [],
       "centroid_xyz": [
-        0.2844194769859314,
-        0.1041070967912674,
-        1.4388759136199951
+        0.1973099708557129,
+        0.032579679042100906,
+        1.4415836334228516
       ],
       "class_name": "strawberry",
-      "clear": false,
-      "confidence": 0.4049614369869232,
+      "clear": true,
+      "confidence": 0.9011859893798828,
       "debug_files": {
-        "annotated": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123440_142548_strawberry/strawberry_1/annotated.png",
-        "depth_png": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123440_142548_strawberry/strawberry_1/depth.png",
-        "depth_visualization": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123440_142548_strawberry/strawberry_1/depth_vis.png",
-        "mask": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123440_142548_strawberry/strawberry_1/mask.png",
-        "mask_full": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123440_142548_strawberry/strawberry_1/mask_full.png",
-        "mask_overlay": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123440_142548_strawberry/strawberry_1/mask_overlay.png",
-        "mask_raw": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123440_142548_strawberry/strawberry_1/mask_raw.png",
-        "rgb": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123440_142548_strawberry/strawberry_1/rgb.png",
-        "rgb_masked": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_123440_142548_strawberry/strawberry_1/rgb_masked.png"
+        "annotated": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_372003_strawberry/strawberry_1/annotated.png",
+        "depth_png": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_372003_strawberry/strawberry_1/depth.png",
+        "depth_visualization": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_372003_strawberry/strawberry_1/depth_vis.png",
+        "mask": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_372003_strawberry/strawberry_1/mask.png",
+        "mask_full": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_372003_strawberry/strawberry_1/mask_full.png",
+        "mask_overlay": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_372003_strawberry/strawberry_1/mask_overlay.png",
+        "mask_raw": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_372003_strawberry/strawberry_1/mask_raw.png",
+        "rgb": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_372003_strawberry/strawberry_1/rgb.png",
+        "rgb_masked": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260603_180359_372003_strawberry/strawberry_1/rgb_masked.png"
       },
-      "depth_median": 1.4388759136199951,
+      "depth_median": 1.4415836334228516,
       "detected": true,
       "error": null,
-      "foreground_points": 104,
+      "foreground_points": 170,
       "graspable": true,
       "instance_index": 1,
       "location": "table",
-      "mask_pixels": 155,
+      "mask_pixels": 208,
       "near": [],
       "pose_known": true,
       "safe": true,
@@ -1336,91 +617,41 @@
   "occupied_buffers": [],
   "predicates": [
     "at banana_0 table",
-    "at coke_can_0 table",
-<<<<<<< HEAD
-    "at coke_can_1 table",
+    "at coke_can table",
     "at hammer_0 table",
-=======
-    "at hammer table",
->>>>>>> feature/grasping2
     "at meat_can_0 table",
-    "at meat_can_1 table",
     "at strawberry_0 table",
-<<<<<<< HEAD
     "at strawberry_1 table",
-    "blocks coke_can_1 strawberry_1",
-    "blocks meat_can_0 hammer_0",
     "blocks meat_can_0 strawberry_0",
-    "blocks strawberry_0 hammer_0",
     "buffer dynamic_buffer",
     "buffer-free dynamic_buffer",
-=======
-    "blocks strawberry_0 coke_can_0",
-    "buffer buffer1",
-    "buffer buffer2",
-    "buffer-free buffer1",
-    "buffer-free buffer2",
->>>>>>> feature/grasping2
     "clear banana_0",
-    "clear coke_can_0",
-    "clear coke_can_1",
+    "clear hammer_0",
     "clear meat_can_0",
-<<<<<<< HEAD
-    "clear meat_can_1",
-    "goal-at hammer_0 left_storage",
+    "clear strawberry_1",
+    "goal-at meat_can_0 right_storage",
     "graspable banana_0",
-    "graspable coke_can_0",
-    "graspable coke_can_1",
     "graspable hammer_0",
-=======
-    "clear strawberry_0",
-    "goal-at banana_0 left_storage",
-    "goal-at coke_can_0 right_storage",
-    "goal-at hammer right_storage",
-    "goal-at meat_can_0 left_storage",
-    "goal-at strawberry_0 left_storage",
-    "graspable banana_0",
-    "graspable coke_can_0",
->>>>>>> feature/grasping2
     "graspable meat_can_0",
-    "graspable meat_can_1",
     "graspable strawberry_0",
     "graspable strawberry_1",
     "handempty",
     "obstacle banana_0",
-    "obstacle coke_can_0",
-    "obstacle coke_can_1",
-    "obstacle meat_can_0",
-    "obstacle meat_can_1",
+    "obstacle coke_can",
+    "obstacle hammer_0",
     "obstacle strawberry_0",
     "obstacle strawberry_1",
     "safe banana_0",
-    "safe coke_can_0",
-<<<<<<< HEAD
-    "safe coke_can_1",
+    "safe coke_can",
     "safe hammer_0",
-=======
-    "safe hammer",
->>>>>>> feature/grasping2
     "safe meat_can_0",
-    "safe meat_can_1",
     "safe strawberry_0",
     "safe strawberry_1",
     "storage bookshelf",
     "storage left_storage",
     "storage right_storage",
-<<<<<<< HEAD
-    "target hammer_0"
+    "target meat_can_0"
   ],
-  "stamp_sec": 1780457687.133756,
-=======
-    "target banana_0",
-    "target coke_can_0",
-    "target hammer",
-    "target meat_can_0",
-    "target strawberry_0"
-  ],
-  "stamp_sec": 1780387849.2812014,
->>>>>>> feature/grasping2
+  "stamp_sec": 1780477439.5334866,
   "step": 1
 }

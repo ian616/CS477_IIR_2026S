@@ -183,8 +183,8 @@ def grasping_item(node, arm, grasp_pose, obj_name, perception_info=None,
         # Log
         node.get_logger().info(
             f"\n<Grasping> Loaded grasp transform for '{matched_name}' "
-            f"state='{item_state}' using measured_area_m2={measured_area} "
-            f"source={measured_area_source}, area_by_state={bbox_area_by_state}: "
+            f"state='{item_state}' using measured_area_m2={pca_bbox_area} "
+            f"source=pca_bbox_area_m2, area_by_state={bbox_area_by_state}: "
             f"x={grasp_transform['x']:.4f}, y={grasp_transform['y']:.4f}, "
             f"z={grasp_transform['z']:.4f}, "
             f"roll={grasp_transform['roll']:.4f}, "

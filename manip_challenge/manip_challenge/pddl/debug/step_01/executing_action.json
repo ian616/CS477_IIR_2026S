@@ -1,28 +1,15 @@
 {
   "action": {
     "args": [
-<<<<<<< HEAD
       "meat_can_0",
-=======
-      "strawberry_0",
->>>>>>> feature/grasping2
       "table",
-      "dynamic_buffer"
+      "right_storage"
     ],
-<<<<<<< HEAD
-    "name": "move-obstacle-to-buffer",
-    "pddl": "(move-obstacle-to-buffer meat_can_0 table dynamic_buffer)",
+    "name": "move-target-to-goal",
+    "pddl": "(move-target-to-goal meat_can_0 table right_storage)",
     "source": "external"
   },
   "event": "executing_action",
-  "stamp_sec": 1780457687.7875185,
-=======
-    "name": "move-target-to-goal",
-    "pddl": "(move-target-to-goal strawberry_0 table left_storage)",
-    "source": "fallback"
-  },
-  "event": "executing_action",
-  "stamp_sec": 1780387849.5077634,
->>>>>>> feature/grasping2
+  "stamp_sec": 1780477439.740716,
   "step": 1
 }
