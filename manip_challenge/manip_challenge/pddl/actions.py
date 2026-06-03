@@ -212,9 +212,9 @@ def _mirrored_buffer_xy(
     object_xy = _object_base_xy(server, state, moving_object_name, grasp_pose)
     if object_xy is None:
         return None, None
-    center_x, center_y = DYNAMIC_BUFFER_WORKSPACE_CENTER
+    _, center_y = DYNAMIC_BUFFER_WORKSPACE_CENTER
     mirrored = [
-        _clamp(2.0 * center_x - object_xy[0], x_range[0], x_range[1]),
+        _clamp(object_xy[0], x_range[0], x_range[1]),
         _clamp(2.0 * center_y - object_xy[1], y_range[0], y_range[1]),
     ]
     return mirrored, object_xy
@@ -264,13 +264,13 @@ def find_empty_workspace_buffer(server, state, moving_object_name: str, grasp_po
         )
         if clearance >= 0.0:
             server.get_logger().info(
-                "[DynamicBuffer] selected mirrored workspace buffer "
+                "[DynamicBuffer] selected y-mirrored workspace buffer "
                 f"{mirrored_xy} from object_xy={object_xy} clearance={clearance:.3f}m"
             )
             return {
                 "name": DYNAMIC_BUFFER_LOCATION,
                 "moving_object": moving_object_name,
-                "policy": "workspace_center_mirror",
+                "policy": "workspace_y_mirror",
                 "object_xy": [float(object_xy[0]), float(object_xy[1])] if object_xy is not None else None,
                 "mirror_xy": [float(mirrored_xy[0]), float(mirrored_xy[1])],
                 "workspace_center": [float(DYNAMIC_BUFFER_WORKSPACE_CENTER[0]), float(DYNAMIC_BUFFER_WORKSPACE_CENTER[1])],
@@ -322,7 +322,7 @@ def find_empty_workspace_buffer(server, state, moving_object_name: str, grasp_po
     return {
         "name": DYNAMIC_BUFFER_LOCATION,
         "moving_object": moving_object_name,
-        "policy": "workspace_center_mirror_adjusted" if mirrored_xy is not None else "max_clearance",
+        "policy": "workspace_y_mirror_adjusted" if mirrored_xy is not None else "max_clearance",
         "object_xy": [float(object_xy[0]), float(object_xy[1])] if object_xy is not None else None,
         "mirror_xy": [float(mirrored_xy[0]), float(mirrored_xy[1])] if mirrored_xy is not None else None,
         "workspace_center": [float(DYNAMIC_BUFFER_WORKSPACE_CENTER[0]), float(DYNAMIC_BUFFER_WORKSPACE_CENTER[1])],

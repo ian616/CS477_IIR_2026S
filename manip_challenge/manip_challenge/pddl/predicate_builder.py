@@ -31,6 +31,7 @@ BBOX_OVERLAP_THRESHOLD = 0.08
 DEPTH_ORDER_EPS_M = 0.008
 SAFE_DISTANCE_M = 0.11
 SAFE_PIXEL_DISTANCE = 10.0
+ACTIVE_SCENE_REGIONS = {"active_table", "active_workspace"}
 # Predicate tuning guide:
 # This file is the main swap point for symbolic state judgement.  Geometry,
 # masks, depth, and safety distances should be converted to boolean PDDL facts
@@ -431,8 +432,13 @@ def _annotate_relations(objects: dict[str, ObjectState]) -> None:
         obj.near.clear()
         obj.safe = True
         obj.clear = obj.graspable
+        obj.relation_candidate = (
+            obj.visible
+            and obj.location == "table"
+            and obj.scene_region in ACTIVE_SCENE_REGIONS
+        )
 
-    values = [obj for obj in objects.values() if obj.visible]
+    values = [obj for obj in objects.values() if obj.relation_candidate]
     for i, a in enumerate(values):
         for b in values[i + 1:]:
             overlap = _bbox_overlap(a.bbox_xyxy, b.bbox_xyxy)
@@ -510,6 +516,8 @@ def _build_predicates(state: PredicateState) -> set[str]:
     # - The strings are written into problem.pddl by problem_generator.py.
     predicates = {"handempty"}
     for obj in state.objects.values():
+        if obj.location != "table" or obj.scene_region not in ACTIVE_SCENE_REGIONS:
+            continue
         predicates.add(("target" if obj.is_target else "obstacle") + f" {obj.name}")
         predicates.add(f"at {obj.name} {obj.location}")
         if obj.clear:
@@ -590,6 +598,8 @@ def _bind_goals_to_instances(goals: list[Goal], objects: dict[str, ObjectState],
             and obj.class_name == goal.object_name
             and obj.name not in reserved
             and obj.detected
+            and obj.location == "table"
+            and obj.scene_region in ACTIVE_SCENE_REGIONS
         ]
         if not candidates:
             bound_goals.append(replace(goal, bound_object_name=None))
@@ -619,8 +629,6 @@ def build_predicate_state(
     scan_names = set(KNOWN_OBJECTS if scan_all_targets else goal_names)
     scan_names.update(goal_names)
     for name in sorted(scan_names):
-        if name in completed:
-            continue
         try:
             detection = detect_fn(name)
             facts = _objects_from_detection(name, detection, is_target=name in goal_names)
@@ -635,6 +643,7 @@ def build_predicate_state(
     _annotate_relations(objects)
     bound_goals = _bind_goals_to_instances(goals, objects, completed)
     state = PredicateState(goals=bound_goals, objects=objects, completed=completed, occupied_buffers=occupied_buffers)
+    state.relation_input_objects = sorted(obj.name for obj in objects.values() if obj.relation_candidate)
     state.predicates = _build_predicates(state)
     for obj in objects.values():
         if obj.error:
