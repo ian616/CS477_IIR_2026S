@@ -65,6 +65,7 @@ from manip_challenge.pddl.predicate_builder import (
     _bind_goals_to_instances,
     _build_predicates,
     build_predicate_state,
+    build_predicate_state_from_scene,
 )
 from manip_challenge.pddl.problem_generator import ensure_domain, write_problem
 from manip_challenge.pddl.ros_helpers import (
@@ -817,12 +818,12 @@ class PddlTampServer(Node):
 
     def _warm_scene_worker(self) -> None:
         try:
-            state = build_predicate_state(
+            scene_detection = self.detect_scene()
+            state = build_predicate_state_from_scene(
                 [],
-                self.detect_object_with_grasp,
+                scene_detection,
                 completed=set(),
                 occupied_buffers=set(),
-                scan_all_targets=True,
                 debug=self.args.debug,
             )
         except Exception as exc:
@@ -1031,12 +1032,12 @@ class PddlTampServer(Node):
         use_wrist: bool,
     ) -> None:
         try:
-            state = build_predicate_state(
+            scene_detection = self.detect_scene_wrist() if use_wrist else self.detect_scene()
+            state = build_predicate_state_from_scene(
                 goals,
-                self.detect_object_with_grasp_wrist if use_wrist else self.detect_object_with_grasp,
+                scene_detection,
                 completed=set(),
                 occupied_buffers=set(),
-                scan_all_targets=scan_all_targets,
                 debug=self.args.debug,
             )
             self.reconcile_state_with_ledger(state, goals, action_ledger)
@@ -1060,13 +1061,16 @@ class PddlTampServer(Node):
         scan_all_targets: bool,
     ) -> PredicateState | None:
         key = self.prefetch_key(goals, action_ledger, scan_all_targets)
-        deadline = time.monotonic() + float(self.args.prefetch_wait_timeout)
+        warn_after = time.monotonic() + max(0.0, float(self.args.prefetch_wait_timeout))
+        warned = False
         with self.prefetch_condition:
             while key in self.prefetch_pending:
-                remaining = deadline - time.monotonic()
-                if remaining <= 0.0:
-                    break
-                self.prefetch_condition.wait(timeout=min(0.1, remaining))
+                self.prefetch_condition.wait(timeout=0.1)
+                if not warned and time.monotonic() >= warn_after:
+                    warned = True
+                    self.get_logger().info(
+                        "[Prefetch] Scene scan is still running; waiting instead of starting a duplicate scan."
+                    )
             return self.prefetch_states.pop(key, None)
 
     def publish_json(self, publisher, payload: dict) -> None:
@@ -1195,12 +1199,12 @@ class PddlTampServer(Node):
                     scan_all_targets,
                 )
                 if state is None:
-                    state = build_predicate_state(
+                    scene_detection = self.detect_scene()
+                    state = build_predicate_state_from_scene(
                         goals,
-                        self.detect_object_with_grasp,
+                        scene_detection,
                         completed=set(),
                         occupied_buffers=set(),
-                        scan_all_targets=scan_all_targets,
                         debug=self.args.debug,
                     )
                     self.reconcile_state_with_ledger(state, goals, action_ledger)
@@ -2396,7 +2400,14 @@ class PddlTampServer(Node):
 
     def detect_object_from_client(self, obj_name: str, client, service_name: str) -> dict:
         req = StringString.Request()
-        req.data = obj_name
+        req.data = json.dumps(
+            {
+                "mode": "object",
+                "target": obj_name,
+                "debug": bool(self.args.debug),
+            },
+            sort_keys=True,
+        )
         future = client.call_async(req)
         deadline = time.monotonic() + self.args.perception_timeout
         while rclpy.ok() and not future.done():
@@ -2413,6 +2424,33 @@ class PddlTampServer(Node):
 
     def detect_object_wrist(self, obj_name: str) -> dict:
         return self.detect_object_from_client(obj_name, self.wrist_perception_client, self.args.wrist_perception_service)
+
+    def detect_scene_from_client(self, client, service_name: str) -> dict:
+        req = StringString.Request()
+        req.data = json.dumps(
+            {
+                "mode": "scene",
+                "target": "__scene__",
+                "debug": bool(self.args.debug),
+            },
+            sort_keys=True,
+        )
+        future = client.call_async(req)
+        deadline = time.monotonic() + self.args.perception_timeout
+        while rclpy.ok() and not future.done():
+            if time.monotonic() > deadline:
+                raise TimeoutError(f"Timed out waiting for scene perception result from '{service_name}'.")
+            time.sleep(0.02)
+        result = future.result()
+        if result is None:
+            raise RuntimeError(f"Perception service '{service_name}' returned no scene result.")
+        return json.loads(result.data)
+
+    def detect_scene(self) -> dict:
+        return self.detect_scene_from_client(self.perception_client, self.args.perception_service)
+
+    def detect_scene_wrist(self) -> dict:
+        return self.detect_scene_from_client(self.wrist_perception_client, self.args.wrist_perception_service)
 
     def detect_object_with_grasp(self, obj_name: str) -> dict:
         detection = self.detect_object(obj_name)
@@ -3018,6 +3056,7 @@ def main(argv=None):
     if top_view_module is not None:
         top_defaults = dict(top_view_module.DEFAULTS)
         top_defaults["service_name"] = args.perception_service
+        top_defaults["display"] = bool(args.debug)
         perception_node = top_view_module.RgbdSegCropServiceNode(
             node_name="pddl_top_view_seg_crop_service_node",
             default_params=top_defaults,
@@ -3025,6 +3064,7 @@ def main(argv=None):
         perception_node.get_logger().info("Embedded top-view perception is running inside PDDL TAMP server.")
         wrist_defaults = dict(WRIST_VIEW_DEFAULTS)
         wrist_defaults["service_name"] = args.wrist_perception_service
+        wrist_defaults["display"] = bool(args.debug)
         wrist_perception_node = RgbdSegCropServiceNode(
             node_name="pddl_wrist_seg_crop_service_node",
             default_params=wrist_defaults,

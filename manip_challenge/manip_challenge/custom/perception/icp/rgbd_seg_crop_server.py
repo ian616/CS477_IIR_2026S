@@ -49,6 +49,7 @@ DEFAULT_MODEL_PATH = CUSTOM_DIR / "best.pt"
 DEFAULT_SAVE_DIR = Path(
     "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/icp/results"
 )
+SCENE_REQUEST_TARGETS = {"__scene__", "scene", "all", "*"}
 
 
 @dataclass
@@ -735,10 +736,32 @@ class RgbdSegCropServiceNode(Node):
             msg.header.frame_id = self.camera_frame
             self.roi_mask_pub.publish(msg)
 
-    def detect_callback(self, request, response):
-        target_label = parse_target_label(request.data) or self.target_label
+    @staticmethod
+    def request_options(request_text):
+        text = str(request_text or "").strip()
+        if not text.startswith("{"):
+            return {"target": text, "debug": True, "mode": "object"}
         try:
-            info = self.detect_and_save(target_label, request.data)
+            payload = json.loads(text)
+        except json.JSONDecodeError:
+            return {"target": text, "debug": True, "mode": "object"}
+        target = payload.get("target") or payload.get("label") or payload.get("object") or ""
+        mode = payload.get("mode") or ("scene" if str(target).strip().lower() in SCENE_REQUEST_TARGETS else "object")
+        return {
+            "target": str(target),
+            "debug": bool(payload.get("debug", True)),
+            "mode": str(mode).strip().lower(),
+        }
+
+    def detect_callback(self, request, response):
+        options = self.request_options(request.data)
+        raw_target = str(options.get("target") or "")
+        target_label = parse_target_label(raw_target) or self.target_label
+        try:
+            if options.get("mode") == "scene" or raw_target.strip().lower() in SCENE_REQUEST_TARGETS:
+                info = self.detect_scene(request.data, debug=bool(options.get("debug", True)))
+            else:
+                info = self.detect_and_save(target_label, request.data, debug=bool(options.get("debug", True)))
         except Exception as exc:
             info = {"ok": False, "error": str(exc), "target": target_label, "known_labels": known_labels()}
             self.get_logger().warn(str(exc))
@@ -773,7 +796,7 @@ class RgbdSegCropServiceNode(Node):
         if missing:
             raise RuntimeError(f"{', '.join(missing)} has not been received yet.")
 
-    def detect_and_save(self, target_label, request_text):
+    def detect_and_save(self, target_label, request_text, debug=True):
         self.wait_for_detection_inputs()
 
         target_model = get_model(target_label)
@@ -781,12 +804,14 @@ class RgbdSegCropServiceNode(Node):
             raise RuntimeError(f"Unknown target='{target_label}'. Choose one of: {known_labels()}")
 
         rgb_image, depth_image, cloud = self.get_detection_inputs()
+        started = time.monotonic()
         detections = self.detector.detect(rgb_image)
+        yolo_done = time.monotonic()
         matching_detections = self.detector.matches(detections, target_model.name)
         if not matching_detections:
             seen = [detection.label for detection in detections]
             self.annotated_img = draw_seg_debug(rgb_image, detections, selected=None)
-            debug_path = self.save_failure_debug_image(target_model.name)
+            debug_path = self.save_failure_debug_image(target_model.name) if debug else None
             raise RuntimeError(
                 f"No YOLO segmentation matched target='{target_model.name}'. "
                 f"seen={seen}. debug_image={debug_path}"
@@ -821,6 +846,7 @@ class RgbdSegCropServiceNode(Node):
                     roi,
                     request_text,
                     rgb_image,
+                    debug=debug,
                 )
                 instance = {
                     "ok": True,
@@ -852,28 +878,31 @@ class RgbdSegCropServiceNode(Node):
                     "error": str(exc),
                     "save_dir": str(candidate_dir),
                 })
+        roi_done = time.monotonic()
 
         valid_instances = [instance for instance in instances if instance.get("ok")]
         if not valid_instances:
             self.annotated_img = draw_seg_debug(rgb_image, detections, selected=None)
-            debug_path = self.save_failure_debug_image(target_model.name)
+            debug_path = self.save_failure_debug_image(target_model.name) if debug else None
             raise RuntimeError(
                 f"YOLO matched target='{target_model.name}', but no instance produced a usable RGB-D ROI. "
                 f"errors={[instance.get('error') for instance in instances]}. debug_image={debug_path}"
             )
 
-        pca_bboxes = compute_all_detection_pca_bboxes(
-            rgb_image=rgb_image,
-            depth_image=depth_image,
-            cloud=cloud,
-            detections=detections,
-            bbox_padding_ratio=self.bbox_padding_ratio,
-            max_depth_m=self.max_depth_m,
-            depth_filter=self.depth_filter,
-            depth_margin_m=self.depth_margin_m,
-            min_points=self.min_roi_points,
-            extract_roi=extract_seg_rgbd_roi,
-        )
+        pca_bboxes = []
+        if debug:
+            pca_bboxes = compute_all_detection_pca_bboxes(
+                rgb_image=rgb_image,
+                depth_image=depth_image,
+                cloud=cloud,
+                detections=detections,
+                bbox_padding_ratio=self.bbox_padding_ratio,
+                max_depth_m=self.max_depth_m,
+                depth_filter=self.depth_filter,
+                depth_margin_m=self.depth_margin_m,
+                min_points=self.min_roi_points,
+                extract_roi=extract_seg_rgbd_roi,
+            )
         position_points = [
             {
                 "label": item.get("label"),
@@ -911,7 +940,143 @@ class RgbdSegCropServiceNode(Node):
         self.get_logger().info(
             f"Saved {len(valid_instances)}/{len(instances)} seg RGB-D instance crops for {target_model.name}: "
             f"selected_bbox={selected_roi.bbox_xyxy}, points={len(selected_roi.foreground_points)}, "
-            f"centroid=({selected_roi.centroid[0]:.3f}, {selected_roi.centroid[1]:.3f}, {selected_roi.centroid[2]:.3f})"
+            f"centroid=({selected_roi.centroid[0]:.3f}, {selected_roi.centroid[1]:.3f}, {selected_roi.centroid[2]:.3f}), "
+            f"timing_ms=yolo:{(yolo_done - started) * 1000.0:.1f}, "
+            f"roi:{(roi_done - yolo_done) * 1000.0:.1f}, total:{(time.monotonic() - started) * 1000.0:.1f}"
+        )
+        return info
+
+    def detect_scene(self, request_text, debug=True):
+        self.wait_for_detection_inputs()
+        rgb_image, depth_image, cloud = self.get_detection_inputs()
+        started = time.monotonic()
+        detections = self.detector.detect(rgb_image)
+        yolo_done = time.monotonic()
+        request_dir = self.make_request_dir("scene")
+
+        label_counts: dict[str, int] = {}
+        instances = []
+        valid_instances = 0
+        selected_for_display = None
+        selected_roi = None
+        for detection in detections:
+            target_model = get_model(detection.label)
+            if target_model is None:
+                continue
+            class_name = target_model.name
+            index = label_counts.get(class_name, 0)
+            label_counts[class_name] = index + 1
+            instance_name = f"{class_name}_{index}"
+            candidate_dir = request_dir / instance_name
+            candidate_dir.mkdir(parents=True, exist_ok=False)
+            try:
+                roi = extract_seg_rgbd_roi(
+                    rgb_image=rgb_image,
+                    depth_image=depth_image,
+                    cloud=cloud,
+                    detection=detection,
+                    bbox_padding_ratio=self.bbox_padding_ratio,
+                    max_depth_m=self.max_depth_m,
+                    depth_filter=self.depth_filter,
+                    depth_margin_m=self.depth_margin_m,
+                    min_points=self.min_roi_points,
+                )
+                files = self.save_rgbd_crop(
+                    candidate_dir,
+                    class_name,
+                    detection,
+                    detections,
+                    roi,
+                    request_text,
+                    rgb_image,
+                    debug=debug,
+                )
+                instance = {
+                    "ok": True,
+                    "target": class_name,
+                    "instance_name": instance_name,
+                    "instance_index": int(index),
+                    "detected_label": detection.label,
+                    "frame_id": self.camera_frame,
+                    "detection": detection.to_dict(),
+                    "roi": roi.to_dict(),
+                    "location_xyz_m": roi.centroid.astype(float).tolist(),
+                    "save_dir": str(candidate_dir),
+                    "files": files,
+                }
+                valid_instances += 1
+                if selected_for_display is None:
+                    selected_for_display = detection
+                    selected_roi = roi
+            except Exception as exc:
+                instance = {
+                    "ok": False,
+                    "target": class_name,
+                    "instance_name": instance_name,
+                    "instance_index": int(index),
+                    "detected_label": detection.label,
+                    "frame_id": self.camera_frame,
+                    "detection": detection.to_dict(),
+                    "error": str(exc),
+                    "save_dir": str(candidate_dir),
+                }
+            instances.append(instance)
+        roi_done = time.monotonic()
+
+        if selected_roi is not None:
+            self.publish_roi_cloud(selected_roi.foreground_points)
+            self.mask_img = selected_roi.mask_full
+        else:
+            self.mask_img = None
+        self.annotated_img = draw_seg_debug(rgb_image, detections, selected_for_display, selected_roi)
+
+        pca_bboxes = []
+        if debug:
+            pca_bboxes = compute_all_detection_pca_bboxes(
+                rgb_image=rgb_image,
+                depth_image=depth_image,
+                cloud=cloud,
+                detections=detections,
+                bbox_padding_ratio=self.bbox_padding_ratio,
+                max_depth_m=self.max_depth_m,
+                depth_filter=self.depth_filter,
+                depth_margin_m=self.depth_margin_m,
+                min_points=self.min_roi_points,
+                extract_roi=extract_seg_rgbd_roi,
+            )
+            (request_dir / "scene_metadata.json").write_text(
+                json.dumps(
+                    {
+                        "request": request_text,
+                        "frame_id": self.camera_frame,
+                        "all_detections": [detection.to_dict() for detection in detections],
+                        "instances": instances,
+                        "all_pca_bboxes": pca_bboxes,
+                    },
+                    indent=2,
+                    sort_keys=True,
+                ),
+                encoding="utf-8",
+            )
+            cv2.imwrite(str(request_dir / "scene_annotated.png"), self.annotated_img)
+
+        info = {
+            "ok": True,
+            "stage": "scene_scan",
+            "message": "YOLO scene scan completed.",
+            "request": request_text,
+            "target": "__scene__",
+            "frame_id": self.camera_frame,
+            "all_detections": [detection.to_dict() for detection in detections],
+            "all_pca_bboxes": pca_bboxes,
+            "input_crop_ratio": float(self.input_crop_ratio),
+            "instances": instances,
+            "save_dir": str(request_dir),
+        }
+        self.get_logger().info(
+            f"Scene scan: yolo_detections={len(detections)}, known_instances={valid_instances}, debug={debug}, "
+            f"timing_ms=yolo:{(yolo_done - started) * 1000.0:.1f}, "
+            f"roi:{(roi_done - yolo_done) * 1000.0:.1f}, total:{(time.monotonic() - started) * 1000.0:.1f}"
         )
         return info
 
@@ -953,6 +1118,7 @@ class RgbdSegCropServiceNode(Node):
         request_text,
         source_image=None,
         pca_bboxes=None,
+        debug=True,
     ):
         paths = {
             "rgb": request_dir / "rgb.png",
@@ -974,6 +1140,12 @@ class RgbdSegCropServiceNode(Node):
             "polygon_json": request_dir / "polygon.json",
             "metadata": request_dir / "metadata.json",
         }
+
+        if not debug:
+            np.save(paths["foreground_points_npy"], roi.foreground_points)
+            return {
+                "foreground_points_npy": str(paths["foreground_points_npy"]),
+            }
 
         cv2.imwrite(str(paths["rgb"]), roi.rgb_crop)
         cv2.imwrite(str(paths["rgb_masked"]), roi.rgb_masked_crop)

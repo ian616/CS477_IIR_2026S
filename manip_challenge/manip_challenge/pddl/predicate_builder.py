@@ -653,3 +653,65 @@ def build_predicate_state(
         if obj.error:
             state.notes.append(f"{obj.name}: {obj.error}")
     return state
+
+
+def build_predicate_state_from_scene(
+    goals: list[Goal],
+    scene_detection: dict | None,
+    completed: set[str] | None = None,
+    occupied_buffers: set[str] | None = None,
+    debug: bool = False,
+) -> PredicateState:
+    objects: dict[str, ObjectState] = {}
+    completed = set(completed or set())
+    occupied_buffers = set(occupied_buffers or set())
+    goal_names = {goal.object_name for goal in goals}
+
+    if scene_detection and scene_detection.get("ok"):
+        for index, instance in enumerate(scene_detection.get("instances") or []):
+            class_name = pddl_name(instance.get("target") or instance.get("detected_label") or "unknown")
+            instance_index = int(instance.get("instance_index", index))
+            instance_name = pddl_name(instance.get("instance_name") or f"{class_name}_{instance_index}")
+            objects[instance_name] = object_from_detection(
+                instance_name,
+                instance,
+                is_target=class_name in goal_names,
+                class_name=class_name,
+                instance_index=instance_index,
+            )
+        _merge_all_detections(objects, scene_detection)
+    else:
+        error = (scene_detection or {}).get("error") or "scene detection failed"
+        for name in sorted(goal_names):
+            objects[pddl_name(name)] = object_from_detection(
+                name,
+                None,
+                is_target=True,
+                class_name=name,
+                error=error,
+            )
+
+    for name in sorted(goal_names):
+        if not any(obj.class_name == name and obj.is_target for obj in objects.values()):
+            objects[pddl_name(name)] = object_from_detection(
+                name,
+                None,
+                is_target=True,
+                class_name=name,
+                error="target not detected in scene scan",
+            )
+
+    _annotate_relations(objects, debug=debug)
+    bound_goals = _bind_goals_to_instances(goals, objects, completed)
+    state = PredicateState(goals=bound_goals, objects=objects, completed=completed, occupied_buffers=occupied_buffers)
+    state.raw_observed_objects = {
+        "stage": (scene_detection or {}).get("stage"),
+        "detections": len((scene_detection or {}).get("all_detections") or []),
+        "instances": len((scene_detection or {}).get("instances") or []),
+    }
+    state.relation_input_objects = sorted(obj.name for obj in objects.values() if obj.relation_candidate)
+    state.predicates = _build_predicates(state)
+    for obj in objects.values():
+        if obj.error:
+            state.notes.append(f"{obj.name}: {obj.error}")
+    return state
