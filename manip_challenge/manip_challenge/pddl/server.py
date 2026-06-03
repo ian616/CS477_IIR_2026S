@@ -50,7 +50,14 @@ from std_msgs.msg import String
 from tf2_ros import Buffer, ConnectivityException, ExtrapolationException, LookupException, TransformListener
 
 from assignment_2.move_joint import ArmClient
-from manip_challenge.pddl.actions import ActionContext, execute_action
+from manip_challenge.pddl.actions import (
+    ActionContext,
+    DYNAMIC_BUFFER_DEFAULT_OBJECT_RADIUS_M,
+    DYNAMIC_BUFFER_MIN_CLEARANCE_M,
+    DYNAMIC_BUFFER_WORKSPACE_X,
+    DYNAMIC_BUFFER_WORKSPACE_Y,
+    execute_action,
+)
 from manip_challenge.pddl.nlp import parse_goals
 from manip_challenge.pddl.planner import plan
 from manip_challenge.pddl.predicate_builder import (
@@ -71,6 +78,7 @@ from manip_challenge.pddl.ros_helpers import (
     stop_child_processes,
 )
 from manip_challenge.pddl.pddl_types import (
+    ActionLedgerEntry,
     DYNAMIC_BUFFER_LOCATION,
     Goal,
     ObjectState,
@@ -174,6 +182,11 @@ def object_summary(obj) -> dict:
         "foreground_points": obj.foreground_points,
         "bbox_xyxy": obj.bbox_xyxy,
         "centroid_xyz": obj.centroid_xyz,
+        "grasp_xyz": obj.grasp_xyz,
+        "base_link_xy": obj.base_link_xy,
+        "scene_region": obj.scene_region,
+        "classification_reason": obj.classification_reason,
+        "relation_candidate": obj.relation_candidate,
         "depth_median": obj.depth_median,
         "blocks": sorted(obj.blocks),
         "blocked_by": sorted(obj.blocked_by),
@@ -217,6 +230,11 @@ def object_command_payload(obj) -> dict | None:
         "foreground_points": obj.foreground_points,
         "bbox_xyxy": list(obj.bbox_xyxy) if obj.bbox_xyxy is not None else None,
         "centroid_xyz": list(obj.centroid_xyz) if obj.centroid_xyz is not None else None,
+        "grasp_xyz": list(obj.grasp_xyz) if obj.grasp_xyz is not None else None,
+        "base_link_xy": list(obj.base_link_xy) if obj.base_link_xy is not None else None,
+        "scene_region": obj.scene_region,
+        "classification_reason": obj.classification_reason,
+        "relation_candidate": obj.relation_candidate,
         "depth_median": obj.depth_median,
         "blocks": sorted(obj.blocks),
         "blocked_by": sorted(obj.blocked_by),
@@ -230,6 +248,8 @@ def object_state_from_command(payload: dict | None, fallback_name: str) -> Objec
     payload = payload or {}
     bbox = payload.get("bbox_xyxy")
     centroid = payload.get("centroid_xyz")
+    grasp = payload.get("grasp_xyz")
+    base_xy = payload.get("base_link_xy")
     return ObjectState(
         name=str(payload.get("name") or fallback_name),
         class_name=str(payload.get("class_name") or fallback_name),
@@ -247,6 +267,11 @@ def object_state_from_command(payload: dict | None, fallback_name: str) -> Objec
         foreground_points=int(payload.get("foreground_points") or 0),
         bbox_xyxy=tuple(int(v) for v in bbox) if bbox and len(bbox) == 4 else None,
         centroid_xyz=tuple(float(v) for v in centroid) if centroid and len(centroid) >= 3 else None,
+        grasp_xyz=tuple(float(v) for v in grasp) if grasp and len(grasp) >= 3 else None,
+        base_link_xy=tuple(float(v) for v in base_xy) if base_xy and len(base_xy) >= 2 else None,
+        scene_region=str(payload.get("scene_region") or "active_table"),
+        classification_reason=payload.get("classification_reason"),
+        relation_candidate=bool(payload.get("relation_candidate", True)),
         depth_median=float(payload["depth_median"]) if payload.get("depth_median") is not None else None,
         blocks=set(payload.get("blocks") or []),
         blocked_by=set(payload.get("blocked_by") or []),
@@ -485,10 +510,251 @@ class PddlTampServer(Node):
             self.executor_results[str(command_id)] = payload
             self.executor_condition.notify_all()
 
-    def dispatch_action_to_executor(self, action: PlanAction, state: PredicateState, step_idx: int) -> dict:
+    @staticmethod
+    def _xy_tuple(values) -> tuple[float, float] | None:
+        if values is None:
+            return None
+        try:
+            if len(values) < 2:
+                return None
+            xy = (float(values[0]), float(values[1]))
+        except (TypeError, ValueError, IndexError):
+            return None
+        return xy if all(math.isfinite(v) for v in xy) else None
+
+    @staticmethod
+    def _ledger_from_payload(payload: list[dict] | None) -> list[ActionLedgerEntry]:
+        return [ActionLedgerEntry.from_dict(item) for item in (payload or []) if isinstance(item, dict)]
+
+    @staticmethod
+    def _ledger_key(goals: list[Goal], action_ledger: list[ActionLedgerEntry], scan_all_targets: bool) -> tuple:
+        goal_key = tuple((goal.object_name, goal.location) for goal in goals)
+        return (
+            goal_key,
+            tuple(entry.planning_key() for entry in action_ledger),
+            bool(scan_all_targets),
+        )
+
+    @staticmethod
+    def _matches_ledger_object(obj: ObjectState, entry: ActionLedgerEntry) -> bool:
+        if entry.object_name and obj.name == entry.object_name:
+            return True
+        return bool(entry.class_name and obj.class_name == entry.class_name)
+
+    @staticmethod
+    def _active_workspace_object(obj: ObjectState) -> bool:
+        return (
+            obj.detected
+            and obj.visible
+            and obj.location == "table"
+            and obj.scene_region in {"active_table", "active_workspace", "unknown"}
+        )
+
+    @staticmethod
+    def _dynamic_buffer_place_xy_from_result(result: dict | None) -> tuple[float, float] | None:
+        result = result or {}
+        dynamic = result.get("dynamic_buffer") or {}
+        config = result.get("buffer_config") or {}
+        return (
+            PddlTampServer._xy_tuple(dynamic.get("place_xy"))
+            or PddlTampServer._xy_tuple(config.get("place_xy"))
+        )
+
+    def object_base_link_xy(self, obj: ObjectState) -> tuple[float, float] | None:
+        if obj.base_link_xy is not None:
+            return obj.base_link_xy
+        detection = obj.detection or {}
+        source_frame = detection.get("frame_id") or self.args.camera_frame
+        for xyz in (obj.centroid_xyz, obj.grasp_xyz):
+            if xyz is None:
+                continue
+            try:
+                pose = self.transform_pose(pose_from_xyz(xyz), source_frame, "base_link")
+            except Exception as exc:
+                obj.classification_reason = f"TF unavailable for scene classification: {exc}"
+                continue
+            obj.base_link_xy = (float(pose.position.x), float(pose.position.y))
+            return obj.base_link_xy
+        return None
+
+    def action_ledger_entry(
+        self,
+        action: PlanAction,
+        state: PredicateState,
+        step_idx: int,
+        result: dict | None = None,
+        command_id: str | None = None,
+        anticipated: bool = False,
+    ) -> ActionLedgerEntry:
+        object_name = action.args[0] if action.args else ""
+        selected = state.objects.get(object_name)
+        class_name = selected.class_name if selected is not None and selected.class_name else object_name
+        source_xy = self.object_base_link_xy(selected) if selected is not None else None
+        place_xy = self._dynamic_buffer_place_xy_from_result(result)
+        ok = result.get("ok") if isinstance(result, dict) else None
+        return ActionLedgerEntry(
+            action_name=action.name,
+            object_name=object_name,
+            class_name=class_name,
+            source_location=action.args[1] if len(action.args) >= 2 else "",
+            destination_location=action.args[2] if len(action.args) >= 3 else "",
+            dynamic_buffer_place_xy=place_xy,
+            dynamic_buffer_radius_m=DYNAMIC_BUFFER_DEFAULT_OBJECT_RADIUS_M + DYNAMIC_BUFFER_MIN_CLEARANCE_M,
+            source_base_link_xy=source_xy,
+            result_ok=bool(ok) if ok is not None else None,
+            result_status="anticipated_ok" if anticipated else ("ok" if ok else "failure"),
+            step=int(step_idx),
+            stamp_sec=time.time(),
+            command_id=command_id or (result or {}).get("command_id"),
+            anticipated=anticipated,
+            result=result,
+        )
+
+    @staticmethod
+    def dynamic_buffer_contains(xy: tuple[float, float] | None, entry: ActionLedgerEntry) -> bool:
+        if xy is None:
+            return False
+        if entry.dynamic_buffer_place_xy is not None:
+            radius = float(entry.dynamic_buffer_radius_m or (DYNAMIC_BUFFER_DEFAULT_OBJECT_RADIUS_M + DYNAMIC_BUFFER_MIN_CLEARANCE_M))
+            return math.hypot(xy[0] - entry.dynamic_buffer_place_xy[0], xy[1] - entry.dynamic_buffer_place_xy[1]) <= radius
+        return (
+            DYNAMIC_BUFFER_WORKSPACE_X[0] <= xy[0] <= DYNAMIC_BUFFER_WORKSPACE_X[1]
+            and DYNAMIC_BUFFER_WORKSPACE_Y[0] <= xy[1] <= DYNAMIC_BUFFER_WORKSPACE_Y[1]
+        )
+
+    def classify_observed_object(self, obj: ObjectState, action_ledger: list[ActionLedgerEntry]) -> None:
+        if not obj.detected or not obj.visible:
+            obj.scene_region = "unknown"
+            obj.location = "table"
+            obj.classification_reason = obj.classification_reason or "not visible in fresh observation"
+            return
+        xy = self.object_base_link_xy(obj)
+        obj.scene_region = "active_table"
+        obj.location = "table"
+        obj.classification_reason = "fresh top-view observation in active scene"
+        obstacle_buffer_entries = [
+            entry for entry in action_ledger
+            if entry.action_name == "move-obstacle-to-buffer"
+            and entry.result_ok
+            and self._matches_ledger_object(obj, entry)
+        ]
+        if not obstacle_buffer_entries:
+            return
+        latest = obstacle_buffer_entries[-1]
+        if xy is not None and self.dynamic_buffer_contains(xy, latest):
+            obj.location = DYNAMIC_BUFFER_LOCATION
+            obj.scene_region = "dynamic_buffer"
+            obj.classification_reason = "matched successful buffer ledger and observed inside dynamic buffer area"
+        elif xy is None:
+            obj.scene_region = "unknown"
+            obj.classification_reason = "matched buffer ledger but base_link XY was unavailable; kept active for retry safety"
+        else:
+            obj.classification_reason = "matched buffer ledger but observed outside dynamic buffer area; treating as active obstacle"
+
+    def reconcile_state_with_ledger(
+        self,
+        state: PredicateState,
+        goals: list[Goal],
+        action_ledger: list[ActionLedgerEntry],
+    ) -> PredicateState:
+        state.action_ledger = list(action_ledger)
+        state.reconciliation = []
+        state.ignored_objects = {}
+
+        for obj in state.objects.values():
+            self.classify_observed_object(obj, action_ledger)
+        state.raw_observed_objects = {name: object_summary(obj) for name, obj in state.objects.items()}
+
+        completed: set[str] = set()
+        occupied_buffers: set[str] = set()
+        buffered_obstacles: set[str] = set()
+        for index, entry in enumerate(action_ledger):
+            record = {
+                "ledger_index": index,
+                "action": entry.to_dict(),
+                "status": "ignored",
+                "reason": "",
+                "observed_objects": [],
+            }
+            matches = [
+                obj for obj in state.objects.values()
+                if self._matches_ledger_object(obj, entry)
+            ]
+            record["observed_objects"] = [obj.name for obj in matches]
+            if not entry.result_ok:
+                record["status"] = "failed"
+                record["reason"] = "executor result was not ok; no symbolic completion inferred"
+            elif entry.action_name == "move-target-to-goal":
+                active = [obj for obj in matches if self._active_workspace_object(obj)]
+                if active:
+                    record["status"] = "retry"
+                    record["reason"] = "target still appears in active workspace after move-target-to-goal"
+                else:
+                    completed.add(entry.class_name or entry.object_name)
+                    record["status"] = "completed"
+                    record["reason"] = "successful target move plus disappearance from active workspace"
+            elif entry.action_name == "move-obstacle-to-buffer":
+                dynamic = [obj for obj in matches if obj.location == DYNAMIC_BUFFER_LOCATION]
+                active = [obj for obj in matches if self._active_workspace_object(obj)]
+                if dynamic:
+                    record["status"] = "buffered"
+                    record["reason"] = "obstacle observed in dynamic buffer; excluded from relations/PDDL"
+                    for obj in dynamic:
+                        buffered_obstacles.add(f"name:{obj.name}")
+                        if obj.class_name:
+                            buffered_obstacles.add(f"class:{obj.class_name}")
+                elif active:
+                    record["status"] = "retry"
+                    record["reason"] = "obstacle still appears in active workspace; keeping it as an obstacle"
+                else:
+                    record["status"] = "ignored"
+                    record["reason"] = "successful obstacle move and no active observation; treating as removed from active scene"
+                    if entry.object_name:
+                        buffered_obstacles.add(f"name:{entry.object_name}")
+                    if entry.class_name:
+                        buffered_obstacles.add(f"class:{entry.class_name}")
+                if entry.destination_location and entry.destination_location != DYNAMIC_BUFFER_LOCATION:
+                    occupied_buffers.add(entry.destination_location)
+            else:
+                record["reason"] = "ledger action has no reconciliation rule"
+            state.reconciliation.append(record)
+
+        kept: dict[str, ObjectState] = {}
+        for name, obj in state.objects.items():
+            if obj.is_target and obj.class_name in completed:
+                state.ignored_objects[name] = "target completed by ledger/observation reconciliation"
+                continue
+            kept[name] = obj
+        state.objects = kept
+        state.completed = completed
+        state.occupied_buffers = occupied_buffers
+        state.buffered_obstacles = buffered_obstacles
+        _annotate_relations(state.objects)
+        state.goals = _bind_goals_to_instances(goals, state.objects, completed)
+        state.relation_input_objects = sorted(obj.name for obj in state.objects.values() if obj.relation_candidate)
+        state.predicates = _build_predicates(state)
+        if state.reconciliation:
+            state.notes.append("state reconciled from fresh observation and action ledger")
+        return state
+
+    def dispatch_action_to_executor(
+        self,
+        action: PlanAction,
+        state: PredicateState,
+        step_idx: int,
+        action_ledger: list[ActionLedgerEntry],
+    ) -> dict:
         command_id = f"step{step_idx}-{uuid.uuid4().hex[:8]}"
         selected_object = state.objects.get(action.args[0]) if action.args else None
-        next_completed, next_occupied = self.anticipated_progress_after_action(action, state)
+        anticipated_entry = self.action_ledger_entry(
+            action,
+            state,
+            step_idx,
+            result={"ok": True, "anticipated": True},
+            command_id=command_id,
+            anticipated=True,
+        )
+        anticipated_ledger = [*action_ledger, anticipated_entry]
         payload = {
             "event": "execute_action",
             "command_id": command_id,
@@ -498,8 +764,7 @@ class PddlTampServer(Node):
             "selected_object": object_command_payload(selected_object),
             "prefetch": {
                 "goals": [goal.__dict__ for goal in state.goals],
-                "completed": sorted(next_completed),
-                "occupied_buffers": sorted(next_occupied),
+                "action_ledger": [entry.to_dict() for entry in anticipated_ledger],
                 "scan_all_targets": not self.args.scan_goals_only,
             },
         }
@@ -574,11 +839,10 @@ class PddlTampServer(Node):
     def consume_warm_scene_state(
         self,
         goals: list[Goal],
-        completed: set[str],
-        occupied_buffers: set[str],
+        action_ledger: list[ActionLedgerEntry],
         scan_all_targets: bool,
     ) -> PredicateState | None:
-        if completed or occupied_buffers or self.args.disable_warm_start:
+        if action_ledger or self.args.disable_warm_start:
             return None
         deadline = time.monotonic() + float(self.args.warm_start_wait_timeout)
         with self.warm_scene_condition:
@@ -593,7 +857,12 @@ class PddlTampServer(Node):
                 return None
             base = copy.deepcopy(self.warm_scene_state)
             self.warm_scene_consumed = True
-        state = self.bind_goals_to_warm_scene(base, goals, completed, occupied_buffers, scan_all_targets)
+        state = self.bind_goals_to_warm_scene(
+            base,
+            goals,
+            action_ledger,
+            scan_all_targets,
+        )
         self.get_logger().info("[WarmStart] Using initial top-view scene; running planner without a new scan.")
         return state
 
@@ -601,28 +870,47 @@ class PddlTampServer(Node):
         self,
         state: PredicateState,
         goals: list[Goal],
-        completed: set[str],
-        occupied_buffers: set[str],
+        action_ledger: list[ActionLedgerEntry],
         scan_all_targets: bool,
     ) -> PredicateState:
         goal_names = {goal.object_name for goal in goals}
-        completed_classes = set(completed)
         for obj in state.objects.values():
             obj.is_target = obj.class_name in goal_names
-        state.objects = {
-            name: obj
-            for name, obj in state.objects.items()
-            if not (obj.is_target and obj.class_name in completed_classes)
-        }
-        _annotate_relations(state.objects)
-        state.goals = _bind_goals_to_instances(goals, state.objects, completed_classes)
-        state.completed = set(completed)
-        state.occupied_buffers = set(occupied_buffers)
-        state.predicates = _build_predicates(state)
+        self.reconcile_state_with_ledger(state, goals, action_ledger)
         state.notes = [
             *state.notes,
             "used warm-start top-view scene captured from observe pose before command",
         ]
+        return state
+
+    def filter_buffered_obstacles(self, state: PredicateState, buffered_obstacles: set[str]) -> PredicateState:
+        state.buffered_obstacles = set(buffered_obstacles or set())
+        if not state.buffered_obstacles:
+            return state
+
+        removed = []
+        kept = {}
+        for name, obj in state.objects.items():
+            if obj.is_target:
+                kept[name] = obj
+                continue
+            keys = {f"name:{name}"}
+            if obj.class_name:
+                keys.add(f"class:{obj.class_name}")
+            if keys & state.buffered_obstacles:
+                removed.append(f"{name}/{obj.class_name}")
+                continue
+            kept[name] = obj
+
+        if not removed:
+            return state
+        state.objects = kept
+        _annotate_relations(state.objects)
+        state.goals = _bind_goals_to_instances(state.goals, state.objects, state.completed)
+        state.predicates = _build_predicates(state)
+        state.notes.append(
+            "ignored already-buffered obstacles during this command: " + ", ".join(sorted(removed))
+        )
         return state
 
     def move_to_observe_pose(self, reason: str = "observe") -> None:
@@ -638,9 +926,12 @@ class PddlTampServer(Node):
         )
 
     @staticmethod
-    def prefetch_key(goals: list[Goal], completed: set[str], occupied_buffers: set[str], scan_all_targets: bool) -> tuple:
-        goal_key = tuple((goal.object_name, goal.location) for goal in goals)
-        return (goal_key, tuple(sorted(completed)), tuple(sorted(occupied_buffers)), bool(scan_all_targets))
+    def prefetch_key(
+        goals: list[Goal],
+        action_ledger: list[ActionLedgerEntry],
+        scan_all_targets: bool,
+    ) -> tuple:
+        return PddlTampServer._ledger_key(goals, action_ledger, scan_all_targets)
 
     @staticmethod
     def goals_from_payload(payload: list[dict]) -> list[Goal]:
@@ -653,19 +944,40 @@ class PddlTampServer(Node):
             for item in payload
         ]
 
-    def anticipated_progress_after_action(self, action: PlanAction, state: PredicateState) -> tuple[set[str], set[str]]:
+    @staticmethod
+    def buffered_obstacle_keys_for_action(action: PlanAction, state: PredicateState) -> set[str]:
+        if action.name != "move-obstacle-to-buffer" or not action.args:
+            return set()
+        object_name = action.args[0]
+        moved = state.objects.get(object_name)
+        keys = {f"name:{object_name}"}
+        if moved is None or not moved.class_name:
+            return keys
+        same_class_obstacles = [
+            obj
+            for obj in state.objects.values()
+            if not obj.is_target and obj.class_name == moved.class_name
+        ]
+        if len(same_class_obstacles) == 1:
+            keys.add(f"class:{moved.class_name}")
+        return keys
+
+    def anticipated_progress_after_action(
+        self,
+        action: PlanAction,
+        state: PredicateState,
+    ) -> tuple[set[str], set[str], set[str]]:
         completed = set(state.completed)
         occupied_buffers = set(state.occupied_buffers)
+        buffered_obstacles = set(state.buffered_obstacles)
         if action.name == "move-target-to-goal" and action.args:
             moved = state.objects.get(action.args[0])
             completed.add(moved.class_name if moved is not None and moved.class_name else action.args[0])
-        elif (
-            action.name == "move-obstacle-to-buffer"
-            and len(action.args) >= 3
-            and action.args[2] != DYNAMIC_BUFFER_LOCATION
-        ):
-            occupied_buffers.add(action.args[2])
-        return completed, occupied_buffers
+        elif action.name == "move-obstacle-to-buffer" and len(action.args) >= 3:
+            buffered_obstacles.update(self.buffered_obstacle_keys_for_action(action, state))
+            if action.args[2] != DYNAMIC_BUFFER_LOCATION:
+                occupied_buffers.add(action.args[2])
+        return completed, occupied_buffers, buffered_obstacles
 
     def start_scene_prefetch(
         self,
@@ -678,13 +990,12 @@ class PddlTampServer(Node):
             return
         try:
             goals = self.goals_from_payload(prefetch_payload.get("goals") or [])
-            completed = set(prefetch_payload.get("completed") or [])
-            occupied_buffers = set(prefetch_payload.get("occupied_buffers") or [])
+            action_ledger = self._ledger_from_payload(prefetch_payload.get("action_ledger") or [])
             scan_all_targets = bool(prefetch_payload.get("scan_all_targets", True))
         except Exception as exc:
             self.get_logger().warn(f"[Prefetch] Ignoring malformed prefetch payload: {exc}")
             return
-        key = self.prefetch_key(goals, completed, occupied_buffers, scan_all_targets)
+        key = self.prefetch_key(goals, action_ledger, scan_all_targets)
         with self.prefetch_condition:
             if key in self.prefetch_states or key in self.prefetch_pending:
                 return
@@ -692,11 +1003,18 @@ class PddlTampServer(Node):
         self.get_logger().info(
             f"[Prefetch] Starting {trigger} {'wrist-camera' if use_wrist else 'top-view'} scene scan "
             f"for command_id={command_id}; "
-            f"completed={', '.join(sorted(completed)) or '<none>'}"
+            f"ledger_entries={len(action_ledger)}"
         )
         worker = threading.Thread(
             target=self._prefetch_scene_worker,
-            args=(key, goals, completed, occupied_buffers, scan_all_targets, command_id, use_wrist),
+            args=(
+                key,
+                goals,
+                action_ledger,
+                scan_all_targets,
+                command_id,
+                use_wrist,
+            ),
             daemon=True,
         )
         worker.start()
@@ -705,8 +1023,7 @@ class PddlTampServer(Node):
         self,
         key: tuple,
         goals: list[Goal],
-        completed: set[str],
-        occupied_buffers: set[str],
+        action_ledger: list[ActionLedgerEntry],
         scan_all_targets: bool,
         command_id: str,
         use_wrist: bool,
@@ -715,10 +1032,11 @@ class PddlTampServer(Node):
             state = build_predicate_state(
                 goals,
                 self.detect_object_with_grasp_wrist if use_wrist else self.detect_object_with_grasp,
-                completed=completed,
-                occupied_buffers=occupied_buffers,
+                completed=set(),
+                occupied_buffers=set(),
                 scan_all_targets=scan_all_targets,
             )
+            self.reconcile_state_with_ledger(state, goals, action_ledger)
         except Exception as exc:
             self.get_logger().warn(f"[Prefetch] Scene scan failed for command_id={command_id}: {exc}")
             state = None
@@ -735,11 +1053,10 @@ class PddlTampServer(Node):
     def consume_prefetched_state(
         self,
         goals: list[Goal],
-        completed: set[str],
-        occupied_buffers: set[str],
+        action_ledger: list[ActionLedgerEntry],
         scan_all_targets: bool,
     ) -> PredicateState | None:
-        key = self.prefetch_key(goals, completed, occupied_buffers, scan_all_targets)
+        key = self.prefetch_key(goals, action_ledger, scan_all_targets)
         deadline = time.monotonic() + float(self.args.prefetch_wait_timeout)
         with self.prefetch_condition:
             while key in self.prefetch_pending:
@@ -851,6 +1168,8 @@ class PddlTampServer(Node):
 
         completed: set[str] = set()
         occupied_buffers: set[str] = set()
+        buffered_obstacles: set[str] = set()
+        action_ledger: list[ActionLedgerEntry] = []
         steps = []
         scenes = []
         domain_path = ensure_domain(PDDL_DIR / "domain.pddl")
@@ -859,22 +1178,40 @@ class PddlTampServer(Node):
         for step_idx in range(1, self.args.max_steps + 1):
             self.get_logger().info(f"[PDDL] ===== planning step {step_idx}/{self.args.max_steps} =====")
             scan_all_targets = not self.args.scan_goals_only
-            state = self.consume_prefetched_state(goals, completed, occupied_buffers, scan_all_targets)
+            state = self.consume_prefetched_state(
+                goals,
+                action_ledger,
+                scan_all_targets,
+            )
             if state is not None:
                 self.get_logger().info("[Prefetch] Using cached scene state.")
             else:
-                state = self.consume_warm_scene_state(goals, completed, occupied_buffers, scan_all_targets)
+                state = self.consume_warm_scene_state(
+                    goals,
+                    action_ledger,
+                    scan_all_targets,
+                )
                 if state is None:
                     state = build_predicate_state(
                         goals,
                         self.detect_object_with_grasp,
-                        completed=completed,
-                        occupied_buffers=occupied_buffers,
+                        completed=set(),
+                        occupied_buffers=set(),
                         scan_all_targets=scan_all_targets,
                     )
+                    self.reconcile_state_with_ledger(state, goals, action_ledger)
+            completed = set(state.completed)
+            occupied_buffers = set(state.occupied_buffers)
+            buffered_obstacles = set(state.buffered_obstacles)
             scene_summary = {
                 "completed": sorted(completed),
                 "occupied_buffers": sorted(occupied_buffers),
+                "buffered_obstacles": sorted(buffered_obstacles),
+                "action_ledger": [entry.to_dict() for entry in action_ledger],
+                "reconciliation": state.reconciliation,
+                "raw_observed_objects": state.raw_observed_objects,
+                "ignored_objects": state.ignored_objects,
+                "relation_input_objects": state.relation_input_objects,
                 "objects": {name: object_summary(obj) for name, obj in state.objects.items()},
                 "predicates": sorted(state.predicates),
                 "notes": state.notes,
@@ -946,6 +1283,7 @@ class PddlTampServer(Node):
                         "step": int(step_idx),
                         "stamp_sec": time.time(),
                         "completed": sorted(completed),
+                        "action_ledger": [entry.to_dict() for entry in action_ledger],
                         "message": "No executable PDDL action found.",
                     },
                     latest_name="latest_planning_failed.json",
@@ -962,6 +1300,8 @@ class PddlTampServer(Node):
                     "goals": [goal.__dict__ for goal in goals],
                     "completed": sorted(completed),
                     "occupied_buffers": sorted(occupied_buffers),
+                    "buffered_obstacles": sorted(buffered_obstacles),
+                    "action_ledger": [entry.to_dict() for entry in action_ledger],
                     "steps": steps,
                     "scenes": scenes,
                 }
@@ -1005,7 +1345,7 @@ class PddlTampServer(Node):
                 latest_name="latest_executing_action.json",
             )
 
-            result = self.dispatch_action_to_executor(action, state, step_idx)
+            result = self.dispatch_action_to_executor(action, state, step_idx, action_ledger)
             steps.append(result)
             self.publish_json(self.result_pub, {"event": "action_result", "result": result})
             self.get_logger().info("[PDDL] Action execution result: " + json.dumps(result, sort_keys=True))
@@ -1029,27 +1369,27 @@ class PddlTampServer(Node):
                 result=result,
             )
 
-            if action.name == "move-target-to-goal" and result.get("ok"):
-                moved = state.objects.get(action.args[0])
-                completed.add(moved.class_name if moved is not None and moved.class_name else action.args[0])
-            elif (
-                action.name == "move-obstacle-to-buffer"
-                and result.get("ok")
-                and action.args[2] != DYNAMIC_BUFFER_LOCATION
-            ):
-                occupied_buffers.add(action.args[2])
+            action_ledger.append(
+                self.action_ledger_entry(
+                    action,
+                    state,
+                    step_idx,
+                    result=result,
+                    command_id=result.get("command_id"),
+                    anticipated=False,
+                )
+            )
 
             self.get_logger().info("[PDDL] Replanning after action execution.")
             self.publish_pddl_log(
                 "replan",
                 [
                     "[PDDL] replanning after action execution",
-                    f"completed: {', '.join(sorted(completed)) or '<none>'}",
-                    f"occupied_buffers: {', '.join(sorted(occupied_buffers)) or '<none>'}",
+                    "completion/buffer status will be reconciled from the next fresh observation",
+                    f"action_ledger_entries: {len(action_ledger)}",
                 ],
                 step=step_idx,
-                completed=sorted(completed),
-                occupied_buffers=sorted(occupied_buffers),
+                action_ledger=[entry.to_dict() for entry in action_ledger],
             )
             if self.args.one_step:
                 break
@@ -1061,10 +1401,13 @@ class PddlTampServer(Node):
                 f"[PDDL] command finished ok={ok}",
                 f"completed: {', '.join(sorted(completed)) or '<none>'}",
                 f"occupied_buffers: {', '.join(sorted(occupied_buffers)) or '<none>'}",
+                f"buffered_obstacles: {', '.join(sorted(buffered_obstacles)) or '<none>'}",
             ],
             ok=ok,
             completed=sorted(completed),
             occupied_buffers=sorted(occupied_buffers),
+            buffered_obstacles=sorted(buffered_obstacles),
+            action_ledger=[entry.to_dict() for entry in action_ledger],
         )
         return {
             "ok": ok,
@@ -1072,6 +1415,8 @@ class PddlTampServer(Node):
             "goals": [goal.__dict__ for goal in goals],
             "completed": sorted(completed),
             "occupied_buffers": sorted(occupied_buffers),
+            "buffered_obstacles": sorted(buffered_obstacles),
+            "action_ledger": [entry.to_dict() for entry in action_ledger],
             "steps": steps,
             "scenes": scenes,
             "message": "PDDL TAMP completed." if ok else "PDDL TAMP stopped before all goals completed.",
@@ -1086,10 +1431,19 @@ class PddlTampServer(Node):
 
     def log_state(self, summary: dict) -> None:
         self.get_logger().info("[PDDL] Detected objects and predicates:")
+        self.get_logger().info(
+            "[PDDL]   buffered_obstacles: "
+            + (", ".join(summary.get("buffered_obstacles", [])) if summary.get("buffered_obstacles") else "<none>")
+        )
+        self.get_logger().info(
+            "[PDDL]   relation_input_objects: "
+            + (", ".join(summary.get("relation_input_objects", [])) if summary.get("relation_input_objects") else "<none>")
+        )
         for name, obj in sorted(summary["objects"].items()):
             self.get_logger().info(
                 "[PDDL]   "
                 f"{name}: class={obj['class_name']}, target={obj['target']}, detected={obj['detected']}, "
+                f"region={obj.get('scene_region')}, base_xy={obj.get('base_link_xy')}, "
                 f"visible={obj['visible']}, pose_known={obj['pose_known']}, "
                 f"graspable={obj['graspable']}, clear={obj['clear']}, safe={obj['safe']}, "
                 f"conf={obj['confidence']:.3f}, bbox={obj['bbox_xyxy']}, "
@@ -1106,12 +1460,17 @@ class PddlTampServer(Node):
             "completed: " + (", ".join(summary["completed"]) if summary["completed"] else "<none>"),
             "occupied_buffers: "
             + (", ".join(summary.get("occupied_buffers", [])) if summary.get("occupied_buffers") else "<none>"),
+            "buffered_obstacles: "
+            + (", ".join(summary.get("buffered_obstacles", [])) if summary.get("buffered_obstacles") else "<none>"),
+            "relation_input_objects: "
+            + (", ".join(summary.get("relation_input_objects", [])) if summary.get("relation_input_objects") else "<none>"),
             "objects:",
         ]
         for name, obj in sorted(summary["objects"].items()):
             lines.append(
                 f"  {name}: target={obj['target']} detected={obj['detected']} visible={obj['visible']} "
-                f"class={obj['class_name']} pose_known={obj['pose_known']} graspable={obj['graspable']} clear={obj['clear']} "
+                f"class={obj['class_name']} region={obj.get('scene_region')} base_xy={obj.get('base_link_xy')} "
+                f"pose_known={obj['pose_known']} graspable={obj['graspable']} clear={obj['clear']} "
                 f"safe={obj['safe']} conf={obj['confidence']:.3f}"
             )
             lines.append(
@@ -1120,6 +1479,16 @@ class PddlTampServer(Node):
             )
             if obj["error"]:
                 lines.append(f"    error={obj['error']}")
+            if obj.get("classification_reason"):
+                lines.append(f"    classification={obj['classification_reason']}")
+        if summary.get("reconciliation"):
+            lines.append("reconciliation:")
+            for record in summary["reconciliation"]:
+                action = record.get("action") or {}
+                lines.append(
+                    f"  {action.get('action_name')} {action.get('object_name')}: "
+                    f"{record.get('status')} - {record.get('reason')}"
+                )
         lines.append("predicates:")
         lines.extend(f"  {predicate}" for predicate in summary["predicates"])
         if summary["notes"]:
@@ -1327,6 +1696,12 @@ class PddlTampServer(Node):
             ],
             "completed": summary["completed"],
             "occupied_buffers": summary.get("occupied_buffers", []),
+            "buffered_obstacles": summary.get("buffered_obstacles", []),
+            "action_ledger": summary.get("action_ledger", []),
+            "reconciliation": summary.get("reconciliation", []),
+            "raw_observed_objects": summary.get("raw_observed_objects", {}),
+            "ignored_objects": summary.get("ignored_objects", {}),
+            "relation_input_objects": summary.get("relation_input_objects", []),
             "objects": summary["objects"],
             "predicates": summary["predicates"],
             "notes": summary["notes"],
@@ -1343,6 +1718,12 @@ class PddlTampServer(Node):
         summary = {
             "completed": sorted(state.completed),
             "occupied_buffers": sorted(state.occupied_buffers),
+            "buffered_obstacles": sorted(state.buffered_obstacles),
+            "action_ledger": [entry.to_dict() for entry in state.action_ledger],
+            "reconciliation": state.reconciliation,
+            "raw_observed_objects": state.raw_observed_objects,
+            "ignored_objects": state.ignored_objects,
+            "relation_input_objects": state.relation_input_objects,
             "objects": {name: object_summary(obj) for name, obj in state.objects.items()},
             "predicates": sorted(state.predicates),
             "notes": state.notes,
@@ -1381,6 +1762,12 @@ class PddlTampServer(Node):
             "stamp_sec": time.time(),
             "completed": summary["completed"],
             "occupied_buffers": summary["occupied_buffers"],
+            "buffered_obstacles": summary["buffered_obstacles"],
+            "action_ledger": summary["action_ledger"],
+            "reconciliation": summary["reconciliation"],
+            "raw_observed_objects": summary["raw_observed_objects"],
+            "ignored_objects": summary["ignored_objects"],
+            "relation_input_objects": summary["relation_input_objects"],
             "objects": summary["objects"],
             "predicates": summary["predicates"],
             "notes": summary["notes"],
@@ -1411,6 +1798,61 @@ class PddlTampServer(Node):
             (debug_dir / latest_name).write_text(text + "\n", encoding="utf-8")
         self.get_logger().info(f"[PDDL] Step JSON saved: {path}")
 
+    def save_grasp_pose_debug(
+        self,
+        obj_name: str,
+        detection: dict,
+        selection: dict,
+        source_frame: str,
+        base_pose: Pose,
+        target_pose_base: Pose | None,
+        grasp_pose: Pose,
+        corrected_grasp_pose: Pose | None,
+        correction: dict | None,
+    ) -> None:
+        visualization = selection.setdefault("visualization", {})
+        summary_path_text = visualization.get("summary_json")
+        if summary_path_text:
+            summary_path = Path(summary_path_text).expanduser()
+        else:
+            debug_dir = PDDL_DIR / "debug" / "grasp_debug"
+            debug_dir.mkdir(parents=True, exist_ok=True)
+            summary_path = debug_dir / f"{self.safe_debug_filename(obj_name)}_latest_grasp.json"
+
+        payload = {}
+        if summary_path.is_file():
+            try:
+                payload = json.loads(summary_path.read_text(encoding="utf-8"))
+            except Exception as exc:
+                payload = {"previous_summary_error": str(exc)}
+
+        payload.update({
+            "object_name": str(obj_name),
+            "source_frame": source_frame,
+            "base_frame": "base_link",
+            "detection_save_dir": detection.get("save_dir"),
+            "points_path": selection.get("points_path"),
+            "selection": selection,
+            "base_link_debug": {
+                "target_pose_base": pose_to_dict(target_pose_base) if target_pose_base is not None else None,
+                "grasp_reference_pose_base": pose_to_dict(base_pose),
+                "final_grasp_pose_base": pose_to_dict(grasp_pose),
+                "corrected_grasp_pose_base": pose_to_dict(corrected_grasp_pose) if corrected_grasp_pose is not None else None,
+                "grasp_database_correction": correction,
+            },
+            "notes": {
+                "target_pose_base": "Pose transformed from target_xyz_m, the point selected by PCA band search.",
+                "grasp_reference_pose_base": "Pose transformed from grasp_pose_xyz_m, the point actually used before orientation and clearance offsets.",
+                "final_grasp_pose_base": "Pose sent into execute_pick_place_sequence before grasp_database correction.",
+                "corrected_grasp_pose_base": "Preview of the pose after grasp_database transform; grasping_item applies the same correction at close time.",
+            },
+        })
+
+        summary_path.parent.mkdir(parents=True, exist_ok=True)
+        summary_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        visualization["summary_json"] = str(summary_path)
+        self.get_logger().info(f"[GraspDebug] saved grasp pose debug: {summary_path}")
+
     @staticmethod
     def safe_debug_filename(text: str) -> str:
         safe = "".join(ch if ch.isalnum() or ch in {"_", "-"} else "_" for ch in str(text or "unknown"))
@@ -1440,17 +1882,30 @@ class PddlTampServer(Node):
                 status_color = (80, 120, 255)
             lines.append((
                 f"{name}: target={obj['target']} det={obj['detected']} vis={obj['visible']} "
-                f"class={obj['class_name']} pose={obj['pose_known']} grasp={obj['graspable']} clear={obj['clear']} safe={obj['safe']} "
+                f"class={obj['class_name']} region={obj.get('scene_region')} pose={obj['pose_known']} "
+                f"grasp={obj['graspable']} clear={obj['clear']} safe={obj['safe']} "
                 f"conf={obj['confidence']:.2f}",
                 status_color,
             ))
             lines.append((
-                f"  bbox={obj['bbox_xyxy']} centroid={obj['centroid_xyz']} depth={obj['depth_median']} "
+                f"  base_xy={obj.get('base_link_xy')} bbox={obj['bbox_xyxy']} centroid={obj['centroid_xyz']} depth={obj['depth_median']} "
                 f"blocks={obj['blocks']} blocked_by={obj['blocked_by']} near={obj['near']}",
                 (205, 205, 205),
             ))
+            if obj.get("classification_reason"):
+                lines.append((f"  classification={obj['classification_reason']}", (170, 210, 255)))
             if obj["error"]:
                 lines.append((f"  error={obj['error']}", (80, 120, 255)))
+        if summary.get("reconciliation"):
+            lines.extend([("", (220, 220, 220)), ("RECONCILIATION", (120, 230, 255))])
+            for record in summary["reconciliation"]:
+                action = record.get("action") or {}
+                lines.append((
+                    f"{action.get('action_name')} {action.get('object_name')}: {record.get('status')} - {record.get('reason')}",
+                    (190, 190, 190),
+                ))
+        if summary.get("relation_input_objects"):
+            lines.append((f"relation inputs: {summary['relation_input_objects']}", (170, 210, 255)))
         lines.extend([
             ("", (220, 220, 220)),
             ("TRUE PREDICATES", (120, 230, 255)),
@@ -1620,6 +2075,19 @@ class PddlTampServer(Node):
         detected_pose = pose_from_xyz(grasp_xyz)
         base_pose = self.transform_pose(detected_pose, source_frame, "base_link")
         selection["centroid_xyz_base"] = [float(base_pose.position.x), float(base_pose.position.y), float(base_pose.position.z)]
+
+        target_pose_base = None
+        target_xyz = selection.get("target_xyz_m")
+        if target_xyz is not None:
+            try:
+                target_pose_base = self.transform_pose(pose_from_xyz(target_xyz), source_frame, "base_link")
+                selection["target_xyz_base"] = [
+                    float(target_pose_base.position.x),
+                    float(target_pose_base.position.y),
+                    float(target_pose_base.position.z),
+                ]
+            except Exception as exc:
+                selection["target_xyz_base_error"] = str(exc)
         
         xyz_major_axis = selection.get("xyz_major_axis")
         major_axis_base_3d = None
@@ -1694,6 +2162,8 @@ class PddlTampServer(Node):
         self.grasp_pose_publisher.publish(pose_msg)
         
         # PREVIEW CORRECTED POSE (from grasp_database.json)
+        corrected_grasp_pose = None
+        grasp_correction = None
         try:
             perception_features = extract_perception_features(detection)
             measured_area, measured_area_source = _measured_object_area_from_features(perception_features)
@@ -1704,6 +2174,17 @@ class PddlTampServer(Node):
             grasp_transform = _extract_grasp_transform(grasp_config)
             
             corrected_grasp_pose = apply_grasp_transform(grasp_pose, grasp_transform)
+            grasp_value = grasp_config.get("grasp_value")
+            grasp_correction = {
+                "matched_name": matched_name,
+                "selected_state": item_state,
+                "measured_area_m2": measured_area,
+                "measured_area_source": measured_area_source,
+                "transform": grasp_transform,
+                "grasp_value_deg": float(grasp_value) if grasp_value is not None else None,
+            }
+            selection["grasp_database_correction"] = grasp_correction
+            selection["corrected_grasp_pose_base"] = pose_to_dict(corrected_grasp_pose)
             
             corrected_msg = PoseStamped()
             corrected_msg.header = pose_msg.header
@@ -1715,7 +2196,20 @@ class PddlTampServer(Node):
                 f"(state={item_state}, area={measured_area}, source={measured_area_source})"
             )
         except Exception as e:
+            selection["grasp_database_correction_error"] = str(e)
             self.get_logger().warn(f"Failed to publish preview of corrected grasp pose: {e}")
+
+        self.save_grasp_pose_debug(
+            obj_name,
+            detection,
+            selection,
+            source_frame,
+            base_pose,
+            target_pose_base,
+            grasp_pose,
+            corrected_grasp_pose,
+            grasp_correction,
+        )
         
         # Visualize actual PCA and centroid
         marker_array = MarkerArray()
@@ -1738,6 +2232,25 @@ class PddlTampServer(Node):
         centroid_marker.color.b = 0.0
         centroid_marker.color.a = 0.8
         marker_array.markers.append(centroid_marker)
+
+        if target_pose_base is not None:
+            target_marker = Marker()
+            target_marker.header.frame_id = "base_link"
+            target_marker.header.stamp.sec = 0
+            target_marker.header.stamp.nanosec = 0
+            target_marker.ns = "pca_debug"
+            target_marker.id = 2
+            target_marker.type = Marker.SPHERE
+            target_marker.action = Marker.ADD
+            target_marker.pose.position = target_pose_base.position
+            target_marker.scale.x = 0.025
+            target_marker.scale.y = 0.025
+            target_marker.scale.z = 0.025
+            target_marker.color.r = 1.0
+            target_marker.color.g = 0.0
+            target_marker.color.b = 0.0
+            target_marker.color.a = 0.9
+            marker_array.markers.append(target_marker)
         
         if major_axis_base_3d is not None:
             # 3D PCA Arrow (Cyan)
