@@ -1,0 +1,12 @@
+{
+  "completed": [
+    "banana",
+    "coke_can",
+    "meat_can",
+    "strawberry"
+  ],
+  "event": "planning_failed",
+  "message": "No executable PDDL action found.",
+  "stamp_sec": 1780387941.572457,
+  "step": 5
+}

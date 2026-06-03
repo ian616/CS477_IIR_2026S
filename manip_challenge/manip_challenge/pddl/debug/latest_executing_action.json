@@ -10,6 +10,11 @@
     "source": "external"
   },
   "event": "executing_action",
+<<<<<<< HEAD
   "stamp_sec": 1780457926.0895514,
   "step": 6
+=======
+  "stamp_sec": 1780387912.1569262,
+  "step": 4
+>>>>>>> feature/grasping2
 }

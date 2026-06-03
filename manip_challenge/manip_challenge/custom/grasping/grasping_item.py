@@ -152,19 +152,27 @@ def grasping_item(node, arm, grasp_pose, obj_name, perception_info=None,
     gripper_close_pos = DEFAULT_GRIPPER_CLOSE_POS
     corrected_grasp_pose = copy.deepcopy(grasp_pose)
 
-    perception_features = extract_perception_features(perception_info)
+    if perception_info and "grasp_selection" not in perception_info and "target_xyz_m" in perception_info:
+        perception_features = extract_perception_features({"grasp_selection": perception_info})
+    else:
+        perception_features = extract_perception_features(perception_info)
 
     target_position = perception_features["target_position_xyz_m"]
     target_orientation = perception_features["target_orientation_yaw_rad"]
     target_orientation_deg = perception_features["target_orientation_yaw_deg"]
     pca_major_axis = perception_features["pca_major_axis_xy"]
     pca_minor_axis = perception_features["pca_minor_axis_xy"]
-    measured_area, measured_area_source = _measured_object_area_from_features(perception_features)
+    pca_bbox_width = perception_features.get("pca_bbox_width_m")
+    pca_bbox_length = perception_features.get("pca_bbox_length_m")
+    pca_bbox_area = perception_features.get("pca_bbox_area_m2")
+    if pca_bbox_area is None and pca_bbox_width is not None and pca_bbox_length is not None:
+        pca_bbox_area = float(pca_bbox_width) * float(pca_bbox_length)
 
     try:
         database = _load_grasp_database()
         matched_name, object_configs = _lookup_object_grasp_configs(database, obj_name)
-        item_state, grasp_config, bbox_area_by_state = _select_state_config(object_configs, measured_area)
+        item_state, grasp_config, bbox_area_by_state = _select_state_config(object_configs, pca_bbox_area)
+        node.last_grasped_state = item_state
         grasp_transform = _extract_grasp_transform(grasp_config)
         corrected_grasp_pose = apply_grasp_transform(grasp_pose, grasp_transform)
 

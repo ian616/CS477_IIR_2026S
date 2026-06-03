@@ -1,0 +1,15 @@
+{
+  "action": {
+    "args": [
+      "coke_can_0",
+      "table",
+      "right_storage"
+    ],
+    "name": "move-target-to-goal",
+    "pddl": "(move-target-to-goal coke_can_0 table right_storage)",
+    "source": "fallback"
+  },
+  "event": "selected_action",
+  "stamp_sec": 1780387886.626791,
+  "step": 3
+}

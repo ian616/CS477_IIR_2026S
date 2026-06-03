@@ -31,7 +31,7 @@ DEFAULTS = {
     "display": "false",
     # Top-view training coverage appears weaker than wrist-view, so keep the
     # first-pass threshold low enough to inspect uncertain detections.
-    "confidence": "0.15",
+    "confidence": "0.75",
     # Digital zoom: run YOLO on the center 75% of RGB/depth/cloud. Set this to
     # 1.0 to disable, or smaller values such as 0.6 to zoom in more.
     "input_crop_ratio": "0.5",

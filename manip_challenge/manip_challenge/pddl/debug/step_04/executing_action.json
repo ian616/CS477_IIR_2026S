@@ -1,0 +1,15 @@
+{
+  "action": {
+    "args": [
+      "banana_0",
+      "table",
+      "left_storage"
+    ],
+    "name": "move-target-to-goal",
+    "pddl": "(move-target-to-goal banana_0 table left_storage)",
+    "source": "fallback"
+  },
+  "event": "executing_action",
+  "stamp_sec": 1780387912.1569262,
+  "step": 4
+}

@@ -1,0 +1,108 @@
+{
+  "action": {
+    "args": [
+      "strawberry_0",
+      "table",
+      "left_storage"
+    ],
+    "name": "move-target-to-goal",
+    "pddl": "(move-target-to-goal strawberry_0 table left_storage)",
+    "source": "fallback"
+  },
+  "event": "action_result",
+  "result": {
+    "action": {
+      "args": [
+        "strawberry_0",
+        "table",
+        "left_storage"
+      ],
+      "name": "move-target-to-goal",
+      "pddl": "(move-target-to-goal strawberry_0 table left_storage)",
+      "source": "fallback"
+    },
+    "class_name": "strawberry",
+    "command_id": "step1-8d15f311",
+    "destination": "left storage",
+    "detected_pose_in_source": {
+      "orientation": {
+        "w": 1.0,
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "position": {
+        "x": -0.1541457623243332,
+        "y": 0.08183459937572479,
+        "z": 1.3267621994018555
+      }
+    },
+    "dry_run": false,
+    "grasp_pose_in_base": {
+      "orientation": {
+        "w": 0.0,
+        "x": 0.44931617482439373,
+        "y": 0.8933728085414145,
+        "z": 0.0
+      },
+      "position": {
+        "x": 0.5739799210940228,
+        "y": 0.17164576232433337,
+        "z": 0.06300116430017444
+      }
+    },
+    "grasp_selection": {
+      "delta_from_raw_centroid_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "grasp_pose_source": "raw_centroid_xyz",
+      "grasp_pose_xyz_m": [
+        -0.1541457623243332,
+        0.08183459937572479,
+        1.3267621994018555
+      ],
+      "gripper_axis_base_xy": [
+        0.5962299500823497,
+        -0.8028137060519076
+      ],
+      "gripper_axis_base_yaw_rad": -0.931999498918017,
+      "gripper_axis_rule": "perpendicular_to_pca_major_axis",
+      "method": "median_fallback",
+      "pca_major_axis_base_xy": [
+        -0.8028137060519076,
+        -0.5962299500823497
+      ],
+      "pca_major_axis_base_yaw_rad": -2.5027958257129135,
+      "points_path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171049_201078_strawberry/strawberry_0/foreground_points.npy",
+      "raw_centroid_xyz_m": [
+        -0.1541457623243332,
+        0.08183459937572479,
+        1.3267621994018555
+      ],
+      "reason": "no_dense_axis_bin",
+      "target_xyz_m": [
+        -0.1541457623243332,
+        0.08183459937572479,
+        1.3267621994018555
+      ],
+      "xy_major_axis": [
+        0.5962251472373017,
+        0.8028172729842438
+      ],
+      "xy_minor_axis": [
+        -0.8028172729842438,
+        0.5962251472373017
+      ],
+      "xyz_major_axis": [
+        0.6121708155505264,
+        0.7847536756853243,
+        0.09699773753328572
+      ]
+    },
+    "ok": true
+  },
+  "stamp_sec": 1780387867.5427935,
+  "step": 1
+}

@@ -2,6 +2,7 @@
   (:domain manip-tamp)
 
   (:objects
+<<<<<<< HEAD
     banana_0 coke_can_0 coke_can_1 hammer_0 meat_can_0 meat_can_1 strawberry_0 strawberry_1 - item
     left_storage right_storage bookshelf dynamic_buffer - location
   )
@@ -54,11 +55,34 @@
     (storage left_storage)
     (storage right_storage)
     (target hammer_0)
+=======
+    hammer - item
+    left_storage right_storage bookshelf buffer1 buffer2 - location
+  )
+
+  (:init
+    (at hammer table)
+    (buffer buffer1)
+    (buffer buffer2)
+    (buffer-free buffer1)
+    (buffer-free buffer2)
+    (goal-at hammer right_storage)
+    (handempty)
+    (safe hammer)
+    (storage bookshelf)
+    (storage left_storage)
+    (storage right_storage)
+    (target hammer)
+>>>>>>> feature/grasping2
   )
 
   (:goal
     (and
+<<<<<<< HEAD
       (at hammer_0 left_storage)
+=======
+      (at hammer right_storage)
+>>>>>>> feature/grasping2
     )
   )
 )

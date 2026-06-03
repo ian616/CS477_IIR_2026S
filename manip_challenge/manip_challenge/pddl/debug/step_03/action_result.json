@@ -1,0 +1,115 @@
+{
+  "action": {
+    "args": [
+      "coke_can_0",
+      "table",
+      "right_storage"
+    ],
+    "name": "move-target-to-goal",
+    "pddl": "(move-target-to-goal coke_can_0 table right_storage)",
+    "source": "fallback"
+  },
+  "event": "action_result",
+  "result": {
+    "action": {
+      "args": [
+        "coke_can_0",
+        "table",
+        "right_storage"
+      ],
+      "name": "move-target-to-goal",
+      "pddl": "(move-target-to-goal coke_can_0 table right_storage)",
+      "source": "fallback"
+    },
+    "class_name": "coke_can",
+    "command_id": "step3-b9a1e10f",
+    "destination": "right storage",
+    "detected_pose_in_source": {
+      "orientation": {
+        "w": 1.0,
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "position": {
+        "x": -0.10999935120344162,
+        "y": 0.07790534943342209,
+        "z": 1.357677698135376
+      }
+    },
+    "dry_run": false,
+    "grasp_pose_in_base": {
+      "orientation": {
+        "w": 0.0,
+        "x": -0.22049167466687922,
+        "y": 0.9753888565093386,
+        "z": 0.0
+      },
+      "position": {
+        "x": 0.5777545551805291,
+        "y": 0.1274993512034418,
+        "z": 0.03206640707526032
+      }
+    },
+    "grasp_selection": {
+      "delta_from_raw_centroid_m": [
+        0.00882827490568161,
+        -0.0031335577368736267,
+        -0.002384781837463379
+      ],
+      "grasp_pose_source": "raw_centroid_xyz",
+      "grasp_pose_xyz_m": [
+        -0.10999935120344162,
+        0.07790534943342209,
+        1.357677698135376
+      ],
+      "gripper_axis_base_xy": [
+        0.9027668428051902,
+        0.43013024484631285
+      ],
+      "gripper_axis_base_yaw_rad": 0.4446370449398967,
+      "gripper_axis_rule": "perpendicular_to_pca_major_axis",
+      "method": "local_thick_axis_band",
+      "pca_major_axis_base_xy": [
+        0.43013024484631285,
+        -0.9027668428051902
+      ],
+      "pca_major_axis_base_yaw_rad": -1.126159281855,
+      "points_path": "/home/alvan/ros_ws/cs477_ws/src/CS477_IIR_2026S/manip_challenge/manip_challenge/custom/perception/two-view/results/top_seg/20260602_171123_112264_coke_can/coke_can_0/foreground_points.npy",
+      "raw_centroid_xyz_m": [
+        -0.10999935120344162,
+        0.07790534943342209,
+        1.357677698135376
+      ],
+      "selected_band": {
+        "along_max_m": 0.009701729787169364,
+        "along_min_m": 0.007230250525207767,
+        "point_count": 21,
+        "score": 0.05206726142276977,
+        "width_m": 0.052806990218435726,
+        "z_spread_m": 0.01333761215209961
+      },
+      "target_xyz_m": [
+        -0.10117107629776001,
+        0.07477179169654846,
+        1.3552929162979126
+      ],
+      "xy_major_axis": [
+        0.9027647552664954,
+        -0.43013462619117837
+      ],
+      "xy_minor_axis": [
+        0.43013462619117837,
+        0.9027647552664954
+      ],
+      "xyz_major_axis": [
+        0.8805167310057307,
+        -0.4425519669129784,
+        0.16981767575972784
+      ]
+    },
+    "ok": true
+  },
+  "stamp_sec": 1780387911.9219644,
+  "step": 3
+}

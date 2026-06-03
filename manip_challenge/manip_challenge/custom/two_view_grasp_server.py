@@ -157,7 +157,7 @@ def executor_safe_gripper_goto(node, pos, force=1.0, timeout=3.0, **kwargs):
     return result
 
 
-def executor_safe_gripper_open(node, force=1.0, timeout=1.0, gripper_open_pos=0.0, **kwargs):
+def executor_safe_gripper_open(node, force=1.0, timeout=1.0, gripper_open_pos=0.0, shake=False, **kwargs):
     node.get_logger().info("Opening gripper.")
     return executor_safe_gripper_goto(node, gripper_open_pos, force=force, timeout=timeout, **kwargs)
 
