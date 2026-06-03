@@ -67,16 +67,17 @@ from manip_challenge.pddl.ros_helpers import (
     load_grasp_points_from_detection,
     load_top_view_perception_module,
     patch_move_gripper,
-    ros_args_with_embedded_perception_defaults,
     save_grasp_selection_visualization,
     stop_child_processes,
 )
 from manip_challenge.pddl.pddl_types import Goal, ObjectState, PlanAction, PredicateState, KNOWN_OBJECTS, BUFFER_LOCATIONS
 from manip_challenge.pddl.utils import PDDL_DIR, load_dotenv
+from manip_challenge.custom.perception.icp.rgbd_seg_crop_server import RgbdSegCropServiceNode
 from manip_challenge.custom.grasping.grasping_item import (
     _load_grasp_database,
     _lookup_object_grasp_configs,
     _select_state_config,
+    _measured_object_area_from_features,
     _extract_grasp_transform,
 )
 from manip_challenge.custom.grasping.pose_math import apply_grasp_transform
@@ -84,6 +85,35 @@ from manip_challenge.custom.grasping.perception_features import extract_percepti
 
 
 patch_move_gripper()
+
+
+OBSERVE_JOINTS = list(HOME_JOINTS)
+OBSERVE_X_OFFSET_M = 0.15
+OBSERVE_RETREAT_DURATION_S = 2.0
+
+
+def move_arm_to_observe_pose(
+    arm,
+    observe_joints,
+    x_offset_m: float,
+    duration_s: float,
+    logger=None,
+    reason: str = "observe",
+) -> None:
+    if logger is not None:
+        logger.info(f"Moving to observe base joints for {reason}: {observe_joints}")
+    arm.move_joint(observe_joints)
+    x_offset_m = float(x_offset_m)
+    if abs(x_offset_m) <= 1e-6:
+        return
+    pose = copy.deepcopy(arm.fk_request(arm.js_joint_position, attach_tool=True))
+    pose.position.x -= x_offset_m
+    if logger is not None:
+        logger.info(
+            f"Retreating gripper in base -X for {reason}: "
+            f"offset={x_offset_m:.3f}m target_x={pose.position.x:.3f}"
+        )
+    arm.move_position(pose, duration=float(duration_s))
 
 
 class TfNode(Node):
@@ -220,6 +250,24 @@ def object_state_from_command(payload: dict | None, fallback_name: str) -> Objec
 
 VERTICAL_DOWN_GRASP_QUATERNION = np.asarray([0.0, 1.0, 0.0, 0.0], dtype=np.float64)
 GRASP_AXIS_ENDPOINT_OFFSET_M = 0.05
+WRIST_VIEW_DEFAULTS = {
+    "model_path": str(Path(__file__).resolve().parents[1] / "custom" / "best.pt"),
+    "image_topic": "/wrist_camera/wrist_camera/color/image_raw",
+    "depth_topic": "/wrist_camera/wrist_camera/depth/color/image_raw",
+    "points_topic": "/wrist_camera/wrist_camera/depth/color/points",
+    "camera_frame": "wrist_camera_color_optical_frame",
+    "service_name": "detect_object_rgbd_seg_crop",
+    "display": False,
+    "confidence": 0.35,
+    "input_crop_ratio": 1.0,
+    "save_dir": str(Path(__file__).resolve().parents[1] / "custom" / "perception" / "icp" / "results" / "wrist_seg"),
+    "annotated_image_topic": "/wrist_view/seg/detection_image",
+    "roi_mask_topic": "/wrist_view/seg/mask",
+    "roi_info_topic": "/wrist_view/seg/info",
+    "roi_points_topic": "/wrist_view/seg/points",
+    "max_depth_m": 1.5,
+    "depth_margin_m": 0.04,
+}
 
 
 def grasp_pose_xyz_from_selection(selection):
@@ -347,6 +395,11 @@ class PddlTampServer(Node):
             args.perception_service,
             callback_group=self.callback_group,
         )
+        self.wrist_perception_client = self.create_client(
+            StringString,
+            args.wrist_perception_service,
+            callback_group=self.callback_group,
+        )
         self.command_service = self.create_service(
             StringString,
             args.service_name,
@@ -367,7 +420,9 @@ class PddlTampServer(Node):
         self.pddl_log_pub = self.create_publisher(String, args.log_topic, 10)
         self.grasp_pose_publisher = self.create_publisher(PoseStamped, '/grasp_target_pose', 10)
         self.corrected_grasp_pose_publisher = self.create_publisher(PoseStamped, '/corrected_grasp_pose', 10)
-        self.pca_debug_publisher = self.create_publisher(MarkerArray, '/grasp_pca_debug', 10)
+        self.pca_debug_publisher = self.create_publisher(MarkerArray, '/pca_debug', 10)
+        from sensor_msgs.msg import PointCloud2
+        self.pc2_publisher = self.create_publisher(PointCloud2, '/pca_debug_cloud', 10)
         self.executor_command_pub = self.create_publisher(String, args.executor_command_topic, 10)
         self.executor_result_sub = self.create_subscription(
             String,
@@ -388,13 +443,17 @@ class PddlTampServer(Node):
         self.warm_scene_scheduled = False
         self.warm_scene_consumed = False
 
-        self.get_logger().info(f"Waiting for perception service '{args.perception_service}'...")
+        self.get_logger().info(f"Waiting for top-view perception service '{args.perception_service}'...")
         while rclpy.ok() and not self.perception_client.wait_for_service(timeout_sec=1.0):
             self.get_logger().info(f"Still waiting for '{args.perception_service}'...")
+        self.get_logger().info(f"Waiting for wrist perception service '{args.wrist_perception_service}'...")
+        while rclpy.ok() and not self.wrist_perception_client.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info(f"Still waiting for '{args.wrist_perception_service}'...")
         self.get_logger().info(
             f"PDDL TAMP server ready. Publish natural-language commands to '{args.command_topic}' "
             f"or call service '{args.service_name}'."
         )
+        self.reset_debug_artifacts()
         self.warm_start_timer = None
         if not self.args.disable_warm_start:
             self.warm_scene_scheduled = True
@@ -422,8 +481,6 @@ class PddlTampServer(Node):
         command_id = f"step{step_idx}-{uuid.uuid4().hex[:8]}"
         selected_object = state.objects.get(action.args[0]) if action.args else None
         next_completed, next_occupied = self.anticipated_progress_after_action(action, state)
-        if self.should_reuse_previous_topview(action):
-            self.seed_previous_topview_prefetch(action, state, next_completed, next_occupied, command_id)
         payload = {
             "event": "execute_action",
             "command_id": command_id,
@@ -472,7 +529,7 @@ class PddlTampServer(Node):
             if self.warm_scene_pending or self.warm_scene_state is not None:
                 return
             self.warm_scene_pending = True
-        self.get_logger().info("[WarmStart] Starting initial top-view scene scan.")
+        self.get_logger().info("[WarmStart] Starting initial top-view scene scan from observe pose.")
         worker = threading.Thread(target=self._warm_scene_worker, daemon=True)
         worker.start()
 
@@ -504,6 +561,7 @@ class PddlTampServer(Node):
             self.get_logger().info(
                 f"[WarmStart] Initial top-view scene ready: objects={len(state.objects)}"
             )
+            self.save_warm_start_artifacts(state)
 
     def consume_warm_scene_state(
         self,
@@ -555,50 +613,20 @@ class PddlTampServer(Node):
         state.predicates = _build_predicates(state)
         state.notes = [
             *state.notes,
-            "used warm-start top-view scene captured before command",
+            "used warm-start top-view scene captured from observe pose before command",
         ]
         return state
 
-    @staticmethod
-    def should_reuse_previous_topview(action: PlanAction) -> bool:
-        return (
-            action.name == "move-target-to-goal"
-            and len(action.args) >= 3
-            and action.args[2] == "bookshelf"
-        )
-
-    def seed_previous_topview_prefetch(
-        self,
-        action: PlanAction,
-        state: PredicateState,
-        completed: set[str],
-        occupied_buffers: set[str],
-        command_id: str,
-    ) -> None:
-        scan_all_targets = not self.args.scan_goals_only
-        cached = copy.deepcopy(state)
-        cached.completed = set(completed)
-        cached.occupied_buffers = set(occupied_buffers)
-        completed_classes = set(completed)
-        cached.objects = {
-            name: obj
-            for name, obj in cached.objects.items()
-            if not (obj.is_target and obj.class_name in completed_classes)
-        }
-        cached.predicates = _build_predicates(cached)
-        cached.notes = [
-            *cached.notes,
-            f"reused previous top-view state after {action.pddl()} for bookshelf placement",
-        ]
-        key = self.prefetch_key(cached.goals, cached.completed, cached.occupied_buffers, scan_all_targets)
-        with self.prefetch_condition:
-            if key in self.prefetch_states or key in self.prefetch_pending:
-                return
-            self.prefetch_states[key] = cached
-            self.prefetch_condition.notify_all()
-        self.get_logger().info(
-            f"[Prefetch] Reusing previous top-view state for bookshelf action command_id={command_id}; "
-            f"completed={', '.join(sorted(completed)) or '<none>'}; objects={len(cached.objects)}"
+    def move_to_observe_pose(self, reason: str = "observe") -> None:
+        if self.args.dry_run or self.args.no_home:
+            return
+        move_arm_to_observe_pose(
+            self.arm,
+            self.args.observe_joints,
+            self.args.observe_x_offset,
+            self.args.observe_retreat_duration,
+            logger=self.get_logger(),
+            reason=reason,
         )
 
     @staticmethod
@@ -627,7 +655,13 @@ class PddlTampServer(Node):
             occupied_buffers.add(action.args[2])
         return completed, occupied_buffers
 
-    def start_scene_prefetch(self, prefetch_payload: dict | None, command_id: str, trigger: str = "observe-ready") -> None:
+    def start_scene_prefetch(
+        self,
+        prefetch_payload: dict | None,
+        command_id: str,
+        trigger: str = "observe-ready",
+        use_wrist: bool = False,
+    ) -> None:
         if not prefetch_payload:
             return
         try:
@@ -644,12 +678,13 @@ class PddlTampServer(Node):
                 return
             self.prefetch_pending.add(key)
         self.get_logger().info(
-            f"[Prefetch] Starting {trigger} scene scan for command_id={command_id}; "
+            f"[Prefetch] Starting {trigger} {'wrist-camera' if use_wrist else 'top-view'} scene scan "
+            f"for command_id={command_id}; "
             f"completed={', '.join(sorted(completed)) or '<none>'}"
         )
         worker = threading.Thread(
             target=self._prefetch_scene_worker,
-            args=(key, goals, completed, occupied_buffers, scan_all_targets, command_id),
+            args=(key, goals, completed, occupied_buffers, scan_all_targets, command_id, use_wrist),
             daemon=True,
         )
         worker.start()
@@ -662,11 +697,12 @@ class PddlTampServer(Node):
         occupied_buffers: set[str],
         scan_all_targets: bool,
         command_id: str,
+        use_wrist: bool,
     ) -> None:
         try:
             state = build_predicate_state(
                 goals,
-                self.detect_object_with_grasp,
+                self.detect_object_with_grasp_wrist if use_wrist else self.detect_object_with_grasp,
                 completed=completed,
                 occupied_buffers=occupied_buffers,
                 scan_all_targets=scan_all_targets,
@@ -788,8 +824,6 @@ class PddlTampServer(Node):
         if not goals:
             raise ValueError("No valid goals after filtering unknown destinations.")
 
-        self.reset_debug_artifacts()
-
         self.get_logger().info("[PDDL] Parsed goals:")
         for goal in goals:
             self.get_logger().info(f"[PDDL]   {goal.object_name} -> {goal.location}")
@@ -802,10 +836,6 @@ class PddlTampServer(Node):
             ],
             goals=[goal.__dict__ for goal in goals],
         )
-
-        if not self.args.dry_run and not self.args.no_home:
-            self.get_logger().info("[PDDL] Returning to home before planning.")
-            self.arm.move_joint(HOME_JOINTS)
 
         completed: set[str] = set()
         occupied_buffers: set[str] = set()
@@ -1293,6 +1323,60 @@ class PddlTampServer(Node):
         latest_path.write_text(text + "\n", encoding="utf-8")
         self.get_logger().info(f"[PDDL] Step artifacts saved: {predicates_path}")
 
+    def save_warm_start_artifacts(self, state: PredicateState) -> None:
+        summary = {
+            "completed": sorted(state.completed),
+            "occupied_buffers": sorted(state.occupied_buffers),
+            "objects": {name: object_summary(obj) for name, obj in state.objects.items()},
+            "predicates": sorted(state.predicates),
+            "notes": state.notes,
+        }
+        debug_dir = PDDL_DIR / "debug"
+        warm_dir = debug_dir / "warm_start"
+        if warm_dir.exists():
+            shutil.rmtree(warm_dir)
+        warm_dir.mkdir(parents=True, exist_ok=True)
+
+        images = []
+        for object_name, obj in sorted(summary["objects"].items()):
+            for key, source_text in sorted((obj.get("debug_files") or {}).items()):
+                source = Path(source_text)
+                if not source.is_file():
+                    continue
+                suffix = source.suffix or ".png"
+                filename = f"{self.safe_debug_filename(object_name)}_{self.safe_debug_filename(key)}{suffix}"
+                destination = warm_dir / filename
+                try:
+                    shutil.copyfile(source, destination)
+                except OSError as exc:
+                    self.get_logger().warn(f"[WarmStart] Could not save debug image '{source}': {exc}")
+                    continue
+                images.append({
+                    "object": object_name,
+                    "class_name": obj.get("class_name"),
+                    "instance_index": obj.get("instance_index"),
+                    "kind": key,
+                    "source": str(source),
+                    "path": str(destination),
+                })
+
+        payload = {
+            "event": "warm_start_scene",
+            "stamp_sec": time.time(),
+            "completed": summary["completed"],
+            "occupied_buffers": summary["occupied_buffers"],
+            "objects": summary["objects"],
+            "predicates": summary["predicates"],
+            "notes": summary["notes"],
+            "images": images,
+        }
+        text = json.dumps(payload, indent=2, sort_keys=True)
+        predicates_path = warm_dir / "predicates.json"
+        predicates_path.write_text(text + "\n", encoding="utf-8")
+        (debug_dir / "latest_warm_start_predicates.json").write_text(text + "\n", encoding="utf-8")
+        (debug_dir / "latest_predicates.json").write_text(text + "\n", encoding="utf-8")
+        self.get_logger().info(f"[WarmStart] Debug artifacts saved: {predicates_path}")
+
     def reset_debug_artifacts(self) -> None:
         debug_dir = PDDL_DIR / "debug"
         if debug_dir.exists():
@@ -1393,19 +1477,25 @@ class PddlTampServer(Node):
             return (Path("/tmp/.X11-unix") / f"X{display_num}").exists()
         return True
 
-    def detect_object(self, obj_name: str) -> dict:
+    def detect_object_from_client(self, obj_name: str, client, service_name: str) -> dict:
         req = StringString.Request()
         req.data = obj_name
-        future = self.perception_client.call_async(req)
+        future = client.call_async(req)
         deadline = time.monotonic() + self.args.perception_timeout
         while rclpy.ok() and not future.done():
             if time.monotonic() > deadline:
-                raise TimeoutError(f"Timed out waiting for perception result for '{obj_name}'.")
+                raise TimeoutError(f"Timed out waiting for perception result from '{service_name}' for '{obj_name}'.")
             time.sleep(0.02)
         result = future.result()
         if result is None:
-            raise RuntimeError(f"Perception service returned no result for '{obj_name}'.")
+            raise RuntimeError(f"Perception service '{service_name}' returned no result for '{obj_name}'.")
         return json.loads(result.data)
+
+    def detect_object(self, obj_name: str) -> dict:
+        return self.detect_object_from_client(obj_name, self.perception_client, self.args.perception_service)
+
+    def detect_object_wrist(self, obj_name: str) -> dict:
+        return self.detect_object_from_client(obj_name, self.wrist_perception_client, self.args.wrist_perception_service)
 
     def detect_object_with_grasp(self, obj_name: str) -> dict:
         detection = self.detect_object(obj_name)
@@ -1415,6 +1505,16 @@ class PddlTampServer(Node):
                 detection["grasp_selection"] = selection
             except Exception as exc:
                 self.get_logger().debug(f"[GraspPredict] select_grasp_target failed for {obj_name}: {exc}")
+        return detection
+
+    def detect_object_with_grasp_wrist(self, obj_name: str) -> dict:
+        detection = self.detect_object_wrist(obj_name)
+        if detection and detection.get("ok"):
+            try:
+                selection = self.select_grasp_target(detection, obj_name)
+                detection["grasp_selection"] = selection
+            except Exception as exc:
+                self.get_logger().debug(f"[GraspPredict] wrist select_grasp_target failed for {obj_name}: {exc}")
         return detection
 
     def select_grasp_target(self, detection: dict, obj_name: str) -> dict:
@@ -1575,15 +1675,11 @@ class PddlTampServer(Node):
         # PREVIEW CORRECTED POSE (from grasp_database.json)
         try:
             perception_features = extract_perception_features(detection)
-            pca_bbox_width = perception_features.get("pca_bbox_width_m")
-            pca_bbox_length = perception_features.get("pca_bbox_length_m")
-            pca_bbox_area = perception_features.get("pca_bbox_area_m2")
-            if pca_bbox_area is None and pca_bbox_width is not None and pca_bbox_length is not None:
-                pca_bbox_area = float(pca_bbox_width) * float(pca_bbox_length)
+            measured_area, measured_area_source = _measured_object_area_from_features(perception_features)
                 
             database = _load_grasp_database()
             matched_name, object_configs = _lookup_object_grasp_configs(database, obj_name)
-            item_state, grasp_config, _ = _select_state_config(object_configs, pca_bbox_area)
+            item_state, grasp_config, _ = _select_state_config(object_configs, measured_area)
             grasp_transform = _extract_grasp_transform(grasp_config)
             
             corrected_grasp_pose = apply_grasp_transform(grasp_pose, grasp_transform)
@@ -1593,7 +1689,10 @@ class PddlTampServer(Node):
             corrected_msg.pose = corrected_grasp_pose
             self.corrected_grasp_pose_publisher.publish(corrected_msg)
             
-            self.get_logger().info(f"Published preview of corrected grasp pose for '{obj_name}' (state={item_state})")
+            self.get_logger().info(
+                f"Published preview of corrected grasp pose for '{obj_name}' "
+                f"(state={item_state}, area={measured_area}, source={measured_area_source})"
+            )
         except Exception as e:
             self.get_logger().warn(f"Failed to publish preview of corrected grasp pose: {e}")
         
@@ -1603,7 +1702,8 @@ class PddlTampServer(Node):
         # Centroid Sphere (Yellow)
         centroid_marker = Marker()
         centroid_marker.header.frame_id = "base_link"
-        centroid_marker.header.stamp = pose_msg.header.stamp
+        centroid_marker.header.stamp.sec = 0
+        centroid_marker.header.stamp.nanosec = 0
         centroid_marker.ns = "pca_debug"
         centroid_marker.id = 0
         centroid_marker.type = Marker.SPHERE
@@ -1622,7 +1722,8 @@ class PddlTampServer(Node):
             # 3D PCA Arrow (Cyan)
             pca_arrow = Marker()
             pca_arrow.header.frame_id = "base_link"
-            pca_arrow.header.stamp = pose_msg.header.stamp
+            pca_arrow.header.stamp.sec = 0
+            pca_arrow.header.stamp.nanosec = 0
             pca_arrow.ns = "pca_debug"
             pca_arrow.id = 1
             pca_arrow.type = Marker.ARROW
@@ -1646,28 +1747,24 @@ class PddlTampServer(Node):
         if points_path and os.path.isfile(points_path):
             try:
                 points = np.load(points_path)
-                pc_marker = Marker()
-                pc_marker.header.frame_id = source_frame
-                pc_marker.header.stamp = pose_msg.header.stamp
-                pc_marker.ns = "pca_debug"
-                pc_marker.id = 2
-                pc_marker.type = Marker.POINTS
-                pc_marker.action = Marker.ADD
-                pc_marker.scale.x = 0.005
-                pc_marker.scale.y = 0.005
-                pc_marker.color.r = 1.0
-                pc_marker.color.g = 0.5
-                pc_marker.color.b = 0.0
-                pc_marker.color.a = 0.5
                 
-                step = max(1, len(points) // 3000)
-                for pt in points[::step]:
-                    p = Point()
-                    p.x = float(pt[0])
-                    p.y = float(pt[1])
-                    p.z = float(pt[2])
-                    pc_marker.points.append(p)
-                marker_array.markers.append(pc_marker)
+                # Filter out NaN values
+                points = points.reshape(-1, points.shape[-1])[:, :3]
+                points = points[np.isfinite(points).all(axis=1)]
+                
+                # Create a proper PointCloud2 message
+                from sensor_msgs_py.point_cloud2 import create_cloud_xyz32
+                from std_msgs.msg import Header
+                
+                header = Header()
+                header.frame_id = source_frame
+                # timestamp 0 bypasses strict TF timing checks
+                header.stamp.sec = 0
+                header.stamp.nanosec = 0
+                
+                pc2 = create_cloud_xyz32(header, points)
+                self.pc2_publisher.publish(pc2)
+                self.get_logger().info(f"Published {len(points)} valid points to /pca_debug_cloud")
             except Exception as e:
                 self.get_logger().error(f"Failed to load point cloud for visualization: {e}")
             
@@ -1832,6 +1929,7 @@ def parse_args(argv=None):
     parser.add_argument("--command-topic", default="/task_commands")
     parser.add_argument("--log-topic", default="/pddl_tamp_log")
     parser.add_argument("--perception-service", default="detect_object_top_rgbd_seg_crop")
+    parser.add_argument("--wrist-perception-service", default="detect_object_rgbd_seg_crop")
     parser.add_argument("--camera-frame", default="camera_color_optical_frame")
     parser.add_argument("--perception-timeout", type=float, default=15.0)
     parser.add_argument("--tf-timeout", type=float, default=5.0)
@@ -1843,8 +1941,26 @@ def parse_args(argv=None):
     parser.add_argument("--executor-result-topic", default="/pddl_action_results")
     parser.add_argument(
         "--observe-joints",
-        default="0.0,-1.57079632679,1.0,-1.0471975512,-1.57079632679,0.0",
-        help="Comma-separated six-joint pose used for top-view observation after each place.",
+        default=",".join(str(value) for value in OBSERVE_JOINTS),
+        help="Comma-separated six-joint base pose used before the Cartesian -X observation retreat.",
+    )
+    parser.add_argument(
+        "--observe-x-offset",
+        type=float,
+        default=OBSERVE_X_OFFSET_M,
+        help="Base-frame -X distance in meters used to retreat the gripper for top-view observation.",
+    )
+    parser.add_argument(
+        "--observe-y-offset",
+        type=float,
+        default=None,
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--observe-retreat-duration",
+        type=float,
+        default=OBSERVE_RETREAT_DURATION_S,
+        help="Duration in seconds for the Cartesian -X observation retreat.",
     )
     parser.add_argument("--max-steps", type=int, default=int(os.environ.get("PDDL_TAMP_MAX_STEPS", "8")))
     parser.add_argument("--one-step", action="store_true", help="Execute only the first selected physical action.")
@@ -1861,7 +1977,7 @@ def parse_args(argv=None):
     parser.add_argument("--grasp-surface-clearance", type=float, default=-0.012)
     parser.add_argument("--grasp-depth-local-radius", type=float, default=0.0005)
     parser.add_argument("--grasp-depth-percentile", type=float, default=10.0)
-    parser.add_argument("--grasp-y-offset", type=float, default=-0.0)
+    parser.add_argument("--grasp-y-offset", type=float, default=-0.015)
     parser.add_argument("--gripper-force", type=float, default=0.5)
     parser.add_argument("--gripper-close-pos", type=float, default=0.5)
     parser.add_argument("--gripper-settle-time", type=float, default=0.4)
@@ -1877,27 +1993,45 @@ def main(argv=None):
     args = parse_args(argv)
     logging.basicConfig(level=logging.DEBUG, format="%(name)s %(levelname)s %(message)s")
     top_view_module = None if args.external_perception else load_top_view_perception_module()
-    ros_argv = (
-        ros_args_with_embedded_perception_defaults(argv or sys.argv, args, top_view_module)
-        if top_view_module is not None
-        else argv
-    )
+    ros_argv = argv
     rclpy.init(args=ros_argv)
+    arm = ArmClient()
+    if not args.dry_run and not args.no_home:
+        move_arm_to_observe_pose(
+            arm,
+            args.observe_joints,
+            args.observe_x_offset,
+            args.observe_retreat_duration,
+            logger=arm.get_logger(),
+            reason="startup",
+        )
     perception_node = None
+    wrist_perception_node = None
     tf_node = TfNode()
     if top_view_module is not None:
-        perception_node = top_view_module.RgbdSegCropServiceNode()
+        top_defaults = dict(top_view_module.DEFAULTS)
+        top_defaults["service_name"] = args.perception_service
+        perception_node = top_view_module.RgbdSegCropServiceNode(
+            node_name="pddl_top_view_seg_crop_service_node",
+            default_params=top_defaults,
+        )
         perception_node.get_logger().info("Embedded top-view perception is running inside PDDL TAMP server.")
-    arm = ArmClient()
+        wrist_defaults = dict(WRIST_VIEW_DEFAULTS)
+        wrist_defaults["service_name"] = args.wrist_perception_service
+        wrist_perception_node = RgbdSegCropServiceNode(
+            node_name="pddl_wrist_seg_crop_service_node",
+            default_params=wrist_defaults,
+        )
+        wrist_perception_node.get_logger().info("Embedded wrist-camera perception is running inside PDDL TAMP server.")
     server = PddlTampServer(args, tf_node.tf_buffer, arm)
     manipulator_executor = ManipulatorExecutor(args, server)
     child_processes = []
     try:
-        if not args.no_home:
-            arm.move_joint(HOME_JOINTS)
         executor = MultiThreadedExecutor(num_threads=4)
         if perception_node is not None:
             executor.add_node(perception_node)
+        if wrist_perception_node is not None:
+            executor.add_node(wrist_perception_node)
         executor.add_node(tf_node)
         executor.add_node(server)
         executor.add_node(manipulator_executor)
@@ -1912,6 +2046,8 @@ def main(argv=None):
         tf_node.destroy_node()
         if perception_node is not None:
             perception_node.destroy_node()
+        if wrist_perception_node is not None:
+            wrist_perception_node.destroy_node()
         arm.destroy_node()
         rclpy.shutdown()
         stop_child_processes(child_processes)

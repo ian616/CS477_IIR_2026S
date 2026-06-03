@@ -39,6 +39,9 @@ def executor_safe_gripper_goto(node, pos, force=1.0, timeout=3.0, **kwargs):
     timeout = float(timeout)
     margin = float(getattr(node, "gripper_result_timeout_margin", 8.0))
     strict = bool(getattr(node, "strict_gripper_result", False))
+    tolerance = float(kwargs.get("tolerance", 0.004)) #0.007 is failed
+    max_retries = int(kwargs.get("max_retries", 10))
+
     if not hasattr(node, "_pddl_gripper_client"):
         node._pddl_gripper_client = ActionClient(
             node,
@@ -46,56 +49,95 @@ def executor_safe_gripper_goto(node, pos, force=1.0, timeout=3.0, **kwargs):
             "/gripper_controller/follow_joint_trajectory",
             callback_group=getattr(node, "callback_group", None),
         )
+        
+    if not hasattr(node, "_gripper_pos"):
+        node._gripper_pos = None
+        def js_callback(msg):
+            if 'robotiq_85_left_knuckle_joint' in msg.name:
+                idx = msg.name.index('robotiq_85_left_knuckle_joint')
+                node._gripper_pos = msg.position[idx]
+        from sensor_msgs.msg import JointState
+        node._js_sub = node.create_subscription(
+            JointState, 
+            '/joint_states', 
+            js_callback, 
+            10, 
+            callback_group=getattr(node, "callback_group", None)
+        )
+
     client = node._pddl_gripper_client
     if not client.wait_for_server(timeout_sec=5.0):
         raise RuntimeError("Timed out waiting for gripper action server.")
 
-    goal = FollowJointTrajectory.Goal()
-    goal.trajectory = JointTrajectory()
-    goal.trajectory.joint_names = [CUSTOM_GRIPPER_JOINT_NAME]
-    goal.trajectory.points = [
-        JointTrajectoryPoint(
-            positions=[float(pos)],
-            velocities=[0.0],
-            time_from_start=Duration(sec=int(timeout), nanosec=int((timeout - int(timeout)) * 1e9)),
-        )
-    ]
-    goal_future = client.send_goal_async(goal)
-    deadline = time.monotonic() + timeout + margin
-    while rclpy.ok() and not goal_future.done():
-        if time.monotonic() > deadline:
-            raise TimeoutError("Timed out sending gripper goal.")
-        time.sleep(0.01)
-    goal_handle = goal_future.result()
-    if goal_handle is None or not goal_handle.accepted:
-        raise RuntimeError("Gripper goal was rejected.")
-
-    result_future = goal_handle.get_result_async()
-    deadline = time.monotonic() + timeout + margin
-    while rclpy.ok() and not result_future.done():
-        if time.monotonic() > deadline:
-            if strict:
-                raise TimeoutError("Timed out waiting for gripper motion.")
-            node.get_logger().warn(
-                "Timed out waiting for gripper result; continuing because object contact can stop closing early."
+    for attempt in range(max_retries):
+        node.get_logger().info(f'Attempt {attempt + 1}: Executing trajectory to pos {pos}')
+        goal = FollowJointTrajectory.Goal()
+        goal.trajectory = JointTrajectory()
+        goal.trajectory.joint_names = [CUSTOM_GRIPPER_JOINT_NAME]
+        goal.trajectory.points = [
+            JointTrajectoryPoint(
+                positions=[float(pos)],
+                velocities=[0.0],
+                time_from_start=Duration(sec=int(timeout), nanosec=int((timeout - int(timeout)) * 1e9)),
             )
-            try:
-                goal_handle.cancel_goal_async()
-            except Exception as exc:
-                node.get_logger().warn(f"Could not cancel timed-out gripper goal: {exc}")
-            settle = float(getattr(node, "gripper_settle_time", 0.0))
-            if settle > 0.0:
-                time.sleep(settle)
+        ]
+        
+        goal_future = client.send_goal_async(goal)
+        deadline = time.monotonic() + timeout + margin
+        while rclpy.ok() and not goal_future.done():
+            if time.monotonic() > deadline:
+                raise TimeoutError("Timed out sending gripper goal.")
+            time.sleep(0.01)
+            
+        goal_handle = goal_future.result()
+        if goal_handle is None or not goal_handle.accepted:
+            raise RuntimeError("Gripper goal was rejected.")
+
+        result_future = goal_handle.get_result_async()
+        deadline = time.monotonic() + timeout + margin
+        timed_out = False
+        while rclpy.ok() and not result_future.done():
+            if time.monotonic() > deadline:
+                timed_out = True
+                if strict:
+                    raise TimeoutError("Timed out waiting for gripper motion.")
+                node.get_logger().warn(
+                    "Timed out waiting for gripper result; continuing because object contact can stop closing early."
+                )
+                try:
+                    goal_handle.cancel_goal_async()
+                except Exception as exc:
+                    node.get_logger().warn(f"Could not cancel timed-out gripper goal: {exc}")
+                break
+            time.sleep(0.01)
+
+        settle = float(getattr(node, "gripper_settle_time", 0.0))
+        if settle > 0.0:
+            time.sleep(settle)
+
+        # Closed loop check
+        if timed_out:
+            # If it timed out, it might have grasped an object, so we accept the result.
             return {"ok": True, "timed_out": True, "position": float(pos)}
-        time.sleep(0.01)
-    result = result_future.result()
-    if result is None:
-        message = f"Gripper action returned no result: {result_future.exception()!r}"
-        if strict:
-            raise RuntimeError(message)
-        node.get_logger().warn(message)
-        return {"ok": True, "missing_result": True, "position": float(pos)}
-    return result
+            
+        if node._gripper_pos is not None:
+            error = abs(node._gripper_pos - pos)
+            if error <= tolerance:
+                node.get_logger().info(f"Gripper reached target {pos} within tolerance (Error: {error:.4f}).")
+                return {"ok": True, "timed_out": False, "position": float(pos)}
+            else:
+                node.get_logger().warn(f"Tolerance not met. Target: {pos}, Actual: {node._gripper_pos:.4f}, Error: {error:.4f} > {tolerance}")
+                # If we are closing the gripper (pos > 0.1) and we hit something, the controller succeeds but tolerance isn't met.
+                if not strict and pos > 0.1:
+                    node.get_logger().info("Accepting position anyway because gripper is closing and might have contacted an object.")
+                    return {"ok": True, "timed_out": False, "position": float(pos)}
+        else:
+            node.get_logger().warn("Current position unknown (no joint states received).")
+
+        time.sleep(0.5)
+
+    node.get_logger().error(f"Failed to reach target {pos} within tolerance after {max_retries} attempts.")
+    return {"ok": False, "timed_out": False, "position": float(pos)}
 
 
 def executor_safe_gripper_open(node, force=1.0, timeout=1.0, gripper_open_pos=0.0, **kwargs):
