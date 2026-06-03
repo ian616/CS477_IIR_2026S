@@ -1179,6 +1179,7 @@ class PddlTampServer(Node):
         action_ledger: list[ActionLedgerEntry] = []
         steps = []
         scenes = []
+        returned_home = False
         domain_path = ensure_domain(PDDL_DIR / "domain.pddl")
         problem_path = PDDL_DIR / "problem.pddl"
 
@@ -1247,6 +1248,10 @@ class PddlTampServer(Node):
                     ["[PDDL] all goals completed", f"completed: {', '.join(sorted(completed))}"],
                     step=step_idx,
                     completed=sorted(completed),
+                )
+                returned_home = self.return_home_if_scene_empty(
+                    reason="all goals completed",
+                    scene_summary=scene_summary,
                 )
                 break
 
@@ -1413,6 +1418,9 @@ class PddlTampServer(Node):
             if self.args.one_step:
                 break
 
+        if not returned_home and not self.args.one_step:
+            returned_home = self.return_home_if_scene_empty(reason="command finished")
+
         ok = len(completed) == len({goal.object_name for goal in goals})
         self.publish_pddl_log(
             "command_finished",
@@ -1421,11 +1429,13 @@ class PddlTampServer(Node):
                 f"completed: {', '.join(sorted(completed)) or '<none>'}",
                 f"occupied_buffers: {', '.join(sorted(occupied_buffers)) or '<none>'}",
                 f"buffered_obstacles: {', '.join(sorted(buffered_obstacles)) or '<none>'}",
+                f"returned_home: {returned_home}",
             ],
             ok=ok,
             completed=sorted(completed),
             occupied_buffers=sorted(occupied_buffers),
             buffered_obstacles=sorted(buffered_obstacles),
+            returned_home=returned_home,
             action_ledger=[entry.to_dict() for entry in action_ledger],
         )
         return {
@@ -1440,7 +1450,49 @@ class PddlTampServer(Node):
             "scenes": scenes,
             "message": "PDDL TAMP completed." if ok else "PDDL TAMP stopped before all goals completed.",
             "dry_run": bool(self.args.dry_run),
+            "returned_home": bool(returned_home),
         }
+
+    @staticmethod
+    def scene_summary_empty(summary: dict) -> bool:
+        objects = (summary or {}).get("objects") or {}
+        return not any(obj.get("detected") and obj.get("visible") for obj in objects.values())
+
+    def return_home_if_scene_empty(self, reason: str, scene_summary: dict | None = None) -> bool:
+        if self.args.dry_run:
+            self.get_logger().info(f"[PDDL] Dry-run: skipping final home check for {reason}.")
+            return False
+
+        if scene_summary is not None:
+            empty = self.scene_summary_empty(scene_summary)
+            detected_count = sum(
+                1
+                for obj in (scene_summary.get("objects") or {}).values()
+                if obj.get("detected") and obj.get("visible")
+            )
+        else:
+            try:
+                scene = self.detect_scene()
+            except Exception as exc:
+                self.get_logger().warn(f"[PDDL] Final empty-screen check failed; staying put: {exc}")
+                return False
+            detected_count = len(scene.get("all_detections") or [])
+            empty = detected_count == 0
+
+        if not empty:
+            self.get_logger().info(
+                f"[PDDL] Final screen is not empty after {reason}; detected={detected_count}. Staying put."
+            )
+            return False
+
+        self.get_logger().info(f"[PDDL] Final screen is empty after {reason}; returning to home position.")
+        self.publish_pddl_log(
+            "final_home",
+            [f"[PDDL] final screen empty after {reason}; returning home"],
+            reason=reason,
+        )
+        self.arm.move_joint(HOME_JOINTS)
+        return True
 
     def select_executable_action(self, actions: list[PlanAction]) -> PlanAction:
         for action in actions:
@@ -3004,7 +3056,7 @@ def parse_args(argv=None):
         default=OBSERVE_RETREAT_DURATION_S,
         help="Duration in seconds for the Cartesian -X observation retreat.",
     )
-    parser.add_argument("--max-steps", type=int, default=int(os.environ.get("PDDL_TAMP_MAX_STEPS", "8")))
+    parser.add_argument("--max-steps", type=int, default=int(os.environ.get("PDDL_TAMP_MAX_STEPS", "16")))
     parser.add_argument("--one-step", action="store_true", help="Execute only the first selected physical action.")
     parser.add_argument("--scan-goals-only", action="store_true", help="Only scan requested targets instead of all five fixed targets.")
     parser.add_argument("--no-gemini", action="store_true", help="Disable Gemini parsing and use the rule-based parser.")
