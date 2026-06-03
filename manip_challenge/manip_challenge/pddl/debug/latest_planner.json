@@ -3,17 +3,17 @@
   "plan": [
     {
       "args": [
-        "meat_can_0",
+        "hammer_0",
         "table",
-        "bookshelf"
+        "left_storage"
       ],
       "name": "move-target-to-goal",
-      "pddl": "(move-target-to-goal meat_can_0 table bookshelf)",
+      "pddl": "(move-target-to-goal hammer_0 table left_storage)",
       "source": "external"
     }
   ],
-  "problem": "/home/ubuntu/cs477_ws/src/cs477_IIR/manip_challenge/manip_challenge/pddl/problem.pddl",
-  "raw_output": "(move-target-to-goal meat_can_0 table bookshelf)\n; cost = 1 (unit cost)\n\n",
-  "stamp_sec": 1780450635.472033,
-  "step": 1
+  "problem": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/problem.pddl",
+  "raw_output": "(move-target-to-goal hammer_0 table left_storage)\n; cost = 1 (unit cost)\n\n",
+  "stamp_sec": 1780457926.0859616,
+  "step": 6
 }

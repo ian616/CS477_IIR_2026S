@@ -1,15 +1,15 @@
 {
   "action": {
     "args": [
-      "meat_can_0",
+      "hammer_0",
       "table",
-      "bookshelf"
+      "left_storage"
     ],
     "name": "move-target-to-goal",
-    "pddl": "(move-target-to-goal meat_can_0 table bookshelf)",
+    "pddl": "(move-target-to-goal hammer_0 table left_storage)",
     "source": "external"
   },
   "event": "selected_action",
-  "stamp_sec": 1780450635.4726768,
-  "step": 1
+  "stamp_sec": 1780457926.088001,
+  "step": 6
 }

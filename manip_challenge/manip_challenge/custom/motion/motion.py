@@ -151,6 +151,7 @@ def pick_place_storage(node, arm, grasp_pose, destination, obj_name,
                        on_before_idle=None, get_next_pick_data=None,
                        pick_already_done=False, perception_info=None,
                        on_observe_ready=None, skip_observe_after_place=False):
+    initial_joint = np.array(arm.js_joint_position, dtype=float).flatten().tolist()
     pick_pan_angle = math.atan2(grasp_pose.position.y, grasp_pose.position.x)
 
     if not pick_already_done:
@@ -182,27 +183,36 @@ def pick_place_storage(node, arm, grasp_pose, destination, obj_name,
     # 2. [Place Phase]
     node.get_logger().info(f"Starting PLACE phase. Destination: {destination}")
     config = PLACE_CONFIGS[destination]
+    is_dynamic_buffer = config.get("dynamic_selection") is not None
 
     count_attr = f"storage_{destination.replace(' ', '_')}_count"
     if not hasattr(node, count_attr):
         setattr(node, count_attr, 0)
     count = getattr(node, count_attr)
 
-    # Divide storage into 8 slots
-    x_start, x_end = config["range_x"][0], config["range_x"][1]
-    x_slots = [x_start + (x_end - x_start) * 0.25, x_start + (x_end - x_start) * 0.75]
-
-    y_start, y_end = config["range_y"][0], config["range_y"][1]
-    y_slots = [y_start + (y_end - y_start) * (0.125 + 0.25 * i) for i in range(4)]
-
     lift_pose = copy.deepcopy(grasp_pose)
     lift_pose.position.z += 0.20
 
-    slot_count = 1 if obj_name == 'hammer' else count
     place_pose = Pose()
-    place_pose.position.x = x_slots[(slot_count // 4) % 2]
-    place_pose.position.y = y_slots[slot_count % 4]
-    place_pose.position.z = config["base_z"] + grasp_pose.position.z + 0.15
+    if config.get("place_xy") is not None:
+        place_xy = config["place_xy"]
+        place_pose.position.x = float(place_xy[0])
+        place_pose.position.y = float(place_xy[1])
+    else:
+        # Divide storage into 8 slots
+        x_start, x_end = config["range_x"][0], config["range_x"][1]
+        x_slots = [x_start + (x_end - x_start) * 0.25, x_start + (x_end - x_start) * 0.75]
+
+        y_start, y_end = config["range_y"][0], config["range_y"][1]
+        y_slots = [y_start + (y_end - y_start) * (0.125 + 0.25 * i) for i in range(4)]
+
+        slot_count = 1 if obj_name == 'hammer' else count
+        place_pose.position.x = x_slots[(slot_count // 4) % 2]
+        place_pose.position.y = y_slots[slot_count % 4]
+    if config.get("place_z") is not None:
+        place_pose.position.z = float(config["place_z"])
+    else:
+        place_pose.position.z = config["base_z"] + grasp_pose.position.z + 0.15
     place_pose.orientation = lift_pose.orientation
 
     place_pan_angle = math.atan2(place_pose.position.y, place_pose.position.x)
@@ -216,10 +226,22 @@ def pick_place_storage(node, arm, grasp_pose, destination, obj_name,
 
     # Move deterministically to the storage approach pose first.  Once the arm is
     # actually above storage, trigger the prefetch scan before descending.
-    arm.execute_trajectory(
-        [lift_pose, place_joint, place_approach],
-        durations=[1.0, rot_time_place, 1.5],
-    )
+    if is_dynamic_buffer:
+        node.get_logger().info(
+            "Dynamic buffer transfer: returning to the initial joint posture before moving to buffer."
+        )
+        rot_time_initial = _calc_rot_time(pick_pan_angle, initial_joint[0], min_time=1.5)
+        rot_time_buffer = _calc_rot_time(initial_joint[0], place_pan_angle)
+        arm.execute_trajectory([initial_joint], durations=[rot_time_initial])
+        arm.execute_trajectory(
+            [place_joint, place_approach],
+            durations=[rot_time_buffer, 1.5],
+        )
+    else:
+        arm.execute_trajectory(
+            [lift_pose, place_joint, place_approach],
+            durations=[1.0, rot_time_place, 1.5],
+        )
     if on_before_idle is not None:
         try:
             on_before_idle()

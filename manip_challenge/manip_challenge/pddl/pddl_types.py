@@ -6,7 +6,8 @@ from typing import Any
 
 
 KNOWN_OBJECTS = ("banana", "meat_can", "coke_can", "hammer", "strawberry")
-BUFFER_LOCATIONS = ("buffer1", "buffer2")
+DYNAMIC_BUFFER_LOCATION = "dynamic_buffer"
+BUFFER_LOCATIONS = (DYNAMIC_BUFFER_LOCATION,)
 LOCATIONS = ("table", "left_storage", "right_storage", "bookshelf", *BUFFER_LOCATIONS)
 DESTINATION_TO_LOCATION = {
     "left storage": "left_storage",
@@ -23,8 +24,7 @@ LOCATION_TO_DESTINATION = {
     "left_storage": "left storage",
     "right_storage": "right storage",
     "bookshelf": "bookshelf",
-    "buffer1": "buffer1",
-    "buffer2": "buffer2",
+    "dynamic_buffer": "dynamic_buffer",
 }
 
 

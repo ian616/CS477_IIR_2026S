@@ -70,7 +70,15 @@ from manip_challenge.pddl.ros_helpers import (
     save_grasp_selection_visualization,
     stop_child_processes,
 )
-from manip_challenge.pddl.pddl_types import Goal, ObjectState, PlanAction, PredicateState, KNOWN_OBJECTS, BUFFER_LOCATIONS
+from manip_challenge.pddl.pddl_types import (
+    DYNAMIC_BUFFER_LOCATION,
+    Goal,
+    ObjectState,
+    PlanAction,
+    PredicateState,
+    KNOWN_OBJECTS,
+    BUFFER_LOCATIONS,
+)
 from manip_challenge.pddl.utils import PDDL_DIR, load_dotenv
 from manip_challenge.custom.perception.icp.rgbd_seg_crop_server import RgbdSegCropServiceNode
 from manip_challenge.custom.grasping.grasping_item import (
@@ -651,7 +659,11 @@ class PddlTampServer(Node):
         if action.name == "move-target-to-goal" and action.args:
             moved = state.objects.get(action.args[0])
             completed.add(moved.class_name if moved is not None and moved.class_name else action.args[0])
-        elif action.name == "move-obstacle-to-buffer" and len(action.args) >= 3:
+        elif (
+            action.name == "move-obstacle-to-buffer"
+            and len(action.args) >= 3
+            and action.args[2] != DYNAMIC_BUFFER_LOCATION
+        ):
             occupied_buffers.add(action.args[2])
         return completed, occupied_buffers
 
@@ -1020,7 +1032,11 @@ class PddlTampServer(Node):
             if action.name == "move-target-to-goal" and result.get("ok"):
                 moved = state.objects.get(action.args[0])
                 completed.add(moved.class_name if moved is not None and moved.class_name else action.args[0])
-            elif action.name == "move-obstacle-to-buffer" and result.get("ok"):
+            elif (
+                action.name == "move-obstacle-to-buffer"
+                and result.get("ok")
+                and action.args[2] != DYNAMIC_BUFFER_LOCATION
+            ):
                 occupied_buffers.add(action.args[2])
 
             self.get_logger().info("[PDDL] Replanning after action execution.")

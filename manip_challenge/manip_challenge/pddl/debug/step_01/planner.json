@@ -5,15 +5,34 @@
       "args": [
         "meat_can_0",
         "table",
-        "bookshelf"
+        "dynamic_buffer"
+      ],
+      "name": "move-obstacle-to-buffer",
+      "pddl": "(move-obstacle-to-buffer meat_can_0 table dynamic_buffer)",
+      "source": "external"
+    },
+    {
+      "args": [
+        "meat_can_0",
+        "hammer_0"
+      ],
+      "name": "clear-blocking-relation",
+      "pddl": "(clear-blocking-relation meat_can_0 hammer_0)",
+      "source": "external"
+    },
+    {
+      "args": [
+        "hammer_0",
+        "table",
+        "left_storage"
       ],
       "name": "move-target-to-goal",
-      "pddl": "(move-target-to-goal meat_can_0 table bookshelf)",
+      "pddl": "(move-target-to-goal hammer_0 table left_storage)",
       "source": "external"
     }
   ],
-  "problem": "/home/ubuntu/cs477_ws/src/cs477_IIR/manip_challenge/manip_challenge/pddl/problem.pddl",
-  "raw_output": "(move-target-to-goal meat_can_0 table bookshelf)\n; cost = 1 (unit cost)\n\n",
-  "stamp_sec": 1780450635.472033,
+  "problem": "/home/lhs/CS477_IIR_2026S/manip_challenge/manip_challenge/pddl/problem.pddl",
+  "raw_output": "(move-obstacle-to-buffer meat_can_0 table dynamic_buffer)\n(clear-blocking-relation meat_can_0 hammer_0)\n(move-target-to-goal hammer_0 table left_storage)\n; cost = 3 (unit cost)\n\n",
+  "stamp_sec": 1780457687.7816133,
   "step": 1
 }

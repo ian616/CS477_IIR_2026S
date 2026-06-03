@@ -2,14 +2,16 @@
 from __future__ import annotations
 
 import copy
+import math
 from typing import Any
 
 from geometry_msgs.msg import Pose
+import numpy as np
 
 from manip_challenge.custom.motion import motion as motion_module
 from manip_challenge.custom.motion.motion import execute_pick_place_sequence
 from manip_challenge.pddl.ros_helpers import pose_to_dict
-from .pddl_types import LOCATION_TO_DESTINATION, PlanAction
+from .pddl_types import DYNAMIC_BUFFER_LOCATION, LOCATION_TO_DESTINATION, PlanAction
 
 
 # This file is the main swap point between symbolic PDDL actions and the real
@@ -30,17 +32,31 @@ from .pddl_types import LOCATION_TO_DESTINATION, PlanAction
 # 4. Keep new trajectory/gripper code inside custom/grasping or custom/motion
 #    when possible, then call it from the handler here.
 
+DYNAMIC_BUFFER_DEFAULT_OBJECT_RADIUS_M = 0.065
+DYNAMIC_BUFFER_WALL_CLEARANCE_M = 0.020
+DYNAMIC_BUFFER_WORKSPACE_CENTER = (0.550, 0.000)
+DYNAMIC_BUFFER_WORKSPACE_SIZE = (0.500, 0.900)
+DYNAMIC_BUFFER_WORKSPACE_X = (
+    DYNAMIC_BUFFER_WORKSPACE_CENTER[0] - 0.5 * DYNAMIC_BUFFER_WORKSPACE_SIZE[0]
+    + DYNAMIC_BUFFER_DEFAULT_OBJECT_RADIUS_M + DYNAMIC_BUFFER_WALL_CLEARANCE_M,
+    DYNAMIC_BUFFER_WORKSPACE_CENTER[0] + 0.5 * DYNAMIC_BUFFER_WORKSPACE_SIZE[0]
+    - DYNAMIC_BUFFER_DEFAULT_OBJECT_RADIUS_M - DYNAMIC_BUFFER_WALL_CLEARANCE_M,
+)
+DYNAMIC_BUFFER_WORKSPACE_Y = (
+    DYNAMIC_BUFFER_WORKSPACE_CENTER[1] - 0.5 * DYNAMIC_BUFFER_WORKSPACE_SIZE[1]
+    + DYNAMIC_BUFFER_DEFAULT_OBJECT_RADIUS_M + DYNAMIC_BUFFER_WALL_CLEARANCE_M,
+    DYNAMIC_BUFFER_WORKSPACE_CENTER[1] + 0.5 * DYNAMIC_BUFFER_WORKSPACE_SIZE[1]
+    - DYNAMIC_BUFFER_DEFAULT_OBJECT_RADIUS_M - DYNAMIC_BUFFER_WALL_CLEARANCE_M,
+)
+DYNAMIC_BUFFER_GRID_STEP_M = 0.035
+DYNAMIC_BUFFER_MIN_CLEARANCE_M = 0.075
+DYNAMIC_BUFFER_BASE_Z = 0.06
+
 BUFFER_CONFIGS = {
-    "buffer1": {
-        "range_x": [0.300, 0.430],
-        "range_y": [0.185, 0.335],
-        "base_z": 0.06,
-        "use_grasp_orientation": True,
-    },
-    "buffer2": {
-        "range_x": [0.300, 0.430],
-        "range_y": [-0.335, -0.185],
-        "base_z": 0.06,
+    DYNAMIC_BUFFER_LOCATION: {
+        "range_x": list(DYNAMIC_BUFFER_WORKSPACE_X),
+        "range_y": list(DYNAMIC_BUFFER_WORKSPACE_Y),
+        "base_z": DYNAMIC_BUFFER_BASE_Z,
         "use_grasp_orientation": True,
     },
 }
@@ -61,6 +77,272 @@ def pose_from_xyz(xyz) -> Pose:
     pose.position.z = float(xyz[2])
     pose.orientation.w = 1.0
     return pose
+
+
+def _finite_xyz(values) -> list[float] | None:
+    if values is None:
+        return None
+    try:
+        if len(values) < 3:
+            return None
+        xyz = [float(values[0]), float(values[1]), float(values[2])]
+    except (TypeError, ValueError, IndexError):
+        return None
+    return xyz if all(math.isfinite(v) for v in xyz) else None
+
+
+def _transform_xyz_to_base(server, xyz, source_frame: str) -> tuple[float, float, float] | None:
+    xyz = _finite_xyz(xyz)
+    if xyz is None:
+        return None
+    try:
+        pose = server.transform_pose(pose_from_xyz(xyz), source_frame, "base_link")
+    except Exception as exc:
+        server.get_logger().debug(f"[DynamicBuffer] failed to transform point from {source_frame}: {exc}")
+        return None
+    return (float(pose.position.x), float(pose.position.y), float(pose.position.z))
+
+
+def _scene_footprints_from_detection(server, detection: dict | None) -> list[dict[str, Any]]:
+    if not detection:
+        return []
+    source_frame = detection.get("frame_id") or server.args.camera_frame
+    footprints: list[dict[str, Any]] = []
+
+    for item in detection.get("all_pca_bboxes") or []:
+        if not item.get("ok"):
+            continue
+        position = item.get("position_point") or {}
+        xyz = position.get("grasp_xyz_m") or position.get("target_xyz_m") or position.get("raw_centroid_xyz_m")
+        base_xyz = _transform_xyz_to_base(server, xyz, source_frame)
+        if base_xyz is None:
+            continue
+        length = float(item.get("length_m") or 0.0)
+        width = float(item.get("width_m") or 0.0)
+        radius = max(
+            DYNAMIC_BUFFER_DEFAULT_OBJECT_RADIUS_M,
+            0.5 * math.hypot(length, width) + DYNAMIC_BUFFER_MIN_CLEARANCE_M,
+        )
+        footprints.append({
+            "label": item.get("label"),
+            "xy": base_xyz[:2],
+            "radius": radius,
+            "source": "all_pca_bboxes",
+        })
+
+    if footprints:
+        return footprints
+
+    for item in detection.get("all_position_points") or []:
+        xyz = item.get("grasp_xyz_m") or item.get("target_xyz_m") or item.get("raw_centroid_xyz_m")
+        base_xyz = _transform_xyz_to_base(server, xyz, source_frame)
+        if base_xyz is None:
+            continue
+        footprints.append({
+            "label": item.get("label"),
+            "xy": base_xyz[:2],
+            "radius": DYNAMIC_BUFFER_DEFAULT_OBJECT_RADIUS_M + DYNAMIC_BUFFER_MIN_CLEARANCE_M,
+            "source": "all_position_points",
+        })
+
+    return footprints
+
+
+def _scene_footprints(server, state) -> list[dict[str, Any]]:
+    footprints: list[dict[str, Any]] = []
+    seen: set[tuple[str, int, int]] = set()
+    for obj in state.objects.values():
+        detection = obj.detection or {}
+        for footprint in _scene_footprints_from_detection(server, detection):
+            xy = footprint["xy"]
+            key = (
+                str(footprint.get("label") or ""),
+                int(round(float(xy[0]) * 1000.0)),
+                int(round(float(xy[1]) * 1000.0)),
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            footprints.append(footprint)
+
+        if obj.centroid_xyz is not None:
+            source_frame = detection.get("frame_id") or server.args.camera_frame
+            base_xyz = _transform_xyz_to_base(server, obj.centroid_xyz, source_frame)
+            if base_xyz is not None:
+                footprints.append({
+                    "label": obj.class_name or obj.name,
+                    "xy": base_xyz[:2],
+                    "radius": DYNAMIC_BUFFER_DEFAULT_OBJECT_RADIUS_M + DYNAMIC_BUFFER_MIN_CLEARANCE_M,
+                    "source": "object_centroid",
+                })
+    return footprints
+
+
+def _clamp(value: float, lower: float, upper: float) -> float:
+    return min(max(float(value), float(lower)), float(upper))
+
+
+def _object_base_xy(server, state, moving_object_name: str, grasp_pose: Pose | None) -> tuple[float, float] | None:
+    obj = state.objects.get(moving_object_name)
+    if obj is None:
+        for candidate in state.objects.values():
+            if candidate.class_name == moving_object_name:
+                obj = candidate
+                break
+    if obj is not None:
+        detection = obj.detection or {}
+        source_frame = detection.get("frame_id") or server.args.camera_frame
+        for xyz in (obj.centroid_xyz, obj.grasp_xyz):
+            base_xyz = _transform_xyz_to_base(server, xyz, source_frame)
+            if base_xyz is not None:
+                return base_xyz[:2]
+    if grasp_pose is not None:
+        return (float(grasp_pose.position.x), float(grasp_pose.position.y))
+    return None
+
+
+def _mirrored_buffer_xy(
+    server,
+    state,
+    moving_object_name: str,
+    grasp_pose: Pose | None,
+    x_range: tuple[float, float],
+    y_range: tuple[float, float],
+) -> tuple[list[float] | None, tuple[float, float] | None]:
+    object_xy = _object_base_xy(server, state, moving_object_name, grasp_pose)
+    if object_xy is None:
+        return None, None
+    center_x, center_y = DYNAMIC_BUFFER_WORKSPACE_CENTER
+    mirrored = [
+        _clamp(2.0 * center_x - object_xy[0], x_range[0], x_range[1]),
+        _clamp(2.0 * center_y - object_xy[1], y_range[0], y_range[1]),
+    ]
+    return mirrored, object_xy
+
+
+def _candidate_clearance(
+    x: float,
+    y: float,
+    x_range: tuple[float, float],
+    y_range: tuple[float, float],
+    footprints: list[dict[str, Any]],
+    avoid_points: list[tuple[float, float]],
+) -> tuple[float, float | None]:
+    x_min, x_max = x_range
+    y_min, y_max = y_range
+    edge_clearance = min(x - x_min, x_max - x, y - y_min, y_max - y)
+    clearance = edge_clearance
+    nearest = None
+    for footprint in footprints:
+        fx, fy = footprint["xy"]
+        distance = math.hypot(x - float(fx), y - float(fy)) - float(footprint["radius"])
+        clearance = min(clearance, distance)
+        if nearest is None or distance < nearest:
+            nearest = distance
+    for ax, ay in avoid_points:
+        distance = math.hypot(x - ax, y - ay) - DYNAMIC_BUFFER_MIN_CLEARANCE_M
+        clearance = min(clearance, distance)
+    return float(clearance), float(nearest) if nearest is not None else None
+
+
+def find_empty_workspace_buffer(server, state, moving_object_name: str, grasp_pose: Pose | None = None) -> dict[str, Any]:
+    footprints = _scene_footprints(server, state)
+    avoid_points = []
+    if grasp_pose is not None:
+        avoid_points.append((float(grasp_pose.position.x), float(grasp_pose.position.y)))
+
+    x_range = DYNAMIC_BUFFER_WORKSPACE_X
+    y_range = DYNAMIC_BUFFER_WORKSPACE_Y
+    x_min, x_max = x_range
+    y_min, y_max = y_range
+    mirrored_xy, object_xy = _mirrored_buffer_xy(
+        server, state, moving_object_name, grasp_pose, x_range, y_range
+    )
+    if mirrored_xy is not None:
+        clearance, nearest = _candidate_clearance(
+            mirrored_xy[0], mirrored_xy[1], x_range, y_range, footprints, avoid_points
+        )
+        if clearance >= 0.0:
+            server.get_logger().info(
+                "[DynamicBuffer] selected mirrored workspace buffer "
+                f"{mirrored_xy} from object_xy={object_xy} clearance={clearance:.3f}m"
+            )
+            return {
+                "name": DYNAMIC_BUFFER_LOCATION,
+                "moving_object": moving_object_name,
+                "policy": "workspace_center_mirror",
+                "object_xy": [float(object_xy[0]), float(object_xy[1])] if object_xy is not None else None,
+                "mirror_xy": [float(mirrored_xy[0]), float(mirrored_xy[1])],
+                "workspace_center": [float(DYNAMIC_BUFFER_WORKSPACE_CENTER[0]), float(DYNAMIC_BUFFER_WORKSPACE_CENTER[1])],
+                "workspace_x": [float(x_min), float(x_max)],
+                "workspace_y": [float(y_min), float(y_max)],
+                "footprint_count": len(footprints),
+                "score": float(clearance),
+                "clearance_m": float(clearance),
+                "nearest_object_clearance_m": nearest,
+                "place_xy": [float(mirrored_xy[0]), float(mirrored_xy[1])],
+            }
+
+    step = DYNAMIC_BUFFER_GRID_STEP_M
+    xs = np.arange(x_min, x_max + 0.5 * step, step, dtype=float)
+    ys = np.arange(y_min, y_max + 0.5 * step, step, dtype=float)
+
+    best = None
+    for x in xs:
+        for y in ys:
+            clearance, nearest = _candidate_clearance(x, y, x_range, y_range, footprints, avoid_points)
+            if mirrored_xy is not None:
+                mirror_distance = math.hypot(x - mirrored_xy[0], y - mirrored_xy[1])
+                score = (10.0 if clearance >= 0.0 else 0.0) + clearance - 0.35 * mirror_distance
+            else:
+                mirror_distance = None
+                # Prefer clear spots closer to the robot centerline after satisfying clearance.
+                score = clearance - 0.015 * abs(y)
+            if best is None or score > best["score"]:
+                best = {
+                    "score": float(score),
+                    "clearance_m": float(clearance),
+                    "nearest_object_clearance_m": float(nearest) if nearest is not None else None,
+                    "mirror_distance_m": float(mirror_distance) if mirror_distance is not None else None,
+                    "place_xy": [float(x), float(y)],
+                }
+
+    if best is None:
+        raise RuntimeError("Could not sample any dynamic buffer candidate inside workspace.")
+    if best["clearance_m"] < 0.0:
+        server.get_logger().warn(
+            "[DynamicBuffer] no fully clear workspace sample found; using least-crowded "
+            f"candidate {best['place_xy']} clearance={best['clearance_m']:.3f}m"
+        )
+    else:
+        server.get_logger().info(
+            "[DynamicBuffer] selected workspace buffer "
+            f"{best['place_xy']} clearance={best['clearance_m']:.3f}m from {len(footprints)} footprints"
+        )
+    return {
+        "name": DYNAMIC_BUFFER_LOCATION,
+        "moving_object": moving_object_name,
+        "policy": "workspace_center_mirror_adjusted" if mirrored_xy is not None else "max_clearance",
+        "object_xy": [float(object_xy[0]), float(object_xy[1])] if object_xy is not None else None,
+        "mirror_xy": [float(mirrored_xy[0]), float(mirrored_xy[1])] if mirrored_xy is not None else None,
+        "workspace_center": [float(DYNAMIC_BUFFER_WORKSPACE_CENTER[0]), float(DYNAMIC_BUFFER_WORKSPACE_CENTER[1])],
+        "workspace_x": [float(x_min), float(x_max)],
+        "workspace_y": [float(y_min), float(y_max)],
+        "footprint_count": len(footprints),
+        **best,
+    }
+
+
+def dynamic_buffer_config(server, state, object_name: str, grasp_pose: Pose | None = None) -> dict[str, Any]:
+    selection = find_empty_workspace_buffer(server, state, object_name, grasp_pose=grasp_pose)
+    return {
+        "range_x": list(DYNAMIC_BUFFER_WORKSPACE_X),
+        "range_y": list(DYNAMIC_BUFFER_WORKSPACE_Y),
+        "base_z": DYNAMIC_BUFFER_BASE_Z,
+        "use_grasp_orientation": True,
+        "place_xy": selection["place_xy"],
+        "dynamic_selection": selection,
+    }
 
 
 class ActionContext:
@@ -170,12 +452,16 @@ def move_obstacle_to_buffer(context: ActionContext, action: PlanAction, state) -
     object_name, _from, buffer_name = action.args
     if buffer_name not in BUFFER_CONFIGS:
         raise RuntimeError(f"Unknown buffer location: {buffer_name}")
-    motion_module.PLACE_CONFIGS.setdefault(buffer_name, BUFFER_CONFIGS[buffer_name])
     fact = state.objects.get(object_name)
     class_name = fact.class_name if fact is not None and fact.class_name else object_name
     if fact is not None and not fact.graspable:
         raise RuntimeError(f"Obstacle {object_name} is not graspable. Note: {fact.error}")
     if context.pick_already_done and context.prefetch_grasp_pose is not None:
+        buffer_config = (
+            dynamic_buffer_config(context.server, state, object_name, grasp_pose=context.prefetch_grasp_pose)
+            if buffer_name == DYNAMIC_BUFFER_LOCATION else copy.deepcopy(BUFFER_CONFIGS[buffer_name])
+        )
+        motion_module.PLACE_CONFIGS[buffer_name] = buffer_config
         if not context.server.args.dry_run:
             execute_pick_place_sequence(
                 context.server, context.server.arm, context.prefetch_grasp_pose, buffer_name, class_name,
@@ -190,11 +476,18 @@ def move_obstacle_to_buffer(context: ActionContext, action: PlanAction, state) -
             "action": action.to_dict(),
             "class_name": class_name,
             "destination": buffer_name,
+            "buffer_config": buffer_config,
+            "dynamic_buffer": buffer_config.get("dynamic_selection"),
             "pick_already_done": True,
             "dry_run": bool(context.server.args.dry_run),
         }
 
     prepared = _prepare_grasp(context.server, class_name, fact=fact)
+    buffer_config = (
+        dynamic_buffer_config(context.server, state, object_name, grasp_pose=prepared["grasp_pose"])
+        if buffer_name == DYNAMIC_BUFFER_LOCATION else copy.deepcopy(BUFFER_CONFIGS[buffer_name])
+    )
+    motion_module.PLACE_CONFIGS[buffer_name] = buffer_config
     if not context.server.args.dry_run:
         # Low-level implementation reused from custom/motion/motion.py.
         execute_pick_place_sequence(
@@ -210,6 +503,8 @@ def move_obstacle_to_buffer(context: ActionContext, action: PlanAction, state) -
         "action": action.to_dict(),
         "class_name": class_name,
         "destination": buffer_name,
+        "buffer_config": buffer_config,
+        "dynamic_buffer": buffer_config.get("dynamic_selection"),
         "grasp_selection": prepared["grasp_selection"],
         "detected_pose_in_source": pose_to_dict(prepared["detected_pose"]),
         "grasp_pose_in_base": pose_to_dict(prepared["grasp_pose"]),
