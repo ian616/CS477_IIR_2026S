@@ -69,6 +69,13 @@ python3 server.py --debug --debug-window
 python3 server.py --debug --debug-window --debug-wait
 ```
 
+At startup, `--debug` prints a checklist before ROS nodes and arm motion begin.
+It summarizes the planner/Fast Downward smoke test, YOLO top/wrist settings,
+CUDA availability, debug-window usability, and the ROS topics/services. In an
+interactive terminal it waits for Enter so you can abort if the setup is not the
+one you intended. Use `--debug-checklist-no-prompt` to print the checklist
+without pausing.
+
 `--debug` saves the latest perception image plus predicate judgement panel to:
 
 ```text

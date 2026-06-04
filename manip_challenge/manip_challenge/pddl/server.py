@@ -7,8 +7,11 @@ import json
 import logging
 import math
 import os
+import shlex
 import shutil
+import subprocess
 import sys
+import tempfile
 import threading
 import time
 import traceback
@@ -3028,6 +3031,215 @@ def parse_joint_list(text: str) -> list[float]:
     return values
 
 
+def _format_debug_value(value) -> str:
+    if value is None:
+        return "-"
+    text = str(value)
+    return text if text else "-"
+
+
+def _debug_check(status: str, label: str, detail: str) -> dict[str, str]:
+    return {"status": status, "label": label, "detail": detail}
+
+
+def _model_check(label: str, defaults: dict | None) -> dict[str, str]:
+    if defaults is None:
+        return _debug_check("SKIP", label, "external perception is enabled; server will use an existing service.")
+    model_path = Path(str(defaults.get("model_path") or "")).expanduser()
+    detail = (
+        f"model={model_path}, conf={_format_debug_value(defaults.get('confidence'))}, "
+        f"crop={_format_debug_value(defaults.get('input_crop_ratio'))}, "
+        f"device={_format_debug_value(defaults.get('device') or 'auto')}, "
+        f"display={bool(defaults.get('display'))}"
+    )
+    if model_path.is_file():
+        return _debug_check("OK", label, detail)
+    return _debug_check("FAIL", label, detail + " (model file not found)")
+
+
+def _cuda_check(args) -> dict[str, str]:
+    requested = str(args.yolo_device or "").strip()
+    requested_label = requested or "auto"
+    try:
+        import torch
+    except ImportError:
+        if requested and requested.lower() != "cpu":
+            return _debug_check("FAIL", "GPU / CUDA", f"torch is not importable; YOLO device request is {requested_label}.")
+        return _debug_check("WARN", "GPU / CUDA", f"torch is not importable; YOLO device request is {requested_label}.")
+
+    cuda_available = bool(torch.cuda.is_available())
+    device_count = int(torch.cuda.device_count()) if cuda_available else 0
+    names = []
+    for index in range(device_count):
+        try:
+            names.append(torch.cuda.get_device_name(index))
+        except Exception:
+            names.append(f"cuda:{index}")
+    if requested.lower() == "cpu":
+        return _debug_check("OK", "GPU / CUDA", f"YOLO is forced to CPU; CUDA available={cuda_available}, devices={names or '-'}")
+    if requested and not cuda_available:
+        return _debug_check("FAIL", "GPU / CUDA", f"YOLO device request is {requested_label}, but torch reports CUDA unavailable.")
+    if requested:
+        return _debug_check("OK", "GPU / CUDA", f"YOLO device request is {requested_label}; CUDA available={cuda_available}, devices={names or '-'}")
+    if cuda_available:
+        return _debug_check("OK", "GPU / CUDA", f"YOLO device is auto; CUDA is available, devices={names or '-'}")
+    return _debug_check("WARN", "GPU / CUDA", "YOLO device is auto; torch reports CUDA unavailable, so inference will likely use CPU.")
+
+
+def _write_planner_smoke_problem(tmpdir: Path) -> tuple[Path, Path]:
+    domain_path = tmpdir / "debug_check_domain.pddl"
+    problem_path = tmpdir / "debug_check_problem.pddl"
+    domain_path.write_text(
+        "\n".join(
+            [
+                "(define (domain debug-check)",
+                "  (:requirements :strips)",
+                "  (:predicates (ready))",
+                "  (:action finish",
+                "    :parameters ()",
+                "    :precondition ()",
+                "    :effect (ready))",
+                ")",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    problem_path.write_text(
+        "\n".join(
+            [
+                "(define (problem debug-check-problem)",
+                "  (:domain debug-check)",
+                "  (:init)",
+                "  (:goal (ready))",
+                ")",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return domain_path, problem_path
+
+
+def _planner_smoke_check(args) -> dict[str, str]:
+    if not str(args.planner_cmd or "").strip():
+        script = PDDL_DIR / "run_fast_downward.py"
+        repo_fd = PDDL_DIR.parents[2] / "third_party" / "downward" / "fast-downward.py"
+        if script.is_file() and repo_fd.is_file():
+            detail = (
+                "external planner is not active; fallback planner will be used. "
+                "Fast Downward files are present, but --planner-cmd is empty."
+            )
+        else:
+            detail = (
+                "external planner is not active; fallback planner will be used. "
+                "Set --planner-cmd to run Fast Downward."
+            )
+        return _debug_check("SKIP", "Fast Downward smoke", detail)
+
+    try:
+        with tempfile.TemporaryDirectory(prefix="pddl_planner_check_") as tmp:
+            domain_path, problem_path = _write_planner_smoke_problem(Path(tmp))
+            command = str(args.planner_cmd).format(domain=domain_path, problem=problem_path)
+            timeout = min(max(float(args.planner_timeout), 1.0), 15.0)
+            completed = subprocess.run(
+                shlex.split(command),
+                cwd=str(PDDL_DIR),
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                timeout=timeout,
+                check=False,
+            )
+    except Exception as exc:
+        return _debug_check("FAIL", "Fast Downward smoke", f"planner command failed before producing a plan: {exc}")
+
+    output = completed.stdout or ""
+    first_line = next((line.strip() for line in output.splitlines() if line.strip()), "")
+    if completed.returncode == 0 and "finish" in output.lower():
+        return _debug_check("OK", "Fast Downward smoke", f"planner command solved a tiny PDDL problem. first output: {first_line or '-'}")
+    return _debug_check(
+        "FAIL",
+        "Fast Downward smoke",
+        f"returncode={completed.returncode}, first output: {first_line or '-'}",
+    )
+
+
+def _debug_window_check(args) -> dict[str, str]:
+    if not args.debug_window:
+        return _debug_check("OK", "Debug window", "disabled; debug images will still be saved under pddl/debug.")
+    if cv2 is None:
+        return _debug_check("FAIL", "Debug window", "--debug-window requested, but cv2 is not importable.")
+    if not PddlTampServer.debug_display_available():
+        return _debug_check("WARN", "Debug window", "--debug-window requested, but no GUI display environment is detected.")
+    wait_text = "with key wait" if args.debug_wait else "without key wait"
+    return _debug_check("OK", "Debug window", f"enabled {wait_text}.")
+
+
+def _build_perception_defaults(args, top_view_module):
+    if top_view_module is None:
+        return None, None
+    top_defaults = dict(top_view_module.DEFAULTS)
+    top_defaults["service_name"] = args.perception_service
+    top_defaults["display"] = bool(args.debug)
+    if args.yolo_device:
+        top_defaults["device"] = args.yolo_device
+    wrist_defaults = dict(WRIST_VIEW_DEFAULTS)
+    wrist_defaults["service_name"] = args.wrist_perception_service
+    wrist_defaults["display"] = bool(args.debug)
+    if args.yolo_device:
+        wrist_defaults["device"] = args.yolo_device
+    return top_defaults, wrist_defaults
+
+
+def print_debug_startup_checklist(args, top_defaults: dict | None, wrist_defaults: dict | None) -> None:
+    if not args.debug:
+        return
+    checks = [
+        _debug_check("OK", "Debug mode", f"enabled; artifacts directory will be reset at {PDDL_DIR / 'debug'}"),
+        _debug_check(
+            "OK" if (PDDL_DIR / "domain.pddl").is_file() else "FAIL",
+            "PDDL domain",
+            str(PDDL_DIR / "domain.pddl"),
+        ),
+        _debug_check(
+            "OK",
+            "Perception mode",
+            "external services" if args.external_perception else "embedded top-view and wrist-camera services",
+        ),
+        _model_check("YOLO top view", top_defaults),
+        _model_check("YOLO wrist view", wrist_defaults),
+        _cuda_check(args),
+        _planner_smoke_check(args),
+        _debug_window_check(args),
+        _debug_check(
+            "OK",
+            "Motion startup",
+            f"dry_run={bool(args.dry_run)}, no_home={bool(args.no_home)}, observe_x_offset={args.observe_x_offset}",
+        ),
+        _debug_check(
+            "OK",
+            "ROS endpoints",
+            (
+                f"command_topic={args.command_topic}, service={args.service_name}, "
+                f"top_service={args.perception_service}, wrist_service={args.wrist_perception_service}"
+            ),
+        ),
+    ]
+
+    print("\n[PDDL Debug Startup Checklist]", flush=True)
+    for check in checks:
+        print(f"[{check['status']}] {check['label']}: {check['detail']}", flush=True)
+    failed = sum(1 for check in checks if check["status"] == "FAIL")
+    warned = sum(1 for check in checks if check["status"] == "WARN")
+    skipped = sum(1 for check in checks if check["status"] == "SKIP")
+    print(f"Summary: {failed} fail, {warned} warn, {skipped} skip.", flush=True)
+    if not args.debug_checklist_no_prompt and sys.stdin.isatty():
+        suffix = "continue" if failed == 0 else "continue anyway"
+        input(f"Review the checklist above. Press Enter to {suffix}, or Ctrl-C to abort. ")
+    print("", flush=True)
+
+
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description="PDDL-based TAMP command server.")
     parser.add_argument("--service-name", default="pddl_tamp_command")
@@ -3080,6 +3292,11 @@ def parse_args(argv=None):
     parser.add_argument("--gemini-api-key", default="", help="Gemini API key for fallback natural-language parsing.")
     parser.add_argument("--gemini-model", default="gemini-2.0-flash", help="Gemini model for fallback natural-language parsing.")
     parser.add_argument("--debug", action="store_true", help="Enable detailed debug logs, artifacts, views, and grasp confirmation pauses.")
+    parser.add_argument(
+        "--debug-checklist-no-prompt",
+        action="store_true",
+        help="With --debug, print the startup checklist without waiting for Enter.",
+    )
     parser.add_argument("--debug-window", action="store_true", help="With --debug, also open an OpenCV window when a GUI display is usable.")
     parser.add_argument("--debug-wait", action="store_true", help="With --debug-window, wait for a key press at each planning step.")
     parser.add_argument("--external-perception", action="store_true", help="Use an already running top-view perception service.")
@@ -3113,6 +3330,8 @@ def main(argv=None):
         format="%(name)s %(levelname)s %(message)s",
     )
     top_view_module = None if args.external_perception else load_top_view_perception_module()
+    top_defaults, wrist_defaults = _build_perception_defaults(args, top_view_module)
+    print_debug_startup_checklist(args, top_defaults, wrist_defaults)
     ros_argv = argv
     rclpy.init(args=ros_argv)
     arm = ArmClient()
@@ -3129,21 +3348,11 @@ def main(argv=None):
     wrist_perception_node = None
     tf_node = TfNode()
     if top_view_module is not None:
-        top_defaults = dict(top_view_module.DEFAULTS)
-        top_defaults["service_name"] = args.perception_service
-        top_defaults["display"] = bool(args.debug)
-        if args.yolo_device:
-            top_defaults["device"] = args.yolo_device
         perception_node = top_view_module.RgbdSegCropServiceNode(
             node_name="pddl_top_view_seg_crop_service_node",
             default_params=top_defaults,
         )
         perception_node.get_logger().info("Embedded top-view perception is running inside PDDL TAMP server.")
-        wrist_defaults = dict(WRIST_VIEW_DEFAULTS)
-        wrist_defaults["service_name"] = args.wrist_perception_service
-        wrist_defaults["display"] = bool(args.debug)
-        if args.yolo_device:
-            wrist_defaults["device"] = args.yolo_device
         wrist_perception_node = RgbdSegCropServiceNode(
             node_name="pddl_wrist_seg_crop_service_node",
             default_params=wrist_defaults,
