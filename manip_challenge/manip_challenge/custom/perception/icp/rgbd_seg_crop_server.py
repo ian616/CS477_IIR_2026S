@@ -242,15 +242,15 @@ def image_msg_to_cv2_fallback(msg, desired_encoding=None):
 
     if desired_encoding == "bgr8":
         if encoding in ("rgb8", "8uc3"):
-            return image[:, :, [2, 1, 0]].copy()
+            return cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
         if encoding == "bgr8":
             return image
         if encoding == "rgba8":
-            return image[:, :, [2, 1, 0]].copy()
+            return cv2.cvtColor(image, cv2.COLOR_RGBA2BGR)
         if encoding == "bgra8":
-            return image[:, :, :3].copy()
+            return cv2.cvtColor(image, cv2.COLOR_BGRA2BGR)
         if channels == 1 and image.dtype == np.uint8:
-            return np.repeat(image[:, :, None], 3, axis=2)
+            return cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
         raise ValueError(f"cannot convert encoding '{msg.encoding}' to bgr8")
 
     return image
