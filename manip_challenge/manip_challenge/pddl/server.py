@@ -734,7 +734,7 @@ class PddlTampServer(Node):
         state.completed = completed
         state.occupied_buffers = occupied_buffers
         state.buffered_obstacles = buffered_obstacles
-        _annotate_relations(state.objects, debug=self.args.debug)
+        _annotate_relations(state.objects)
         state.goals = _bind_goals_to_instances(goals, state.objects, completed)
         state.relation_input_objects = sorted(obj.name for obj in state.objects.values() if obj.relation_candidate)
         state.predicates = _build_predicates(state)
@@ -827,7 +827,6 @@ class PddlTampServer(Node):
                 scene_detection,
                 completed=set(),
                 occupied_buffers=set(),
-                debug=self.args.debug,
             )
         except Exception as exc:
             self.get_logger().warn(f"[WarmStart] Initial scene scan failed: {exc}")
@@ -911,7 +910,7 @@ class PddlTampServer(Node):
         if not removed:
             return state
         state.objects = kept
-        _annotate_relations(state.objects, debug=self.args.debug)
+        _annotate_relations(state.objects)
         state.goals = _bind_goals_to_instances(state.goals, state.objects, state.completed)
         state.predicates = _build_predicates(state)
         state.notes.append(
@@ -1041,7 +1040,6 @@ class PddlTampServer(Node):
                 scene_detection,
                 completed=set(),
                 occupied_buffers=set(),
-                debug=self.args.debug,
             )
             self.reconcile_state_with_ledger(state, goals, action_ledger)
         except Exception as exc:
@@ -1214,7 +1212,6 @@ class PddlTampServer(Node):
                         scene_detection,
                         completed=set(),
                         occupied_buffers=set(),
-                        debug=self.args.debug,
                     )
                     self.reconcile_state_with_ledger(state, goals, action_ledger)
             completed = set(state.completed)
@@ -2497,7 +2494,7 @@ class PddlTampServer(Node):
             {
                 "mode": "scene",
                 "target": "__scene__",
-                "debug": bool(self.args.debug),
+                "debug": True,
             },
             sort_keys=True,
         )

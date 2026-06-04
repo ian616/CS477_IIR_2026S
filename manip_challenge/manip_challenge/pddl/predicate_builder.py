@@ -416,7 +416,7 @@ def _merge_all_detections(objects: dict[str, ObjectState], detection: dict) -> N
         objects[obstacle.name] = obstacle
 
 
-def _annotate_relations(objects: dict[str, ObjectState], debug: bool = False) -> None:
+def _annotate_relations(objects: dict[str, ObjectState]) -> None:
     # Computes relational predicates from object facts.
     #
     # CHANGE RELATIONAL PREDICATES HERE:
@@ -479,8 +479,7 @@ def _annotate_relations(objects: dict[str, ObjectState], debug: bool = False) ->
             target, obstacle = (a, b) if a.is_target else (b, a)
             d = _grasp_to_obstacle_dist(target, obstacle)
             is_near = d is not None and d < SAFE_PIXEL_DISTANCE
-            if debug:
-                print(
+            print(
                     f"[near] {target.name}(T) <-> {obstacle.name}(O)  "
                     f"d={f'{d:.1f}' if d is not None else 'None'}  "
                     f"thr={SAFE_PIXEL_DISTANCE:.1f}  near={is_near}",
@@ -501,13 +500,17 @@ def _annotate_relations(objects: dict[str, ObjectState], debug: bool = False) ->
                 if neighbor and not neighbor.is_target:
                     obj.safe = False
                     break
-            if debug:
-                print(
+            print(
                     f"[safe] {obj.name}  xyz={xyz_str}  near={sorted(obj.near)}  safe={obj.safe}",
                     flush=True,
                 )
 
-    if debug:
+    # Merge clear and safe: clear is now purely proximity-based (same as safe).
+    # bbox overlap no longer blocks grasping — only near-grasp proximity matters.
+    for obj in objects.values():
+        obj.clear = obj.graspable and obj.safe
+
+    if any(obj.is_target for obj in objects.values()):
         _visualize_safe_check(objects)
 
 
@@ -620,7 +623,6 @@ def build_predicate_state(
     completed: set[str] | None = None,
     occupied_buffers: set[str] | None = None,
     scan_all_targets: bool = True,
-    debug: bool = False,
 ) -> PredicateState:
     # Top-level predicate pipeline called by server.py every planning step:
     #   perception service -> ObjectState -> relations -> PDDL predicates.
@@ -644,7 +646,7 @@ def build_predicate_state(
             fact = object_from_detection(name, None, is_target=name in goal_names, class_name=name, error=str(exc))
             objects[fact.name] = fact
 
-    _annotate_relations(objects, debug=debug)
+    _annotate_relations(objects)
     bound_goals = _bind_goals_to_instances(goals, objects, completed)
     state = PredicateState(goals=bound_goals, objects=objects, completed=completed, occupied_buffers=occupied_buffers)
     state.relation_input_objects = sorted(obj.name for obj in objects.values() if obj.relation_candidate)
@@ -660,7 +662,6 @@ def build_predicate_state_from_scene(
     scene_detection: dict | None,
     completed: set[str] | None = None,
     occupied_buffers: set[str] | None = None,
-    debug: bool = False,
 ) -> PredicateState:
     objects: dict[str, ObjectState] = {}
     completed = set(completed or set())
@@ -701,7 +702,7 @@ def build_predicate_state_from_scene(
                 error="target not detected in scene scan",
             )
 
-    _annotate_relations(objects, debug=debug)
+    _annotate_relations(objects)
     bound_goals = _bind_goals_to_instances(goals, objects, completed)
     state = PredicateState(goals=bound_goals, objects=objects, completed=completed, occupied_buffers=occupied_buffers)
     state.raw_observed_objects = {

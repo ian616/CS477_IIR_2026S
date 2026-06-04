@@ -30,8 +30,6 @@ DEFAULT_OBSERVE_X_OFFSET_M = 0.15
 DEFAULT_OBSERVE_RETREAT_DURATION_S = 2.0
 
 _BOOKSHELF_WRIST_FLIP_OBJECTS = frozenset({'banana', 'hammer'})
-
-
 def _needs_wrist_flip(obj_name):
     base = str(obj_name).strip().lower().split('_')[0]
     return base in _BOOKSHELF_WRIST_FLIP_OBJECTS
@@ -233,17 +231,53 @@ def pick_place_storage(node, arm, grasp_pose, destination, obj_name,
         y_start, y_end = config["range_y"][0], config["range_y"][1]
         y_slots = [y_start + (y_end - y_start) * (0.125 + 0.25 * i) for i in range(4)]
 
-        slot_count = 1 if obj_name == 'hammer' else count
+        base_name = str(obj_name).strip().lower().split('_')[0]
+        slot_count = count % 4 if base_name == 'hammer' else count
         place_pose.position.x = x_slots[(slot_count // 4) % 2]
         place_pose.position.y = y_slots[slot_count % 4]
     if config.get("place_z") is not None:
         place_pose.position.z = float(config["place_z"])
     else:
         place_pose.position.z = config["base_z"] + grasp_pose.position.z + 0.15
-    place_pose.orientation = lift_pose.orientation
+
+    pan_for_fk = math.atan2(place_pose.position.y, place_pose.position.x)
+    down_pose = arm.fk_request(
+        [pan_for_fk, -math.pi / 2.0, 1.0, -math.pi / 3.0, -math.pi / 2.0, math.pi / 2.0],
+        attach_tool=True,
+    )
+    place_q = np.array([
+        down_pose.orientation.x, down_pose.orientation.y,
+        down_pose.orientation.z, down_pose.orientation.w,
+    ])
+
+    db_offset = np.zeros(3)
+    try:
+        perception_features = extract_perception_features(perception_info)
+        pca_bbox_area = perception_features.get("pca_bbox_area_m2")
+        w_m = perception_features.get("pca_bbox_width_m")
+        l_m = perception_features.get("pca_bbox_length_m")
+        if pca_bbox_area is None and w_m is not None and l_m is not None:
+            pca_bbox_area = float(w_m) * float(l_m)
+        database = _load_grasp_database()
+        _, object_configs = _lookup_object_grasp_configs(database, obj_name)
+        _, grasp_config, _ = _select_state_config(object_configs, pca_bbox_area)
+        t = _extract_grasp_transform(grasp_config)
+        db_offset = np.array([t["x"], t["y"], t["z"]], dtype=float)
+    except Exception as e:
+        _debug_print(node, f"[storage place] db_offset lookup failed: {e}", flush=True)
+
+    rotated = rotate_vector(place_q, db_offset)
+    _debug_print(node, f"[storage place] db_offset={db_offset} rotated={rotated}", flush=True)
+    place_pose.position.y += float(rotated[1])
+    if base_name == 'hammer':
+        place_pose.position.x += float(rotated[0]) + 0.05
+    else:
+        place_pose.position.x += float(rotated[0])
+    place_pose.orientation = down_pose.orientation
+    wrist_angle = math.pi / 2
 
     place_pan_angle = math.atan2(place_pose.position.y, place_pose.position.x)
-    place_joint = [place_pan_angle, -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., 0.]
+    place_joint = [place_pan_angle, -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., wrist_angle]
 
     place_approach = copy.deepcopy(place_pose)
     place_approach.position.z += 0.15
