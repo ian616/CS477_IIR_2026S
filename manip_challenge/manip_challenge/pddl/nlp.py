@@ -2,12 +2,11 @@
 from __future__ import annotations
 
 import json
-import os
 import re
 from typing import Iterable
 
 from .pddl_types import DESTINATION_TO_LOCATION, Goal, KNOWN_OBJECTS
-from .utils import load_dotenv, pddl_name
+from .utils import pddl_name
 
 
 OBJECT_ALIASES = {
@@ -103,28 +102,32 @@ def _parse_json_response(text: str) -> list[Goal]:
     )
 
 
-def parse_goals_with_gemini(text: str) -> list[Goal]:
-    load_dotenv()
-    key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-    if not key:
+def parse_goals_with_gemini(text: str, api_key: str = "", model: str = "gemini-2.0-flash") -> list[Goal]:
+    api_key = str(api_key or "").strip()
+    if not api_key:
         return []
     try:
         from google import genai
     except ImportError:
         return []
-    model = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
-    client = genai.Client(api_key=key)
+    model = str(model or "gemini-2.0-flash").strip()
+    client = genai.Client(api_key=api_key)
     response = client.models.generate_content(model=model, contents=_gemini_prompt(text))
     return _parse_json_response(response.text or "")
 
 
-def parse_goals(text: str, use_gemini: bool = True) -> list[Goal]:
+def parse_goals(
+    text: str,
+    use_gemini: bool = True,
+    gemini_api_key: str = "",
+    gemini_model: str = "gemini-2.0-flash",
+) -> list[Goal]:
     goals = parse_goals_rule_based(text)
     if goals:
         return goals
     if use_gemini:
         try:
-            goals = parse_goals_with_gemini(text)
+            goals = parse_goals_with_gemini(text, api_key=gemini_api_key, model=gemini_model)
             if goals:
                 return goals
         except Exception:

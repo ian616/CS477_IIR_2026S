@@ -242,15 +242,15 @@ def image_msg_to_cv2_fallback(msg, desired_encoding=None):
 
     if desired_encoding == "bgr8":
         if encoding in ("rgb8", "8uc3"):
-            return cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+            return image[:, :, [2, 1, 0]].copy()
         if encoding == "bgr8":
             return image
         if encoding == "rgba8":
-            return cv2.cvtColor(image, cv2.COLOR_RGBA2BGR)
+            return image[:, :, [2, 1, 0]].copy()
         if encoding == "bgra8":
-            return cv2.cvtColor(image, cv2.COLOR_BGRA2BGR)
+            return image[:, :, :3].copy()
         if channels == 1 and image.dtype == np.uint8:
-            return cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+            return np.repeat(image[:, :, None], 3, axis=2)
         raise ValueError(f"cannot convert encoding '{msg.encoding}' to bgr8")
 
     return image
@@ -292,7 +292,7 @@ def mask_data_to_full(mask_data, image_shape):
 
 
 class YoloSegDetector:
-    def __init__(self, model_path=DEFAULT_MODEL_PATH, confidence=0.35, iou=0.45):
+    def __init__(self, model_path=DEFAULT_MODEL_PATH, confidence=0.35, iou=0.45, device=""):
         model_path = Path(model_path).expanduser()
         if not model_path.is_file():
             raise FileNotFoundError(f"YOLO segmentation model file not found: {model_path}")
@@ -302,11 +302,20 @@ class YoloSegDetector:
         self.model_path = model_path
         self.confidence = float(confidence)
         self.iou = float(iou)
+        self.device = str(device or "").strip()
         self.model = YOLO(str(model_path))
         self.class_names = self.model.names
 
     def detect(self, image):
-        result = self.model.predict(source=image, conf=self.confidence, iou=self.iou, verbose=False)[0]
+        predict_kwargs = {
+            "source": image,
+            "conf": self.confidence,
+            "iou": self.iou,
+            "verbose": False,
+        }
+        if self.device:
+            predict_kwargs["device"] = self.device
+        result = self.model.predict(**predict_kwargs)[0]
         if result.boxes is None or result.masks is None:
             return []
 
@@ -541,6 +550,7 @@ class RgbdSegCropServiceNode(Node):
         self.declare_parameter("model_path", param_default("model_path", str(DEFAULT_MODEL_PATH)))
         self.declare_parameter("confidence", param_default("confidence", 0.35))
         self.declare_parameter("iou", param_default("iou", 0.45))
+        self.declare_parameter("device", param_default("device", ""))
         self.declare_parameter("display", param_default("display", True))
         self.declare_parameter("display_hz", param_default("display_hz", 5.0))
         self.declare_parameter("target_label", param_default("target_label", ""))
@@ -579,7 +589,10 @@ class RgbdSegCropServiceNode(Node):
             model_path=Path(self.get_parameter("model_path").value).expanduser(),
             confidence=float(self.get_parameter("confidence").value),
             iou=float(self.get_parameter("iou").value),
+            device=str(self.get_parameter("device").value),
         )
+        yolo_device = self.detector.device or "auto"
+        self.get_logger().info(f"YOLO inference device: {yolo_device}")
 
         qos_profile = QoSProfile(depth=10)
         qos_profile.reliability = ReliabilityPolicy.BEST_EFFORT

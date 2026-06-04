@@ -1468,7 +1468,7 @@ def parse_args(argv=None):
     parser.add_argument(
         "--tamp-max-steps",
         type=int,
-        default=int(os.environ.get("TAMP_MAX_STEPS", "8")),
+        default=8,
         help="Maximum pick/place actions the TAMP planner may execute for one natural-language command.",
     )
     parser.add_argument("--no-home", action="store_true", help="Do not move the arm to the home joint pose at startup.")

@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import os
 import re
 import shlex
 import subprocess
@@ -25,10 +24,15 @@ def parse_plan_text(text: str, source: str = "external") -> list[PlanAction]:
     return actions
 
 
-def run_external_planner(domain_path: Path, problem_path: Path) -> tuple[list[PlanAction], str]:
-    command_template = os.environ.get("PDDL_PLANNER_CMD", "").strip()
+def run_external_planner(
+    domain_path: Path,
+    problem_path: Path,
+    command_template: str = "",
+    timeout: float = 30.0,
+) -> tuple[list[PlanAction], str]:
+    command_template = str(command_template or "").strip()
     if not command_template:
-        return [], "PDDL_PLANNER_CMD is not set; using fallback planner."
+        return [], "No external planner command configured; using fallback planner."
     command = command_template.format(domain=domain_path, problem=problem_path)
     try:
         completed = subprocess.run(
@@ -36,7 +40,7 @@ def run_external_planner(domain_path: Path, problem_path: Path) -> tuple[list[Pl
             text=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
-            timeout=float(os.environ.get("PDDL_PLANNER_TIMEOUT", "30")),
+            timeout=float(timeout),
             check=False,
         )
     except Exception as exc:
@@ -113,8 +117,19 @@ def fallback_plan(state: PredicateState) -> list[PlanAction]:
     return []
 
 
-def plan(domain_path: Path, problem_path: Path, state: PredicateState) -> tuple[list[PlanAction], str]:
-    actions, raw = run_external_planner(domain_path, problem_path)
+def plan(
+    domain_path: Path,
+    problem_path: Path,
+    state: PredicateState,
+    planner_cmd: str = "",
+    planner_timeout: float = 30.0,
+) -> tuple[list[PlanAction], str]:
+    actions, raw = run_external_planner(
+        domain_path,
+        problem_path,
+        command_template=planner_cmd,
+        timeout=planner_timeout,
+    )
     if actions:
         return actions, raw
     fallback = fallback_plan(state)

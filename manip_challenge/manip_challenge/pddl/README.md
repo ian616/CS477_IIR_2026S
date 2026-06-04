@@ -6,7 +6,7 @@ It keeps symbolic planning separate from physical execution:
 1. Natural language is parsed into target goals with Gemini or a rule-based fallback.
 2. Top-view YOLO/RGB-D perception is converted into boolean predicates.
 3. `domain.pddl` and `problem.pddl` are generated.
-4. An external planner is used if `PDDL_PLANNER_CMD` is set; otherwise a small fallback planner chooses one action.
+4. An external planner is used if `--planner-cmd` is set; otherwise a small fallback planner chooses one action.
 5. Only the first physical action is executed, then the scene is perceived again and replanned.
 
 ## Run
@@ -106,19 +106,18 @@ python3 server.py --log-topic /my_pddl_log
 
 ## Gemini
 
-Edit `.env`:
+Pass a key only if the rule-based parser is not enough:
 
-```text
-GEMINI_API_KEY=...
-GOOGLE_API_KEY=...
-GEMINI_MODEL=gemini-2.0-flash
+```bash
+python3 server.py --gemini-api-key "$GEMINI_API_KEY" --gemini-model gemini-2.0-flash
 ```
 
 If no key is configured, the rule-based parser still handles the standard move commands.
+Use `--no-gemini` to disable the Gemini fallback entirely.
 
 ## External planner
 
-Set `PDDL_PLANNER_CMD` in `.env`, using `{domain}` and `{problem}` placeholders.
+Set `--planner-cmd`, using `{domain}` and `{problem}` placeholders.
 If it is empty or fails, `planner.py` uses the fallback planner.
 
 This repo can use Fast Downward through the submodule at `third_party/downward`.
@@ -130,10 +129,10 @@ git submodule update --init --recursive
 python3 third_party/downward/build.py
 ```
 
-Then copy `.env.example` to `.env` in this folder and keep:
+Then start the server with:
 
-```text
-PDDL_PLANNER_CMD=python3 run_fast_downward.py {domain} {problem}
+```bash
+python3 server.py --planner-cmd "python3 run_fast_downward.py {domain} {problem}" --planner-timeout 30
 ```
 
 ## Action handlers

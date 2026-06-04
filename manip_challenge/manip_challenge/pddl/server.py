@@ -88,7 +88,7 @@ from manip_challenge.pddl.pddl_types import (
     KNOWN_OBJECTS,
     BUFFER_LOCATIONS,
 )
-from manip_challenge.pddl.utils import PDDL_DIR, load_dotenv
+from manip_challenge.pddl.utils import PDDL_DIR
 from manip_challenge.custom.perception.icp.rgbd_seg_crop_server import RgbdSegCropServiceNode
 from manip_challenge.custom.grasping.grasping_item import (
     _load_grasp_database,
@@ -1148,7 +1148,12 @@ class PddlTampServer(Node):
             )
             return {"ok": True, "action": lowered, "message": "Robot moved to home joints."}
 
-        goals = parse_goals(command_text, use_gemini=not self.args.no_gemini)
+        goals = parse_goals(
+            command_text,
+            use_gemini=not self.args.no_gemini,
+            gemini_api_key=self.args.gemini_api_key,
+            gemini_model=self.args.gemini_model,
+        )
         if not goals:
             raise ValueError("Could not parse any target goals from command.")
 
@@ -1257,7 +1262,13 @@ class PddlTampServer(Node):
 
             generated_problem = write_problem(state, problem_path)
             self.get_logger().info(f"[PDDL] Generated problem: {generated_problem}")
-            actions, raw_output = plan(domain_path, generated_problem, state)
+            actions, raw_output = plan(
+                domain_path,
+                generated_problem,
+                state,
+                planner_cmd=self.args.planner_cmd,
+                planner_timeout=self.args.planner_timeout,
+            )
             if self.args.debug:
                 self.get_logger().info("[PDDL] Planner raw output:\n" + raw_output)
             else:
@@ -3056,14 +3067,27 @@ def parse_args(argv=None):
         default=OBSERVE_RETREAT_DURATION_S,
         help="Duration in seconds for the Cartesian -X observation retreat.",
     )
-    parser.add_argument("--max-steps", type=int, default=int(os.environ.get("PDDL_TAMP_MAX_STEPS", "16")))
+    parser.add_argument(
+        "--planner-cmd",
+        default="",
+        help="External planner command template. Use {domain} and {problem}; empty uses the fallback planner.",
+    )
+    parser.add_argument("--planner-timeout", type=float, default=30.0, help="Timeout in seconds for --planner-cmd.")
+    parser.add_argument("--max-steps", type=int, default=16)
     parser.add_argument("--one-step", action="store_true", help="Execute only the first selected physical action.")
     parser.add_argument("--scan-goals-only", action="store_true", help="Only scan requested targets instead of all five fixed targets.")
     parser.add_argument("--no-gemini", action="store_true", help="Disable Gemini parsing and use the rule-based parser.")
+    parser.add_argument("--gemini-api-key", default="", help="Gemini API key for fallback natural-language parsing.")
+    parser.add_argument("--gemini-model", default="gemini-2.0-flash", help="Gemini model for fallback natural-language parsing.")
     parser.add_argument("--debug", action="store_true", help="Enable detailed debug logs, artifacts, views, and grasp confirmation pauses.")
     parser.add_argument("--debug-window", action="store_true", help="With --debug, also open an OpenCV window when a GUI display is usable.")
     parser.add_argument("--debug-wait", action="store_true", help="With --debug-window, wait for a key press at each planning step.")
     parser.add_argument("--external-perception", action="store_true", help="Use an already running top-view perception service.")
+    parser.add_argument(
+        "--yolo-device",
+        default="",
+        help="Ultralytics YOLO inference device for embedded perception, e.g. 0, cuda:0, cpu. Empty lets Ultralytics choose.",
+    )
     parser.add_argument("--dry-run", action="store_true", help="Plan and bind actions without moving the arm.")
     parser.add_argument("--no-home", action="store_true", help="Do not return to home before executing a command.")
     parser.add_argument("--approach-height", type=float, default=0.15)
@@ -3083,7 +3107,6 @@ def parse_args(argv=None):
 
 
 def main(argv=None):
-    load_dotenv()
     args = parse_args(argv)
     logging.basicConfig(
         level=logging.DEBUG if args.debug else logging.INFO,
@@ -3109,6 +3132,8 @@ def main(argv=None):
         top_defaults = dict(top_view_module.DEFAULTS)
         top_defaults["service_name"] = args.perception_service
         top_defaults["display"] = bool(args.debug)
+        if args.yolo_device:
+            top_defaults["device"] = args.yolo_device
         perception_node = top_view_module.RgbdSegCropServiceNode(
             node_name="pddl_top_view_seg_crop_service_node",
             default_params=top_defaults,
@@ -3117,6 +3142,8 @@ def main(argv=None):
         wrist_defaults = dict(WRIST_VIEW_DEFAULTS)
         wrist_defaults["service_name"] = args.wrist_perception_service
         wrist_defaults["display"] = bool(args.debug)
+        if args.yolo_device:
+            wrist_defaults["device"] = args.yolo_device
         wrist_perception_node = RgbdSegCropServiceNode(
             node_name="pddl_wrist_seg_crop_service_node",
             default_params=wrist_defaults,

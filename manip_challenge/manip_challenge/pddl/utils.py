@@ -38,21 +38,6 @@ def ensure_project_paths() -> None:
             sys.path.insert(0, text)
 
 
-def load_dotenv(path: Path | None = None) -> None:
-    env_path = path or PDDL_DIR / ".env"
-    if not env_path.is_file():
-        return
-    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        key = key.strip()
-        value = value.strip().strip('"').strip("'")
-        if key and key not in os.environ:
-            os.environ[key] = value
-
-
 def pddl_name(name: str) -> str:
     text = str(name or "").strip().lower()
     text = re.sub(r"^(a|an|the)\s+", "", text)
