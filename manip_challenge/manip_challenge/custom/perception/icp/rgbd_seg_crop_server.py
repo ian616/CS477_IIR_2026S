@@ -982,6 +982,14 @@ class RgbdSegCropServiceNode(Node):
             instance_name = f"{class_name}_{index}"
             candidate_dir = request_dir / instance_name
             candidate_dir.mkdir(parents=True, exist_ok=False)
+            # Save the raw YOLO segmentation mask before ROI extraction so it is
+            # available even if depth-based ROI extraction fails later.  This lets
+            # predicate_builder visualise known obstacles whose depth scan fails.
+            yolo_mask_path = str(candidate_dir / "mask_full.png")
+            try:
+                cv2.imwrite(yolo_mask_path, detection.mask.astype(np.uint8))
+            except Exception:
+                yolo_mask_path = None
             try:
                 roi = extract_seg_rgbd_roi(
                     rgb_image=rgb_image,
@@ -1022,6 +1030,7 @@ class RgbdSegCropServiceNode(Node):
                     selected_for_display = detection
                     selected_roi = roi
             except Exception as exc:
+                fallback_files = {"mask_full": yolo_mask_path} if yolo_mask_path else {}
                 instance = {
                     "ok": False,
                     "target": class_name,
@@ -1032,6 +1041,7 @@ class RgbdSegCropServiceNode(Node):
                     "detection": detection.to_dict(),
                     "error": str(exc),
                     "save_dir": str(candidate_dir),
+                    "files": fallback_files,
                 }
             instances.append(instance)
         roi_done = time.monotonic()

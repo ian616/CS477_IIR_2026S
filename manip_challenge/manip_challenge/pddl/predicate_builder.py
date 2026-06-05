@@ -141,7 +141,14 @@ def _visualize_safe_check(objects: dict) -> None:
     if _cv2 is None:
         return
 
-    visible = [obj for obj in objects.values() if obj.visible]
+    def _has_mask_file(obj) -> bool:
+        files = (obj.detection or {}).get("files") or {}
+        return bool(files.get("mask_full") or files.get("mask"))
+
+    # Include objects that are visible OR that have a fallback mask file (e.g.
+    # known obstacles whose depth-based ROI extraction failed but whose YOLO
+    # segmentation mask was saved by the perception server).
+    visible = [obj for obj in objects.values() if obj.visible or _has_mask_file(obj)]
     if not visible:
         return
 
@@ -198,25 +205,29 @@ def _visualize_safe_check(objects: dict) -> None:
 
     name_to_obj = {obj.name: obj for obj in visible}
 
-    # Pre-compute distances for all target-obstacle pairs
+    # Pre-compute distances: from every target's grasp pixel to every OTHER
+    # visible object.  When all objects are targets (no dedicated obstacles),
+    # we still want to show target-to-target proximity in the visualisation.
     # dist_map[(t_name, o_name)] = (d_px, endpoint_px)
     dist_map: dict[tuple[str, str], tuple[float, tuple[int, int]]] = {}
     for t_name, gp in obj_grasp.items():
         if gp is None:
             continue
         for o_name, o_pixels in obj_pixels.items():
-            obstacle = name_to_obj.get(o_name)
-            if obstacle is None or obstacle.is_target:
+            if o_name == t_name:  # skip self
+                continue
+            other = name_to_obj.get(o_name)
+            if other is None:
                 continue
             if o_pixels is not None and len(o_pixels) > 0:
                 diff = o_pixels - np.array([gp[0], gp[1]], dtype=np.float32)
                 idx = int(np.argmin(np.hypot(diff[:, 0], diff[:, 1])))
                 ep = (int(round(o_pixels[idx, 0])), int(round(o_pixels[idx, 1])))
                 d_px = float(np.hypot(diff[idx, 0], diff[idx, 1]))
-            elif obstacle.bbox_xyxy:
-                x1, y1, x2, y2 = obstacle.bbox_xyxy
+            elif other.bbox_xyxy:
+                x1, y1, x2, y2 = other.bbox_xyxy
                 ep = (int(np.clip(gp[0], x1, x2)), int(np.clip(gp[1], y1, y2)))
-                d_px = _dist_point_to_bbox(gp[0], gp[1], obstacle.bbox_xyxy)
+                d_px = _dist_point_to_bbox(gp[0], gp[1], other.bbox_xyxy)
             else:
                 continue
             dist_map[(t_name, o_name)] = (d_px, ep)
@@ -248,7 +259,7 @@ def _visualize_safe_check(objects: dict) -> None:
               color=(180, 180, 180))
     _cv2.line(panel, (6, 32), (PANEL_W - 6, 32), (70, 70, 70), 1)
 
-    # Collect min distance per obstacle (across all targets)
+    # Collect min distance per object (the closest other visible object to it)
     obs_min_dist: dict[str, tuple[float, str]] = {}  # o_name -> (min_d, t_name)
     for (t_name, o_name), (d_px, _) in dist_map.items():
         if o_name not in obs_min_dist or d_px < obs_min_dist[o_name][0]:
@@ -265,7 +276,13 @@ def _visualize_safe_check(objects: dict) -> None:
         if obj.is_target:
             status = "SAFE" if obj.safe else "UNSAFE"
             status_color = (100, 240, 100) if obj.safe else (60, 60, 255)
-            _put_text(panel, status, (190, y), scale=0.45, color=status_color)
+            _put_text(panel, status, (170, y), scale=0.45, color=status_color)
+            # Also show distance to nearest neighbour (useful when all objects are targets)
+            if obj.name in obs_min_dist:
+                d_px, from_name = obs_min_dist[obj.name]
+                is_near = obj.name in name_to_obj[from_name].near if from_name in name_to_obj else False
+                d_color = (60, 60, 255) if is_near else (80, 220, 80)
+                _put_text(panel, f"{d_px:.0f}px", (235, y), scale=0.40, color=d_color)
         else:
             # Show distance from nearest target
             if obj.name in obs_min_dist:
@@ -600,8 +617,7 @@ def _bind_goals_to_instances(goals: list[Goal], objects: dict[str, ObjectState],
         candidates = [
             obj
             for obj in objects.values()
-            if obj.is_target
-            and obj.class_name == goal.object_name
+            if obj.class_name == goal.object_name
             and obj.name not in reserved
             and obj.detected
             and obj.location == "table"
@@ -632,18 +648,24 @@ def build_predicate_state(
     completed = set(completed or set())
     occupied_buffers = set(occupied_buffers or set())
     goal_names = {goal.object_name for goal in goals}
+    # Only the first uncompleted goal is the active target; others are obstacles for safe/near computation.
+    active_target_names: set[str] = set()
+    for goal in goals:
+        if goal.object_name not in completed:
+            active_target_names.add(goal.object_name)
+            break
     scan_names = set(KNOWN_OBJECTS if scan_all_targets else goal_names)
     scan_names.update(goal_names)
     for name in sorted(scan_names):
         try:
             detection = detect_fn(name)
-            facts = _objects_from_detection(name, detection, is_target=name in goal_names)
+            facts = _objects_from_detection(name, detection, is_target=name in active_target_names)
             for fact in facts:
                 objects[fact.name] = fact
             if detection and detection.get("ok"):
                 _merge_all_detections(objects, detection)
         except Exception as exc:
-            fact = object_from_detection(name, None, is_target=name in goal_names, class_name=name, error=str(exc))
+            fact = object_from_detection(name, None, is_target=name in active_target_names, class_name=name, error=str(exc))
             objects[fact.name] = fact
 
     _annotate_relations(objects)
@@ -667,6 +689,12 @@ def build_predicate_state_from_scene(
     completed = set(completed or set())
     occupied_buffers = set(occupied_buffers or set())
     goal_names = {goal.object_name for goal in goals}
+    # Only the first uncompleted goal is the active target; others are obstacles for safe/near computation.
+    active_target_names: set[str] = set()
+    for goal in goals:
+        if goal.object_name not in completed:
+            active_target_names.add(goal.object_name)
+            break
 
     if scene_detection and scene_detection.get("ok"):
         for index, instance in enumerate(scene_detection.get("instances") or []):
@@ -676,7 +704,7 @@ def build_predicate_state_from_scene(
             objects[instance_name] = object_from_detection(
                 instance_name,
                 instance,
-                is_target=class_name in goal_names,
+                is_target=class_name in active_target_names,
                 class_name=class_name,
                 instance_index=instance_index,
             )
@@ -687,17 +715,17 @@ def build_predicate_state_from_scene(
             objects[pddl_name(name)] = object_from_detection(
                 name,
                 None,
-                is_target=True,
+                is_target=name in active_target_names,
                 class_name=name,
                 error=error,
             )
 
     for name in sorted(goal_names):
-        if not any(obj.class_name == name and obj.is_target for obj in objects.values()):
+        if not any(obj.class_name == name for obj in objects.values()):
             objects[pddl_name(name)] = object_from_detection(
                 name,
                 None,
-                is_target=True,
+                is_target=name in active_target_names,
                 class_name=name,
                 error="target not detected in scene scan",
             )
