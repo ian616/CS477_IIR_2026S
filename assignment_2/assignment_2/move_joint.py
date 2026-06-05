@@ -539,7 +539,7 @@ class ArmClient(Node):
         return time, np.array(joint_position_traj), np.array(joint_velocity_traj), None, None
 
 
-    def _ik_pose_subdivided(self, q_init, target_pose, n_steps=5):
+    def _ik_pose_subdivided(self, q_init, target_pose, n_steps=10):
         """IK with linear subdivision to avoid branch jumps on large motions."""
         start_pose = self.fk_request(q_init, attach_tool=True)
         q = list(q_init)

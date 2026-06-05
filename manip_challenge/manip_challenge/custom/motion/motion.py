@@ -406,7 +406,8 @@ def pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name,
     place_pose.position.x = 0.950
 
     y_slots = [-0.215, -0.30, -0.385]
-    place_pose.position.y = y_slots[node.bookshelf_count % len(y_slots)]
+    _is_hammer = str(obj_name).strip().lower().split('_')[0] == 'hammer'
+    place_pose.position.y = y_slots[0] if _is_hammer else y_slots[node.bookshelf_count % len(y_slots)]
 
     # Get database offset (grasp local frame) to correctly adjust place z/y.
     # rotate_vector(place_q, db_offset) converts the grasp-frame offset into
@@ -433,7 +434,7 @@ def pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name,
         rotated = rotate_vector(place_q, db_offset)
         _debug_print(node, f"[bookshelf] wrist_flip rotated={rotated}  -rotated[1]={-rotated[1]:.4f}", flush=True)
         place_pose.position.z = config["base_z"] + 0.16
-        place_pose.position.y += float(rotated[1])
+        hammer_extra_y = 0.06 if str(obj_name).strip().lower().split('_')[0] == 'hammer' else 0.0
         place_pose.orientation.x = 0.0
         place_pose.orientation.y = 0.7071
         place_pose.orientation.z = 0.0
@@ -458,14 +459,45 @@ def pick_place_bookshelf(node, arm, grasp_pose, destination, obj_name,
 
     rot_time_place = _calc_rot_time(pick_pan_angle, place_pan_angle, sec_per_rad=1.8, min_time=1.0, max_time=2.5)
 
-    # Lift → rotate → approach → place in one smooth trajectory
     # Fire on_before_idle after place rotation ends (lift + rotate = 1.0 + rot_time_place)
     if on_before_idle is not None:
         threading.Timer(1.0 + rot_time_place, on_before_idle).start()
-    arm.execute_trajectory(
-        [lift_pose, place_joint, place_approach, place_pose],
-        durations=[1.0, rot_time_place, 1.5, 1.0],
-    )
+
+    if _needs_wrist_flip(obj_name):
+        # Pan rotation with wrist=0, arrive at approach point, THEN flip wrist in place.
+        # Use the standard bookshelf approach orientation (0.5,0.5,0.5,0.5) — same as non-flip
+        # objects — so IK is guaranteed to succeed at any bookshelf slot position.
+        approach_joint_no_flip = [place_pan_angle, -math.pi / 2.0, 1., -math.pi / 3., -math.pi / 2., 0.0]
+        place_approach_no_flip = copy.deepcopy(place_approach)
+        place_approach_no_flip.orientation.x = 0.5
+        place_approach_no_flip.orientation.y = 0.5
+        place_approach_no_flip.orientation.z = 0.5
+        place_approach_no_flip.orientation.w = 0.5
+        if str(obj_name).strip().lower().split('_')[0] == 'hammer':
+            place_approach_no_flip.position.x -= 0.1
+        # Phase 1: approach with wrist=0
+        arm.execute_trajectory(
+            [lift_pose, approach_joint_no_flip, place_approach_no_flip],
+            durations=[1.0, rot_time_place, 1.5],
+        )
+        # Phase 2: flip ONLY joint 6 (index 5), then approach → insert
+        wrist_flip_time = _calc_rot_time(0.0, math.pi / 2.0)
+        current_joints = list(np.array(arm.js_joint_position, dtype=float).flatten())
+        wrist_flipped = list(current_joints)
+        wrist_flipped[5] = math.pi / 2.0
+        arm.execute_trajectory([wrist_flipped], durations=[wrist_flip_time])
+        fk_after_flip = arm.fk_request(wrist_flipped, attach_tool=True)
+        insert_pose = copy.deepcopy(fk_after_flip)
+        insert_pose.position.x = 0.950
+        slot_y = y_slots[0] if _is_hammer else y_slots[node.bookshelf_count % len(y_slots)]
+        insert_pose.position.y = slot_y + hammer_extra_y
+        insert_pose.position.z = config["base_z"] + 0.16
+        arm.execute_trajectory([insert_pose], durations=[1.0])
+    else:
+        arm.execute_trajectory(
+            [lift_pose, place_joint, place_approach, place_pose],
+            durations=[1.0, rot_time_place, 1.5, 1.0],
+        )
     shake = (obj_name.startswith("meat_can") and getattr(node, "last_grasped_state", "") == "lying")
     move_gripper.gripper_open(node, shake=shake)
 
