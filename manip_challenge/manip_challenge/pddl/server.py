@@ -110,6 +110,7 @@ patch_move_gripper()
 OBSERVE_JOINTS = list(HOME_JOINTS)
 OBSERVE_X_OFFSET_M = 0.15
 OBSERVE_RETREAT_DURATION_S = 2.0
+TARGET_FAILURE_LIMIT = 3
 
 
 def move_arm_to_observe_pose(
@@ -671,6 +672,7 @@ class PddlTampServer(Node):
         state.raw_observed_objects = {name: object_summary(obj) for name, obj in state.objects.items()}
 
         completed: set[str] = set()
+        target_failure_counts: dict[str, int] = {}
         occupied_buffers: set[str] = set()
         buffered_obstacles: set[str] = set()
         for index, entry in enumerate(action_ledger):
@@ -689,9 +691,14 @@ class PddlTampServer(Node):
             if not entry.result_ok:
                 record["status"] = "failed"
                 record["reason"] = "executor result was not ok; no symbolic completion inferred"
+                if entry.action_name == "move-target-to-goal":
+                    target_name = entry.class_name or entry.object_name
+                    target_failure_counts[target_name] = target_failure_counts.get(target_name, 0) + 1
             elif entry.action_name == "move-target-to-goal":
                 active = [obj for obj in matches if self._active_workspace_object(obj)]
                 if active:
+                    target_name = entry.class_name or entry.object_name
+                    target_failure_counts[target_name] = target_failure_counts.get(target_name, 0) + 1
                     record["status"] = "retry"
                     record["reason"] = "target still appears in active workspace after move-target-to-goal"
                 else:
@@ -724,6 +731,23 @@ class PddlTampServer(Node):
                 record["reason"] = "ledger action has no reconciliation rule"
             state.reconciliation.append(record)
 
+        abandoned = {
+            name
+            for name, failures in target_failure_counts.items()
+            if failures >= TARGET_FAILURE_LIMIT and name not in completed
+        }
+        for name in sorted(abandoned):
+            for record in reversed(state.reconciliation):
+                action = record.get("action") or {}
+                action_target = action.get("class_name") or action.get("object_name")
+                if action.get("action_name") == "move-target-to-goal" and action_target == name:
+                    record["status"] = "abandoned"
+                    record["reason"] = (
+                        f"target failed {target_failure_counts[name]} times; "
+                        "removed from remaining PDDL goals"
+                    )
+                    break
+
         kept: dict[str, ObjectState] = {}
         for name, obj in state.objects.items():
             if obj.is_target and obj.class_name in completed:
@@ -732,8 +756,27 @@ class PddlTampServer(Node):
             kept[name] = obj
         state.objects = kept
         state.completed = completed
+        state.abandoned = abandoned
+        state.target_failure_counts = target_failure_counts
         state.occupied_buffers = occupied_buffers
         state.buffered_obstacles = buffered_obstacles
+
+        next_target_class = next(
+            (
+                goal.object_name
+                for goal in goals
+                if goal.object_name not in completed and goal.object_name not in abandoned
+            ),
+            None,
+        )
+        for obj in state.objects.values():
+            obj.is_target = obj.class_name == next_target_class
+            if obj.class_name in abandoned:
+                obj.scene_region = "abandoned"
+                obj.classification_reason = (
+                    f"target abandoned after {target_failure_counts[obj.class_name]} failed attempts"
+                )
+
         _annotate_relations(state.objects)
         state.goals = _bind_goals_to_instances(goals, state.objects, completed)
         state.relation_input_objects = sorted(obj.name for obj in state.objects.values() if obj.relation_candidate)
@@ -1180,6 +1223,8 @@ class PddlTampServer(Node):
         )
 
         completed: set[str] = set()
+        abandoned: set[str] = set()
+        target_failure_counts: dict[str, int] = {}
         occupied_buffers: set[str] = set()
         buffered_obstacles: set[str] = set()
         action_ledger: list[ActionLedgerEntry] = []
@@ -1215,10 +1260,14 @@ class PddlTampServer(Node):
                     )
                     self.reconcile_state_with_ledger(state, goals, action_ledger)
             completed = set(state.completed)
+            abandoned = set(state.abandoned)
+            target_failure_counts = dict(state.target_failure_counts)
             occupied_buffers = set(state.occupied_buffers)
             buffered_obstacles = set(state.buffered_obstacles)
             scene_summary = {
                 "completed": sorted(completed),
+                "abandoned": sorted(abandoned),
+                "target_failure_counts": target_failure_counts,
                 "occupied_buffers": sorted(occupied_buffers),
                 "buffered_obstacles": sorted(buffered_obstacles),
                 "action_ledger": [entry.to_dict() for entry in action_ledger],
@@ -1247,15 +1296,20 @@ class PddlTampServer(Node):
                 self.show_debug_view(scene_summary, step_idx)
 
             if not state.unfinished_goals():
-                self.get_logger().info("[PDDL] All goals completed.")
+                self.get_logger().info("[PDDL] All goals resolved.")
                 self.publish_pddl_log(
-                    "all_goals_completed",
-                    ["[PDDL] all goals completed", f"completed: {', '.join(sorted(completed))}"],
+                    "all_goals_resolved",
+                    [
+                        "[PDDL] all goals resolved",
+                        f"completed: {', '.join(sorted(completed)) or '<none>'}",
+                        f"abandoned: {', '.join(sorted(abandoned)) or '<none>'}",
+                    ],
                     step=step_idx,
                     completed=sorted(completed),
+                    abandoned=sorted(abandoned),
                 )
                 returned_home = self.return_home_if_scene_empty(
-                    reason="all goals completed",
+                    reason="all goals resolved",
                     scene_summary=scene_summary,
                 )
                 break
@@ -1313,6 +1367,7 @@ class PddlTampServer(Node):
                         "step": int(step_idx),
                         "stamp_sec": time.time(),
                         "completed": sorted(completed),
+                        "abandoned": sorted(abandoned),
                         "action_ledger": [entry.to_dict() for entry in action_ledger],
                         "message": "No executable PDDL action found.",
                     },
@@ -1329,6 +1384,7 @@ class PddlTampServer(Node):
                     "error": "No executable PDDL action found.",
                     "goals": [goal.__dict__ for goal in goals],
                     "completed": sorted(completed),
+                    "abandoned": sorted(abandoned),
                     "occupied_buffers": sorted(occupied_buffers),
                     "buffered_obstacles": sorted(buffered_obstacles),
                     "action_ledger": [entry.to_dict() for entry in action_ledger],
@@ -1438,12 +1494,14 @@ class PddlTampServer(Node):
             [
                 f"[PDDL] command finished ok={ok}",
                 f"completed: {', '.join(sorted(completed)) or '<none>'}",
+                f"abandoned: {', '.join(sorted(abandoned)) or '<none>'}",
                 f"occupied_buffers: {', '.join(sorted(occupied_buffers)) or '<none>'}",
                 f"buffered_obstacles: {', '.join(sorted(buffered_obstacles)) or '<none>'}",
                 f"returned_home: {returned_home}",
             ],
             ok=ok,
             completed=sorted(completed),
+            abandoned=sorted(abandoned),
             occupied_buffers=sorted(occupied_buffers),
             buffered_obstacles=sorted(buffered_obstacles),
             returned_home=returned_home,
@@ -1454,12 +1512,20 @@ class PddlTampServer(Node):
             "action": "pddl_tamp",
             "goals": [goal.__dict__ for goal in goals],
             "completed": sorted(completed),
+            "abandoned": sorted(abandoned),
+            "target_failure_counts": target_failure_counts,
             "occupied_buffers": sorted(occupied_buffers),
             "buffered_obstacles": sorted(buffered_obstacles),
             "action_ledger": [entry.to_dict() for entry in action_ledger],
             "steps": steps,
             "scenes": scenes,
-            "message": "PDDL TAMP completed." if ok else "PDDL TAMP stopped before all goals completed.",
+            "message": (
+                "PDDL TAMP completed."
+                if ok
+                else "PDDL TAMP finished with abandoned goals."
+                if abandoned
+                else "PDDL TAMP stopped before all goals completed."
+            ),
             "dry_run": bool(self.args.dry_run),
             "returned_home": bool(returned_home),
         }
@@ -1514,6 +1580,10 @@ class PddlTampServer(Node):
     def log_state(self, summary: dict) -> None:
         self.get_logger().info("[PDDL] Detected objects and predicates:")
         self.get_logger().info(
+            "[PDDL]   abandoned: "
+            + (", ".join(summary.get("abandoned", [])) if summary.get("abandoned") else "<none>")
+        )
+        self.get_logger().info(
             "[PDDL]   buffered_obstacles: "
             + (", ".join(summary.get("buffered_obstacles", [])) if summary.get("buffered_obstacles") else "<none>")
         )
@@ -1561,6 +1631,9 @@ class PddlTampServer(Node):
         lines = [
             f"[PDDL] judgement step {step_idx}",
             "completed: " + (", ".join(summary["completed"]) if summary["completed"] else "<none>"),
+            "abandoned: "
+            + (", ".join(summary.get("abandoned", [])) if summary.get("abandoned") else "<none>"),
+            f"target failure counts: {summary.get('target_failure_counts') or {}}",
             "occupied_buffers: "
             + (", ".join(summary.get("occupied_buffers", [])) if summary.get("occupied_buffers") else "<none>"),
             "buffered_obstacles: "
@@ -1800,6 +1873,8 @@ class PddlTampServer(Node):
                 for goal in state.goals
             ],
             "completed": summary["completed"],
+            "abandoned": summary.get("abandoned", []),
+            "target_failure_counts": summary.get("target_failure_counts", {}),
             "occupied_buffers": summary.get("occupied_buffers", []),
             "buffered_obstacles": summary.get("buffered_obstacles", []),
             "action_ledger": summary.get("action_ledger", []),
@@ -1868,6 +1943,8 @@ class PddlTampServer(Node):
             "event": "warm_start_scene",
             "stamp_sec": time.time(),
             "completed": summary["completed"],
+            "abandoned": summary.get("abandoned", []),
+            "target_failure_counts": summary.get("target_failure_counts", {}),
             "occupied_buffers": summary["occupied_buffers"],
             "buffered_obstacles": summary["buffered_obstacles"],
             "action_ledger": summary["action_ledger"],

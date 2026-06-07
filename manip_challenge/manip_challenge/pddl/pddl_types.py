@@ -149,6 +149,8 @@ class PredicateState:
     goals: list[Goal]
     objects: dict[str, ObjectState]
     completed: set[str] = field(default_factory=set)
+    abandoned: set[str] = field(default_factory=set)
+    target_failure_counts: dict[str, int] = field(default_factory=dict)
     occupied_buffers: set[str] = field(default_factory=set)
     buffered_obstacles: set[str] = field(default_factory=set)
     action_ledger: list[ActionLedgerEntry] = field(default_factory=list)
@@ -160,7 +162,12 @@ class PredicateState:
     notes: list[str] = field(default_factory=list)
 
     def unfinished_goals(self) -> list[Goal]:
-        return [goal for goal in self.goals if goal.object_name not in self.completed]
+        return [
+            goal
+            for goal in self.goals
+            if goal.object_name not in self.completed
+            and goal.object_name not in self.abandoned
+        ]
 
     def free_buffers(self) -> list[str]:
         return [buffer for buffer in BUFFER_LOCATIONS if buffer not in self.occupied_buffers]
