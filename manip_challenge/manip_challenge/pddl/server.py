@@ -3359,7 +3359,7 @@ def parse_args(argv=None):
         help="External planner command template. Use {domain} and {problem}; empty uses the fallback planner.",
     )
     parser.add_argument("--planner-timeout", type=float, default=30.0, help="Timeout in seconds for --planner-cmd.")
-    parser.add_argument("--max-steps", type=int, default=16)
+    parser.add_argument("--max-steps", type=int, default=32)
     parser.add_argument("--one-step", action="store_true", help="Execute only the first selected physical action.")
     parser.add_argument("--scan-goals-only", action="store_true", help="Only scan requested targets instead of all five fixed targets.")
     parser.add_argument("--no-gemini", action="store_true", help="Disable Gemini parsing and use the rule-based parser.")
