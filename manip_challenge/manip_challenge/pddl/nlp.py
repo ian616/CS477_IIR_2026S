@@ -87,6 +87,7 @@ def _gemini_prompt(text: str) -> str:
     return (
         "Extract pick-and-place goals for a robot. Return only JSON with a top-level goals array. "
         "Each goal must have object and location. Use underscore names. "
+        "Treat storage A as left_storage and storage B as right_storage. "
         f"Allowed objects: {objects}. Allowed locations: {locations}. "
         f"Command: {text}"
     )
