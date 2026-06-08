@@ -209,6 +209,7 @@ def pick_place_storage(node, arm, grasp_pose, destination, obj_name,
     node.get_logger().info(f"Starting PLACE phase. Destination: {destination}")
     config = PLACE_CONFIGS[destination]
     is_dynamic_buffer = config.get("dynamic_selection") is not None
+    base_name = str(obj_name).strip().lower().split('_')[0]
 
     count_attr = f"storage_{destination.replace(' ', '_')}_count"
     if not hasattr(node, count_attr):
@@ -231,7 +232,6 @@ def pick_place_storage(node, arm, grasp_pose, destination, obj_name,
         y_start, y_end = config["range_y"][0], config["range_y"][1]
         y_slots = [y_start + (y_end - y_start) * (0.125 + 0.25 * i) for i in range(4)]
 
-        base_name = str(obj_name).strip().lower().split('_')[0]
         slot_count = count % 4 if base_name == 'hammer' else count
         place_pose.position.x = x_slots[(slot_count // 4) % 2]
         place_pose.position.y = y_slots[slot_count % 4]
