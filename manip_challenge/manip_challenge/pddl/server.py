@@ -113,6 +113,25 @@ OBSERVE_RETREAT_DURATION_S = 2.0
 TARGET_FAILURE_LIMIT = 3
 
 
+def load_pddl_env(path: Path = PDDL_DIR / ".env") -> None:
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except FileNotFoundError:
+        return
+    for raw_line in lines:
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+        if not key or key in os.environ:
+            continue
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+            value = value[1:-1]
+        os.environ[key] = value
+
+
 def move_arm_to_observe_pose(
     arm,
     observe_joints,
@@ -3315,6 +3334,7 @@ def print_debug_startup_checklist(args, top_defaults: dict | None, wrist_default
 
 
 def parse_args(argv=None):
+    load_pddl_env()
     parser = argparse.ArgumentParser(description="PDDL-based TAMP command server.")
     parser.add_argument("--service-name", default="pddl_tamp_command")
     parser.add_argument("--command-topic", default="/task_commands")
@@ -3363,8 +3383,16 @@ def parse_args(argv=None):
     parser.add_argument("--one-step", action="store_true", help="Execute only the first selected physical action.")
     parser.add_argument("--scan-goals-only", action="store_true", help="Only scan requested targets instead of all five fixed targets.")
     parser.add_argument("--no-gemini", action="store_true", help="Disable Gemini parsing and use the rule-based parser.")
-    parser.add_argument("--gemini-api-key", default="", help="Gemini API key for fallback natural-language parsing.")
-    parser.add_argument("--gemini-model", default="gemini-2.0-flash", help="Gemini model for fallback natural-language parsing.")
+    parser.add_argument(
+        "--gemini-api-key",
+        default=os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY", ""),
+        help="Gemini API key for fallback natural-language parsing.",
+    )
+    parser.add_argument(
+        "--gemini-model",
+        default=os.environ.get("GEMINI_MODEL", "gemini-2.0-flash"),
+        help="Gemini model for fallback natural-language parsing.",
+    )
     parser.add_argument("--debug", action="store_true", help="Enable detailed debug logs, artifacts, views, and grasp confirmation pauses.")
     parser.add_argument(
         "--debug-checklist-no-prompt",
